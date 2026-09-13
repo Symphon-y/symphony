@@ -66,7 +66,10 @@ File: `tests/acceptance/phase-01.bats` — run as the installed user after `sudo
 
 Unit tests: `tests/unit/pkglist.bats`.
 
-Red confirmed: _pending (live ISO)_ · Green confirmed: _pending (installed system)_
+Red confirmed: 2026-09-13 on the live ISO (`2d90890`): 23 not ok, 12 ok. The ISO
+already provides some checked pieces (resolved, sudo, guest agent). Every failure is a
+genuine assertion failure, with no load or syntax errors. · Green confirmed:
+_pending (installed system)_
 
 ## Tasks
 
@@ -85,7 +88,7 @@ Red confirmed: _pending (live ISO)_ · Green confirmed: _pending (installed syst
 - [ ] 0. Unraid prerequisites
 - [x] 1. Repo cloned on the live ISO
 - [x] 2. `system-report` committed (`9b601ab`); Claude reviewed the gates: all pass
-- [ ] 3. Red run committed (`docs/phases/evidence/phase-01-red.tap`)
+- [x] 3. Red run committed (`docs/phases/evidence/phase-01-red.tap`, `2d90890`)
 - [ ] 4–7. Partition, encrypt, Btrfs, pacstrap, configure, reboot
 - [ ] 8. First boot: snapper, repo clone, green run committed (`phase-01-green.tap`)
 - [ ] 9. `linux-lts` entry boots; snap-pac pre/post snapshots observed
@@ -143,6 +146,16 @@ Red confirmed: _pending (live ISO)_ · Green confirmed: _pending (installed syst
 - Git: the report was pushed from the ISO before `50ceacc` was pushed from the Mac.
   Resolved by rebasing the unpushed Mac commit (now `b9243fc`); the ISO clone needs
   `git pull` before its next commit.
+- Red run reviewed: 23 not ok, 12 ok. The expected failures include hostname (still
+  `archiso`), SSH (the ISO ships `sshd`), and package drift (`pkglist` works on the ISO
+  and reports 118 undeclared ISO packages).
+- **Bug found — the ISO's root shell is zsh, not bash.** A screenshot showed the prompt
+  hostname as `autarchy-vm` after the vars file was sourced: zsh treats `HOST` as its
+  hostname parameter (cosmetic only). More importantly, zsh does not word-split unquoted
+  variables, so the planned `pacstrap -K /mnt $PKGS` would have passed every package as
+  one argument. Fixed in the runbook (`2403c0e`) before the user reached step 5 by using
+  `$(scripts/pkglist ...)` directly. The rest of steps 4–7 was re-checked for zsh
+  differences; none found.
 
 ## VM → physical hardware notes
 
