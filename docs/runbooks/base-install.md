@@ -8,7 +8,9 @@ kernel images, with no listening network services. It is verified by
 `tests/acceptance/phase-01.bats`.
 
 **Conventions**
-- Every command block runs in the live ISO's root shell unless it says otherwise.
+- Every command block runs in the live ISO's root shell unless it says otherwise. That
+  shell is **zsh** (the installed system's user shell is bash). Commands here work in
+  both. Setting `HOST` in zsh also changes the prompt's hostname, which is harmless.
 - Commands starting with `arch-chroot /mnt` run inside the new system. Everything else
   acts on `/mnt` from outside, so shell variables stay available.
 - Config files come from `system/`. Each one names its target path in its header.
@@ -150,7 +152,9 @@ findmnt -R /mnt                        # check: 5 btrfs subvolumes + vfat at /mn
 The package set is exactly what `packages/*.txt` declares.
 
 ```sh
-PKGS=$(scripts/pkglist packages/*.txt) && pacstrap -K /mnt $PKGS
+# Command substitution, not a variable: the ISO's zsh doesn't word-split unquoted
+# variables, but it does split $(...), and so does bash.
+pacstrap -K /mnt $(scripts/pkglist packages/*.txt)
 
 genfstab -U /mnt >> /mnt/etc/fstab
 # Mount by subvolume name only: subvolid= would pin the IDs and break rollback by renaming.
