@@ -6,7 +6,7 @@ outlines; their scope is finalized in their own plan mode.
 
 | # | Phase | Layer | Driver | Exit signal | Status |
 |---|---|---|---|---|---|
-| 0 | [Foundation](phases/phase-00-foundation.md) — repo, docs, standing orders, roadmap | — | Claude (Mac, docs only) | Private GitHub repo with core docs | In progress |
+| 0 | [Foundation](phases/phase-00-foundation.md) — repo, docs, standing orders, roadmap | — | Claude (Mac, docs only) | Private GitHub repo with core docs | Complete (2026-09-12) |
 | 1 | Environment inspection + base Arch install | 1 | **User** (runbook) | Boots to TTY; user login; network + pacman work; `tests/acceptance/phase-01.bats` passes | Not started |
 | 2 | Agent handoff + developer bootstrap | 1/5 | User → Claude | Claude Code runs as user in VM; repo cloned; bats/shellcheck/shfmt; deploy mechanism chosen; CI (static + unit) | Not started |
 | 3 | Omarchy research | all | Claude | `docs/omarchy-influences.md` classifies components | Not started |

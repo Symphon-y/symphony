@@ -54,5 +54,6 @@ phase that first needs them, not in advance.
 
 ## Status
 
-Phase 0 (foundation). The lab VM is booted into the Arch installer on an Unraid
-server; nothing is installed yet. See [`docs/roadmap.md`](docs/roadmap.md).
+Phase 0 (foundation) complete. Next: Phase 1, environment inspection and base Arch
+install. The lab VM is booted into the Arch installer on an Unraid server; nothing is
+installed yet. See [`docs/roadmap.md`](docs/roadmap.md).

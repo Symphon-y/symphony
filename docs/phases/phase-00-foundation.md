@@ -2,12 +2,12 @@
 
 | | |
 |---|---|
-| **Status** | In progress |
+| **Status** | Complete |
 | **Driver** | Claude (Mac, documentation only) |
 | **Branch** | `main` (repository bootstrap — no phase branch possible before the first commit) |
 | **Snapshot** | N/A — the VM is not touched |
 | **Started** | 2026-09-12 |
-| **Completed** | — |
+| **Completed** | 2026-09-12 |
 
 ## Goal
 
@@ -58,7 +58,7 @@ Phase 1 (acceptance) and Phase 2 (unit tests, CI). Verification is manual:
 - [x] `git init -b main` and initial commit
 - [x] Private GitHub repo exists (`Symphon-y/autarchy`)
 - [x] Verify visibility is private
-- [ ] Push `main` to origin
+- [x] Push `main` to origin
 
 ## Implementation log
 
@@ -73,6 +73,10 @@ Phase 1 (acceptance) and Phase 2 (unit tests, CI). Verification is manual:
   visibility change. The API then reported `disabled: false`, which suggests GitHub was
   still processing the change. Claude's retry was blocked by the permission policy
   (out-of-place publication); the push is left for the user to run.
+- User pushed `main` successfully. Verified: `origin/main` = local `HEAD` (`9dab082`),
+  visibility `PRIVATE`, default branch `main`.
+- **Lesson for later phases:** pushes to GitHub may need the user to run them (or a
+  permission rule) until Claude's permissions inside the VM are settled in Phase 2.
 
 ## VM → physical hardware notes
 
@@ -80,7 +84,7 @@ Phase 1 (acceptance) and Phase 2 (unit tests, CI). Verification is manual:
 
 ## Exit criteria
 
-- [ ] Private GitHub repo exists with all core documents
+- [x] Private GitHub repo exists with all core documents
 - [x] `DECISIONS.md` updated
 - [x] `docs/omarchy-influences.md` framework in place
-- [ ] `docs/roadmap.md` shows Phase 0 Complete
+- [x] `docs/roadmap.md` shows Phase 0 Complete
