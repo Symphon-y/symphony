@@ -1,0 +1,23 @@
+# Secrets — never commit (D-0003)
+.env
+.env.*
+*.key
+*.pem
+*.age
+secrets/
+*.secret
+
+# Machine-local overrides stay out of portable config
+*.local
+*.local.*
+
+# Claude Code per-user settings
+.claude/settings.local.json
+
+# Editors and OS noise
+.DS_Store
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
