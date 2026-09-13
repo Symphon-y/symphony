@@ -164,6 +164,14 @@ _pending (installed system)_
   root and stubbed commands, written first. It validates all inputs before changing
   anything, is safe to re-run, and also does step 7's resolv.conf link. The runbook's
   step 6 now invokes the script, and the script is the source of truth.
+- Steps 6–7 done; first boot reached. The LUKS prompt, boot, and user login all work.
+- **Bug found — duplicate `/etc/fstab` entries.** During step 8, `snapper create-config`
+  triggered a systemd reload, and `systemd-fstab-generator` warned "Failed to create
+  unit file … as it already exists. Duplicate entry in '/etc/fstab'?" for every mount
+  (`/` several times). Likely cause: `genfstab … >> /etc/fstab` ran more than once, since
+  `>>` appends. Fixes: runbook step 5 now uses `>`; new acceptance test "fstab
+  declares each mountpoint exactly once" (nothing caught this before). The VM's fstab
+  is to be inspected before any cleanup.
 
 ## VM → physical hardware notes
 

@@ -26,6 +26,10 @@ layout_subvolumes() {
   grep -Ev '^[[:space:]]*(#|$)' "$REPO_ROOT/system/storage/subvolumes.txt"
 }
 
+duplicate_fstab_mountpoints() {
+  awk '!/^[[:space:]]*#/ && NF { print $2 }' /etc/fstab | sort | uniq -d
+}
+
 undeclared_packages() {
   LC_ALL=C comm -23 \
     <(pacman -Qqe | LC_ALL=C sort) \
@@ -95,6 +99,13 @@ public_listeners() {
     assert_output --partial "noatime"
     assert_output --partial "compress=zstd"
   done < <(layout_subvolumes)
+}
+
+@test "storage: fstab declares each mountpoint exactly once" {
+  run test -r /etc/fstab
+  assert_success
+  run duplicate_fstab_mountpoints
+  assert_output ""
 }
 
 @test "storage: the ESP is vfat at the ESP mountpoint and not world-readable" {

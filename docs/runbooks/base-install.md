@@ -152,7 +152,8 @@ The package set is exactly what `packages/*.txt` declares.
 # variables, but it does split $(...), and so does bash.
 pacstrap -K /mnt $(scripts/pkglist packages/*.txt)
 
-genfstab -U /mnt >> /mnt/etc/fstab
+# `>` not `>>`: running this line twice must not duplicate every entry.
+genfstab -U /mnt > /mnt/etc/fstab
 # Mount by subvolume name only: subvolid= would pin the IDs and break rollback by renaming.
 sed -i 's/subvolid=[0-9]*,//g' /mnt/etc/fstab
 cat /mnt/etc/fstab                     # check: subvol=/@ ... no subvolid=
