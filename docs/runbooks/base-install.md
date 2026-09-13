@@ -11,8 +11,6 @@ kernel images, with no listening network services. It is verified by
 - Every command block runs in the live ISO's root shell unless it says otherwise. That
   shell is **zsh** (the installed system's user shell is bash). Commands here work in
   both. Setting `HOST` in zsh also changes the prompt's hostname, which is harmless.
-- Commands starting with `arch-chroot /mnt` run inside the new system. Everything else
-  acts on `/mnt` from outside, so shell variables stay available.
 - Config files come from `system/`. Each one names its target path in its header.
 - Anything unexpected: stop, take a screenshot, and record it in the tracking doc.
   Don't improvise changes.
@@ -27,7 +25,7 @@ In the VM's settings in Unraid:
 |---|---|---|
 | BIOS | **OVMF** (UEFI) | systemd-boot and UKIs need UEFI; real hardware will be UEFI |
 | Network bridge | `br0` or the default. Either works because there is no SSH | DHCP and internet access |
-| Primary vDisk | virtio, **≥ 40 GiB** | snapshots and two kernels need room |
+| Primary vDisk | virtio, **≥ 40 GiB** | Btrfs snapshots and two kernels need room |
 | Memory / CPUs | **≥ 4 GiB** / **≥ 2** | live ISO runs in RAM; Hyprland later |
 | Graphics | leave the default VNC display | no GPU passthrough in Phase 1 |
 
@@ -106,6 +104,7 @@ lsblk                                  # confirm $DISK is the blank target disk
 sgdisk --zap-all "$DISK"
 sgdisk -n "1:0:+$ESP_SIZE" -t 1:ef00 -c "1:$ESP_PARTLABEL" \
        -n 2:0:0            -t 2:8309 -c "2:$LUKS_PARTLABEL" "$DISK"
+sgdisk -p "$DISK"                      # check: 1 = 2.0 GiB EF00 ESP, 2 = rest 8309 cryptroot
 partprobe "$DISK" && udevadm settle
 
 ESP_DEV=/dev/disk/by-partlabel/$ESP_PARTLABEL
@@ -114,7 +113,7 @@ LUKS_DEV=/dev/disk/by-partlabel/$LUKS_PARTLABEL
 
 LUKS2 with default settings (argon2id). Choose a passphrase using only characters that
 are easy to type on a US keyboard through the Unraid console: it is typed there at
-every boot.
+every boot. Check first that Shift survives the console: `echo +` must print `+`.
 
 ```sh
 cryptsetup luksFormat --type luks2 "$LUKS_DEV"
@@ -128,14 +127,11 @@ Btrfs and subvolumes, from `system/storage/subvolumes.txt`:
 mkfs.btrfs -L "$BTRFS_LABEL" "/dev/mapper/$LUKS_MAPPER"
 
 mount "/dev/mapper/$LUKS_MAPPER" /mnt
-while read -r subvol mountpoint; do
-  btrfs subvolume create "/mnt/$subvol"
-done < <(grep -Ev '^[[:space:]]*(#|$)' system/storage/subvolumes.txt)
+while read -r subvol mountpoint; do btrfs subvolume create "/mnt/$subvol"; done < <(grep -Ev '^[[:space:]]*(#|$)' system/storage/subvolumes.txt)
+btrfs subvolume list /mnt              # check: @ @home @log @pkg @snapshots
 umount /mnt
 
-while read -r subvol mountpoint; do
-  mount --mkdir -o "$BTRFS_MOUNT_OPTS,subvol=$subvol" "/dev/mapper/$LUKS_MAPPER" "/mnt$mountpoint"
-done < <(grep -Ev '^[[:space:]]*(#|$)' system/storage/subvolumes.txt)
+while read -r subvol mountpoint; do mount --mkdir -o "$BTRFS_MOUNT_OPTS,subvol=$subvol" "/dev/mapper/$LUKS_MAPPER" "/mnt$mountpoint"; done < <(grep -Ev '^[[:space:]]*(#|$)' system/storage/subvolumes.txt)
 ```
 
 The ESP. `fmask`/`dmask` keep the boot loader's random seed unreadable to non-root users.
@@ -164,74 +160,32 @@ cat /mnt/etc/fstab                     # check: subvol=/@ ... no subvolid=
 
 ## 6. Configure the new system
 
-**System config files from the repo:**
+`install/configure-base-system` does this step. Read it first: it's one short function
+per part, running in order. The script is the source of truth; the table only
+summarizes it. It checks everything it needs before changing anything, stops at the
+first error, and is safe to re-run. It asks for your user's password once.
 
 ```sh
-install -Dm644 system/mkinitcpio/10-autarchy.conf  /mnt/etc/mkinitcpio.conf.d/10-autarchy.conf
-install -Dm644 system/mkinitcpio/linux.preset      /mnt/etc/mkinitcpio.d/linux.preset
-install -Dm644 system/mkinitcpio/linux-lts.preset  /mnt/etc/mkinitcpio.d/linux-lts.preset
-install -Dm644 system/zram/zram-generator.conf     /mnt/etc/systemd/zram-generator.conf
-install -Dm644 system/resolved/10-autarchy.conf    /mnt/etc/systemd/resolved.conf.d/10-autarchy.conf
-install -Dm644 system/nftables/nftables.conf       /mnt/etc/nftables.conf
-install -Dm440 system/sudo/10-wheel                /mnt/etc/sudoers.d/10-wheel
-arch-chroot /mnt visudo -cf /etc/sudoers.d/10-wheel
+git pull                               # fetch the script if this clone predates it
+install/configure-base-system base-install.local.vars
+ls /mnt/efi/EFI/Linux                  # check: arch-linux.efi, arch-linux-lts.efi, and both -fallback.efi
 ```
 
-**Time, locale, console, hostname:**
-
-```sh
-ln -sf "/usr/share/zoneinfo/$TZONE" /mnt/etc/localtime
-arch-chroot /mnt hwclock --systohc
-
-sed -i "s/^#$LOCALE /$LOCALE /" /mnt/etc/locale.gen
-arch-chroot /mnt locale-gen
-echo "LANG=$LOCALE"   > /mnt/etc/locale.conf
-echo "KEYMAP=$KEYMAP" > /mnt/etc/vconsole.conf
-echo "$HOST"          > /mnt/etc/hostname
-```
-
-**Kernel command line, UKIs, boot loader:**
-
-```sh
-LUKS_UUID=$(blkid -s UUID -o value "$LUKS_DEV")
-echo "rd.luks.name=$LUKS_UUID=$LUKS_MAPPER root=/dev/mapper/$LUKS_MAPPER rootflags=subvol=@ rw" \
-  > /mnt/etc/kernel/cmdline
-
-# pacstrap already built initramfs images with the stock presets; the UKIs replace them.
-rm -f /mnt/boot/initramfs-*.img
-mkdir -p "/mnt$ESP_MOUNT/EFI/Linux"
-arch-chroot /mnt mkinitcpio -P
-
-arch-chroot /mnt bootctl install
-install -Dm644 system/boot/loader.conf "/mnt$ESP_MOUNT/loader/loader.conf"
-ls "/mnt$ESP_MOUNT/EFI/Linux"          # check: arch-linux.efi, arch-linux-lts.efi, and fallbacks
-```
-
-**Users** (you'll be asked for your password):
-
-```sh
-arch-chroot /mnt useradd -m -G wheel "$USERNAME"
-arch-chroot /mnt passwd "$USERNAME"
-# No root password: administration is sudo only; recovery is from the ISO (see Recovery).
-arch-chroot /mnt passwd -l root
-```
-
-**Services:**
-
-```sh
-systemctl --root=/mnt enable \
-  NetworkManager.service systemd-resolved.service systemd-timesyncd.service \
-  nftables.service systemd-boot-update.service fstrim.timer paccache.timer
-```
+| Part | What it does |
+|---|---|
+| preflight | Requires root, `/mnt` and `/mnt/efi` mounted, and an fstab. Validates the vars, timezone, and locale. |
+| system files | Installs the `system/*` files to their target paths; validates sudoers with `visudo` |
+| identity | Timezone and hardware clock; locale; console keymap; hostname |
+| boot | `/etc/kernel/cmdline` with the LUKS UUID; replaces the stock initramfs images with UKIs (`mkinitcpio -P`); installs systemd-boot and `loader.conf` |
+| users | Creates the wheel user (asks for the password); locks root |
+| services | Enables NetworkManager, resolved, timesyncd, nftables, systemd-boot-update, fstrim.timer, paccache.timer |
+| resolv.conf | Links to the systemd-resolved stub. Done last, because `arch-chroot` bind-mounts over this file. |
 
 `qemu-guest-agent` needs no enabling: udev starts it when the VM exposes the guest-agent channel.
 
 ## 7. Finish and reboot
 
 ```sh
-# Outside the chroot on purpose: arch-chroot bind-mounts over /etc/resolv.conf.
-ln -sf ../run/systemd/resolve/stub-resolv.conf /mnt/etc/resolv.conf
-
 umount -R /mnt
 cryptsetup close "$LUKS_MAPPER"
 poweroff

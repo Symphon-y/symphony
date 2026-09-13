@@ -1,0 +1,189 @@
+#!/usr/bin/env bash
+# configure-base-system: configure a freshly pacstrapped autarchy system
+# (runbook step 6).
+#
+# Usage: install/configure-base-system VARS_FILE [TARGET]
+#   VARS_FILE  per-install values (docs/runbooks/base-install.vars.example)
+#   TARGET     mounted root of the new system (default: /mnt)
+#
+# Runs from the live ISO, outside the chroot, so the repo's system/ files are at
+# hand. Commands that must run inside the new system go through arch-chroot.
+# Every input is validated before anything changes. Safe to re-run: steps that
+# are already done (user account, boot loader) are skipped, and every other step
+# rewrites the same result.
+set -Eeuo pipefail
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+readonly REPO_ROOT
+
+readonly REQUIRED_VARS=(HOST USERNAME TZONE LOCALE KEYMAP)
+
+readonly SERVICES=(
+  NetworkManager.service
+  systemd-resolved.service
+  systemd-timesyncd.service
+  nftables.service
+  systemd-boot-update.service
+  fstrim.timer
+  paccache.timer
+)
+
+trap 'printf "configure-base-system: failed at line %s: %s\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
+
+log() {
+  printf '==> %s\n' "$*"
+}
+
+die() {
+  printf 'configure-base-system: %s\n' "$*" >&2
+  exit 1
+}
+
+usage() {
+  echo "usage: configure-base-system VARS_FILE [TARGET]" >&2
+  exit 2
+}
+
+in_target() {
+  arch-chroot "$TARGET" "$@"
+}
+
+# Copy a repo file to a path inside the target, creating parent directories.
+put_file() {
+  local mode=$1 src=$2 dest=$3
+  mkdir -p "$(dirname "$TARGET$dest")"
+  install -m "$mode" "$REPO_ROOT/$src" "$TARGET$dest"
+}
+
+load_config() {
+  local vars_file=$1 name
+  [[ -r $vars_file ]] || die "cannot read vars file '$vars_file'"
+
+  # shellcheck source-path=SCRIPTDIR source=../system/storage/layout.conf
+  source "$REPO_ROOT/system/storage/layout.conf"
+  # shellcheck disable=SC1090 # per-install file, chosen at runtime
+  source "$vars_file"
+
+  for name in "${REQUIRED_VARS[@]}"; do
+    [[ -n ${!name:-} ]] || die "$name is not set in $vars_file"
+  done
+}
+
+# locale.gen lists every locale commented out, as "#<locale> <charset>".
+locale_is_listed() {
+  awk -v locale="$LOCALE" '
+    { name = $1; sub(/^#/, "", name) }
+    name == locale { found = 1 }
+    END { exit !found }
+  ' "$TARGET/etc/locale.gen"
+}
+
+preflight() {
+  (($(id -u) == 0)) || die "must run as root"
+  mountpoint -q "$TARGET" || die "$TARGET is not mounted"
+  mountpoint -q "$TARGET$ESP_MOUNT" || die "$TARGET$ESP_MOUNT is not mounted"
+  [[ -s $TARGET/etc/fstab ]] || die "$TARGET/etc/fstab is missing or empty: run pacstrap and genfstab first"
+  [[ -e $TARGET/usr/share/zoneinfo/$TZONE ]] || die "unknown timezone '$TZONE'"
+  locale_is_listed || die "locale '$LOCALE' is not listed in $TARGET/etc/locale.gen"
+}
+
+install_system_files() {
+  log "Installing system configuration files"
+  put_file 644 system/mkinitcpio/10-autarchy.conf /etc/mkinitcpio.conf.d/10-autarchy.conf
+  put_file 644 system/mkinitcpio/linux.preset /etc/mkinitcpio.d/linux.preset
+  put_file 644 system/mkinitcpio/linux-lts.preset /etc/mkinitcpio.d/linux-lts.preset
+  put_file 644 system/zram/zram-generator.conf /etc/systemd/zram-generator.conf
+  put_file 644 system/resolved/10-autarchy.conf /etc/systemd/resolved.conf.d/10-autarchy.conf
+  put_file 644 system/nftables/nftables.conf /etc/nftables.conf
+  put_file 440 system/sudo/10-wheel /etc/sudoers.d/10-wheel
+  in_target visudo -cf /etc/sudoers.d/10-wheel
+}
+
+# Uncomment exactly the chosen locale; examples and other locales stay commented.
+enable_locale() {
+  local file="$TARGET/etc/locale.gen" edited
+  edited=$(awk -v locale="$LOCALE" '
+    { name = $1; sub(/^#/, "", name); if (name == locale) sub(/^#/, "") }
+    { print }
+  ' "$file")
+  printf '%s\n' "$edited" >"$file"
+}
+
+configure_identity() {
+  log "Setting timezone, locale, keymap, and hostname"
+  ln -sf "/usr/share/zoneinfo/$TZONE" "$TARGET/etc/localtime"
+  in_target hwclock --systohc
+  enable_locale
+  in_target locale-gen
+  echo "LANG=$LOCALE" >"$TARGET/etc/locale.conf"
+  # Written before the UKIs are built: sd-vconsole bakes the keymap into the initramfs.
+  echo "KEYMAP=$KEYMAP" >"$TARGET/etc/vconsole.conf"
+  echo "$HOST" >"$TARGET/etc/hostname"
+}
+
+configure_boot() {
+  log "Building unified kernel images and installing systemd-boot"
+  local luks_device="/dev/disk/by-partlabel/$LUKS_PARTLABEL" luks_uuid
+  luks_uuid=$(blkid -s UUID -o value "$luks_device" || true)
+  [[ -n $luks_uuid ]] || die "cannot read the UUID of $luks_device"
+
+  # rootflags names the @ subvolume, the first entry in system/storage/subvolumes.txt.
+  mkdir -p "$TARGET/etc/kernel"
+  echo "rd.luks.name=$luks_uuid=$LUKS_MAPPER root=/dev/mapper/$LUKS_MAPPER rootflags=subvol=@ rw" \
+    >"$TARGET/etc/kernel/cmdline"
+
+  # pacstrap built separate initramfs images with the stock presets; UKIs replace them.
+  rm -f "$TARGET"/boot/initramfs-*.img
+  mkdir -p "$TARGET$ESP_MOUNT/EFI/Linux"
+  in_target mkinitcpio -P
+
+  if ! in_target bootctl is-installed >/dev/null 2>&1; then
+    in_target bootctl install
+  fi
+  # After bootctl install, which writes its own default loader.conf.
+  put_file 644 system/boot/loader.conf "$ESP_MOUNT/loader/loader.conf"
+}
+
+create_user() {
+  log "Creating user $USERNAME and locking root"
+  if ! in_target id -u "$USERNAME" >/dev/null 2>&1; then
+    in_target useradd -m -G wheel "$USERNAME"
+  fi
+  # A new account starts locked (L). Prompt only until a usable password (P) is set,
+  # so a mistyped password can be retried by re-running the script.
+  if [[ $(in_target passwd -S "$USERNAME" | awk '{ print $2 }') != P ]]; then
+    in_target passwd "$USERNAME"
+  fi
+  in_target passwd -l root
+}
+
+enable_services() {
+  log "Enabling base services"
+  systemctl --root="$TARGET" enable "${SERVICES[@]}"
+}
+
+# Last on purpose: arch-chroot bind-mounts the host's resolv.conf over this path
+# while it runs.
+link_resolv_conf() {
+  log "Pointing resolv.conf at the systemd-resolved stub"
+  ln -sf ../run/systemd/resolve/stub-resolv.conf "$TARGET/etc/resolv.conf"
+}
+
+main() {
+  (($# >= 1 && $# <= 2)) || usage
+  TARGET=${2:-/mnt}
+
+  load_config "$1"
+  preflight
+
+  install_system_files
+  configure_identity
+  configure_boot
+  create_user
+  enable_services
+  link_resolv_conf
+
+  log "Done. Next (runbook step 7): umount -R $TARGET; cryptsetup close $LUKS_MAPPER; poweroff"
+}
+
+main "$@"

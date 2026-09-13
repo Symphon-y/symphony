@@ -156,6 +156,14 @@ _pending (installed system)_
   one argument. Fixed in the runbook (`2403c0e`) before the user reached step 5 by using
   `$(scripts/pkglist ...)` directly. The rest of steps 4–7 was re-checked for zsh
   differences; none found.
+- Steps 4–5 done by the user. Typos through the console were caught before anything was
+  written (`:=` instead of `:+` in `sgdisk`); the subvolume loops were given as one-liners.
+- **Deviation (user request) — step 6 automated as `install/configure-base-system`.**
+  This is earlier than "automate in Phase 8", because step 6 was the most typing and the
+  most error-prone step. It follows the standing orders: unit tests with a fake target
+  root and stubbed commands, written first. It validates all inputs before changing
+  anything, is safe to re-run, and also does step 7's resolv.conf link. The runbook's
+  step 6 now invokes the script, and the script is the source of truth.
 
 ## VM → physical hardware notes
 
