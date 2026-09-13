@@ -111,6 +111,15 @@ Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
   there because the Mac already has Claude Code and `gh`, which usefully confirms that
   the `claude doctor` "Auto-updates … enabled" pattern matches the real output. The
   shared `as_root` helper moved to `tests/helpers/system.bash`.
+- **Bug caught by CI (first run, `486322d`, run 34758062316): `cmp: command not found`.**
+  6 of 55 unit tests failed in the `archlinux:latest` container. `install/sync-system`
+  uses `cmp` from `diffutils`, which is not a dependency of `base` (checked against the
+  Arch package database). So the VM could fail the same way. Fix: declare `diffutils`
+  in `packages/tooling.txt`, not swap `cmp` for a workaround. That is the one list both
+  CI and the VM install; `sync-system` is repo tooling, and pacstrap uses every list.
+  The runbook installs declared packages (step 2) before `sync-system` first runs
+  (step 3). This is exactly the kind of
+  undeclared dependency CI in a clean container exists to catch.
 
 ## VM → physical hardware notes
 
