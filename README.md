@@ -46,11 +46,17 @@ CLAUDE.md                     working agreement: standing orders + engineering p
 DECISIONS.md                  architectural and UX decisions, with reasoning
 docs/roadmap.md               phases and current status
 docs/omarchy-influences.md    what we took (or didn't) from Omarchy, and why
-docs/phases/                  one tracking document per phase
+docs/phases/                  one tracking document per phase (+ test evidence)
+docs/runbooks/                reusable procedures (base install, ...)
+packages/                     package inventory: one package per line, each with a reason
+system/<component>/           root-owned system config; each file names its target path
+scripts/                      small single-purpose tools (pkglist, system-report)
+tests/unit/                   bats unit tests for scripts
+tests/acceptance/             bats tests asserting system state, one file per phase
 ```
 
-Component directories (`hypr/`, `waybar/`, `shell/`, `tests/`, …) are created by the
-phase that first needs them, not in advance.
+Component directories (`hypr/`, `waybar/`, `shell/`, …) are created by the phase that
+first needs them, not in advance.
 
 ## Status
 

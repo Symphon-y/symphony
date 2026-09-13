@@ -1,0 +1,15 @@
+# Per-install values for docs/runbooks/base-install.md. Sourced by bash.
+#
+#   cp docs/runbooks/base-install.vars.example base-install.local.vars
+#   vim base-install.local.vars
+#   source base-install.local.vars
+#
+# *.local.* files are ignored by Git. These are the only machine- and
+# person-specific values in the install; everything else comes from the repo.
+
+DISK=/dev/vda           # target disk. EVERYTHING on it is erased. Confirm with `lsblk`.
+HOST=                   # hostname, e.g. autarchy-vm
+USERNAME=               # your login name
+TZONE=                  # timezone, e.g. America/Chicago (list: ls /usr/share/zoneinfo)
+LOCALE=en_US.UTF-8      # system language
+KEYMAP=us               # console keyboard layout; the LUKS prompt uses it too

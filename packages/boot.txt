@@ -1,0 +1,5 @@
+# Boot chain: initramfs and unified kernel images (UKIs) for systemd-boot.
+# systemd-boot itself ships with systemd, which base already provides.
+
+mkinitcpio      # builds the initramfs; declared so pacstrap never asks which initramfs generator to use
+systemd-ukify   # packs kernel + initramfs + cmdline into one UKI that can later be signed for Secure Boot

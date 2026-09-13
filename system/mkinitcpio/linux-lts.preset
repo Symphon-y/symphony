@@ -1,0 +1,12 @@
+# Target: /etc/mkinitcpio.d/linux-lts.preset
+#
+# Same shape as linux.preset, for the fallback kernel. See that file for why.
+
+ALL_kver="/boot/vmlinuz-linux-lts"
+
+PRESETS=('default' 'fallback')
+
+default_uki="/efi/EFI/Linux/arch-linux-lts.efi"
+
+fallback_uki="/efi/EFI/Linux/arch-linux-lts-fallback.efi"
+fallback_options="-S autodetect"

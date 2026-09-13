@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# pkglist: print the package names declared in one or more package lists.
+#
+# Lists in packages/ hold one package per line with a trailing "# why" comment.
+# This is the only parser for that format, so pacstrap, bootstrap, and audit
+# commands can never disagree about what a list declares.
+#
+# Output: sorted, de-duplicated package names, one per line.
+# Exit status: 0 on success, 1 on an unreadable file or malformed line
+# (nothing is printed, so a broken list can't yield a partial install),
+# 2 on usage error.
+set -euo pipefail
+
+# Byte-order sorting, so output is identical on every machine.
+export LC_ALL=C
+
+usage() {
+  echo "usage: pkglist FILE..." >&2
+}
+
+# Print every package name, or print nothing and fail if any line is malformed.
+parse() {
+  awk '
+    { sub(/#.*/, "") }
+    NF == 0 { next }
+    NF > 1 {
+      printf "pkglist: %s:%d: expected one package per line\n", FILENAME, FNR > "/dev/stderr"
+      malformed = 1
+      next
+    }
+    { names[++count] = $1 }
+    END {
+      if (malformed) exit 1
+      for (i = 1; i <= count; i++) print names[i]
+    }
+  ' "$@"
+}
+
+main() {
+  if (($# == 0)); then
+    usage
+    return 2
+  fi
+
+  local file
+  for file in "$@"; do
+    if [[ ! -r $file ]]; then
+      echo "pkglist: cannot read '$file'" >&2
+      return 1
+    fi
+  done
+
+  local names
+  names=$(parse "$@")
+  if [[ -n $names ]]; then
+    sort -u <<<"$names"
+  fi
+}
+
+main "$@"

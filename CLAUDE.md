@@ -4,6 +4,11 @@ autarchy is an individually opinionated Arch Linux workstation: **Arch Linux + o
 person's system design**. Omarchy is a source of ideas, never a specification.
 Never install Omarchy or turn this system into an Omarchy installation.
 
+Omarchy classifications (`docs/omarchy-influences.md`) apply to its ideas and
+implementations. **REJECT is final.** Never write "reject for now". **DEFER** is the only
+class that can be revisited, and a deferred idea is always built our own way, never with
+Omarchy's code or packages.
+
 Read `README.md` for the philosophy, `DECISIONS.md` for why things are the way they
 are, and `docs/roadmap.md` for where we are.
 

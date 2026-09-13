@@ -1,0 +1,16 @@
+# Target: /etc/mkinitcpio.d/linux.preset
+#
+# Build unified kernel images directly onto the ESP instead of separate initramfs
+# files. systemd-boot discovers UKIs in EFI/Linux on its own, so no boot entries
+# are written by hand.
+
+ALL_kver="/boot/vmlinuz-linux"
+
+PRESETS=('default' 'fallback')
+
+default_uki="/efi/EFI/Linux/arch-linux.efi"
+
+# The fallback image skips autodetect and so carries every module: it still boots
+# after the (virtual) hardware changes.
+fallback_uki="/efi/EFI/Linux/arch-linux-fallback.efi"
+fallback_options="-S autodetect"

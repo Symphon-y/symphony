@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+# system-report: read-only inventory of this machine, printed as Markdown.
+#
+# Run before an install (Phase 1, from the Arch ISO) and again on physical
+# hardware (Phase 10), so decisions rest on what the machine actually is.
+# It never changes system state.
+#
+# Exit status: 0 if every install gate passes, 1 otherwise. The full report is
+# printed either way.
+
+# No `set -e`: a missing tool should blank one section, not abort the report.
+set -uo pipefail
+shopt -s nullglob
+
+has() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+# Run a command if it exists; otherwise say so instead of failing.
+try() {
+  if has "$1"; then
+    "$@"
+  else
+    echo "($1: not available)"
+  fi
+}
+
+# Print a titled, fenced block holding the output of a report function.
+section() {
+  local title=$1 fn=$2
+  printf '\n## %s\n\n```text\n' "$title"
+  "$fn" 2>&1
+  printf '```\n'
+}
+
+report_identity() {
+  echo "generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "hostname:  $(cat /proc/sys/kernel/hostname 2>/dev/null || hostname)"
+  echo "kernel:    $(uname -srm)"
+}
+
+report_virtualization() {
+  echo "detected: $(try systemd-detect-virt)"
+  local field
+  for field in sys_vendor product_name board_name bios_vendor bios_version; do
+    if [[ -r /sys/class/dmi/id/$field ]]; then
+      printf '%-13s %s\n' "$field:" "$(cat "/sys/class/dmi/id/$field")"
+    fi
+  done
+}
+
+report_firmware() {
+  if [[ -d /sys/firmware/efi ]]; then
+    echo "boot mode:     UEFI"
+    echo "platform size: $(cat /sys/firmware/efi/fw_platform_size 2>/dev/null || echo unknown)-bit"
+  else
+    echo "boot mode:     BIOS (legacy)"
+  fi
+}
+
+report_cpu() {
+  if ! has lscpu; then
+    echo "(lscpu: not available)"
+    return
+  fi
+  lscpu | grep -E '^(Architecture|Model name|CPU\(s\)|Thread\(s\) per core|Core\(s\) per socket|Socket\(s\)|Virtualization|Hypervisor vendor)'
+}
+
+report_memory() {
+  try free -h
+}
+
+report_gpu() {
+  if has lspci; then
+    lspci -nnk | grep -EA3 'VGA|3D controller|Display controller' || echo "(no display controller found)"
+  else
+    echo "(lspci: not available)"
+  fi
+  local nodes=(/dev/dri/*)
+  echo
+  echo "DRM device nodes: ${nodes[*]:-none}"
+}
+
+report_storage() {
+  try lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS,MODEL,ROTA,DISC-GRAN
+}
+
+report_network() {
+  try ip -brief link
+  echo
+  try ip -brief address
+  echo
+  try ip route
+  echo
+  if has resolvectl; then
+    resolvectl dns
+  else
+    cat /etc/resolv.conf
+  fi
+}
+
+report_time() {
+  try timedatectl
+}
+
+report_audio() {
+  if has lspci; then
+    lspci -nn | grep -i audio || echo "(no PCI audio device)"
+  fi
+  if [[ -r /proc/asound/cards ]]; then
+    cat /proc/asound/cards
+  fi
+}
+
+report_input() {
+  grep -E '^N: Name=' /proc/bus/input/devices 2>/dev/null || echo "(no input devices listed)"
+}
+
+report_session() {
+  echo "XDG_SESSION_TYPE: ${XDG_SESSION_TYPE:-unset}"
+  try loginctl list-sessions --no-legend
+  echo "installed packages: $(pacman -Q 2>/dev/null | wc -l)"
+}
+
+gate_uefi64() {
+  [[ $(cat /sys/firmware/efi/fw_platform_size 2>/dev/null) == 64 ]]
+}
+
+# At least one real disk to install to (loop devices, optical drives, and zram don't count).
+gate_disk() {
+  lsblk -dno NAME,TYPE 2>/dev/null |
+    awk '$2 == "disk" && $1 !~ /^(loop|sr|zram)/ { found = 1 } END { exit !found }'
+}
+
+gate_network() {
+  [[ -n $(ip route show default 2>/dev/null) ]]
+}
+
+gate_dns() {
+  getent hosts archlinux.org >/dev/null 2>&1
+}
+
+gate_ntp() {
+  [[ $(timedatectl show -p NTPSynchronized --value 2>/dev/null) == yes ]]
+}
+
+# Print the gate table; return 1 if any gate fails.
+report_gates() {
+  local gates=(
+    "uefi64:64-bit UEFI firmware"
+    "disk:an installable disk is present"
+    "network:a default route exists"
+    "dns:archlinux.org resolves"
+    "ntp:clock is NTP-synchronized"
+  )
+  local entry name failed=0
+  printf '\n## Install gates\n\n| Gate | Checks | Result |\n|---|---|---|\n'
+  for entry in "${gates[@]}"; do
+    name=${entry%%:*}
+    if "gate_$name"; then
+      printf '| %s | %s | PASS |\n' "$name" "${entry#*:}"
+    else
+      printf '| %s | %s | FAIL |\n' "$name" "${entry#*:}"
+      failed=1
+    fi
+  done
+  return "$failed"
+}
+
+main() {
+  printf '# System report\n'
+  section "Identity" report_identity
+  section "Virtualization" report_virtualization
+  section "Firmware" report_firmware
+  section "CPU" report_cpu
+  section "Memory" report_memory
+  section "GPU" report_gpu
+  section "Storage" report_storage
+  section "Network" report_network
+  section "Time" report_time
+  section "Audio" report_audio
+  section "Input devices" report_input
+  section "Session and packages" report_session
+  report_gates
+}
+
+main "$@"

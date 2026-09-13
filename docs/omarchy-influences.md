@@ -13,8 +13,11 @@ installed on this system.
 |---|---|
 | **ADOPT** | We want essentially the same behavior. |
 | **ADAPT** | We like the idea but want an independent implementation or different tooling. |
-| **REJECT** | We intentionally don't want this behavior or architecture. |
-| **DEFER** | Interesting, not important enough yet. |
+| **REJECT** | We intentionally don't want this behavior or architecture. **Final**, with no "for now". |
+| **DEFER** | Interesting, not important enough yet. The only class that is revisited. If we later take the idea, we build it our own way. |
+
+Omarchy itself is never installed. These classifications are about ideas and
+implementations only.
 
 ## Entry format
 
