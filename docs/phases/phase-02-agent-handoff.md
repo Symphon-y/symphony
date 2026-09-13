@@ -120,6 +120,12 @@ Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
   The runbook installs declared packages (step 2) before `sync-system` first runs
   (step 3). This is exactly the kind of
   undeclared dependency CI in a clean container exists to catch.
+- **Second CI run (`116c29c`, run 34758293997): 54/55.** The `cmp` fix worked. The
+  remaining failure was a test bug: "check run as root reports files not owned by root"
+  assumed a non-root runner. In the CI container the tests run as real root, so
+  installed files really are root-owned and `check` correctly said `in sync`. The test
+  now hands the file to uid 65534 when it runs as real root, so it checks the same
+  thing on any runner. The script itself was right.
 
 ## VM → physical hardware notes
 

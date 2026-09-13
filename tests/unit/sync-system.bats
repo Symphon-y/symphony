@@ -84,6 +84,12 @@ manifest_entries() {
 
 @test "check run as root reports files not owned by root" {
   "$SCRIPT" --root "$ROOT" apply
+  # A non-root runner already owns the files it installed. A root runner (the CI
+  # container) must hand one to an unprivileged owner. /usr/bin/id is the real id;
+  # the stub on PATH answers for the script.
+  if (($(/usr/bin/id -u) == 0)); then
+    chown 65534 "$ROOT/etc/nftables.conf"
+  fi
   export STUB_UID=0
   run "$SCRIPT" --root "$ROOT" check
   assert_failure 1
