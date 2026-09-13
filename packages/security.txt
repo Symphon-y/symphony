@@ -1,0 +1,4 @@
+# Access control and network exposure.
+
+sudo            # privilege escalation for the wheel user, always with a password
+nftables        # firewall: drop unsolicited inbound traffic

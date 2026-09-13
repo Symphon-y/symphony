@@ -1,0 +1,8 @@
+# Disk layout: encryption, filesystem, snapshots, swap.
+
+btrfs-progs     # root filesystem tools (subvolumes, scrub, balance)
+cryptsetup      # LUKS2 full-disk encryption; systemd pulls it in too, but we depend on it directly
+dosfstools      # create and check the FAT32 EFI system partition
+snapper         # btrfs snapshot management for /
+snap-pac        # automatic pre/post snapshots around every pacman transaction
+zram-generator  # compressed swap in RAM: no swap partition to size, encrypt, or wear out

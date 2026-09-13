@@ -1,0 +1,3 @@
+# Virtual machines only. Physical machines use hardware lists instead (Phase 10).
+
+qemu-guest-agent  # lets Unraid read the VM's IP address and request a clean shutdown

@@ -5,7 +5,6 @@
 | **Status** | Planned / In progress / Blocked / Complete |
 | **Driver** | User / Claude / Both |
 | **Branch** | `phase/NN-slug` |
-| **Snapshot** | `<unraid snapshot name>` (taken before any VM change) |
 | **Started** | YYYY-MM-DD |
 | **Completed** | YYYY-MM-DD |
 

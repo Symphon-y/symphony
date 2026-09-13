@@ -1,0 +1,5 @@
+# Target: /etc/sudoers.d/10-wheel (mode 0440; validate with `visudo -cf`)
+#
+# Members of wheel administer the machine, always with a password, so neither a
+# compromised session nor an agent acting as the user can silently become root.
+%wheel ALL=(ALL:ALL) ALL

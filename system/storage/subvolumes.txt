@@ -1,0 +1,13 @@
+# Btrfs subvolume layout: the single source of truth for the runbook and tests.
+# Format: <subvolume> <mountpoint>
+#
+# Why separate subvolumes: snapshots of @ capture the operating system only.
+# Rolling / back must not rewind home directories or logs, and the pacman cache
+# and the snapshots themselves must not bloat every snapshot.
+#
+# @ must stay first: it is mounted before everything else is mounted inside it.
+@           /
+@home       /home
+@log        /var/log
+@pkg        /var/cache/pacman/pkg
+@snapshots  /.snapshots
