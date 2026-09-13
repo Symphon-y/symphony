@@ -130,6 +130,7 @@ mount "/dev/mapper/$LUKS_MAPPER" /mnt
 while read -r subvol mountpoint; do btrfs subvolume create "/mnt/$subvol"; done < <(grep -Ev '^[[:space:]]*(#|$)' system/storage/subvolumes.txt)
 btrfs subvolume list /mnt              # check: @ @home @log @pkg @snapshots
 umount /mnt
+findmnt /mnt                           # check: prints NOTHING. If it prints a mount, run umount /mnt again.
 
 while read -r subvol mountpoint; do mount --mkdir -o "$BTRFS_MOUNT_OPTS,subvol=$subvol" "/dev/mapper/$LUKS_MAPPER" "/mnt$mountpoint"; done < <(grep -Ev '^[[:space:]]*(#|$)' system/storage/subvolumes.txt)
 ```
@@ -156,7 +157,8 @@ pacstrap -K /mnt $(scripts/pkglist packages/*.txt)
 genfstab -U /mnt > /mnt/etc/fstab
 # Mount by subvolume name only: subvolid= would pin the IDs and break rollback by renaming.
 sed -i 's/subvolid=[0-9]*,//g' /mnt/etc/fstab
-cat /mnt/etc/fstab                     # check: subvol=/@ ... no subvolid=
+cat /mnt/etc/fstab                     # check: subvol=/@ ... no subvolid=, no "subvol=/" line
+grep -c '^UUID=' /mnt/etc/fstab        # check: exactly 6 (5 subvolumes + ESP)
 ```
 
 ## 6. Configure the new system

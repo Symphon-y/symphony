@@ -172,6 +172,14 @@ _pending (installed system)_
   `>>` appends. Fixes: runbook step 5 now uses `>`; new acceptance test "fstab
   declares each mountpoint exactly once" (nothing caught this before). The VM's fstab
   is to be inspected before any cleanup.
+- **Root cause confirmed from the VM's fstab:** 14 entries, which is `genfstab` output
+  twice, and each copy has 7 entries. The 7th is `/` with `subvol=/` and `relatime`:
+  the Btrfs top-level volume was still mounted at `/mnt` underneath `@`, most likely
+  from `mount /dev/mapper/root /mnt` running twice in step 4, where one `umount` removed
+  only one. Because systemd applies the *first* `/` entry when remounting root, the
+  root filesystem could lose `noatime`. Runbook step 4 now checks `findmnt /mnt` is
+  empty after `umount`, and step 5 checks for exactly 6 `UUID=` entries. The VM fstab
+  is cleaned to the 6 correct entries (backup kept at `/etc/fstab.bak`).
 
 ## VM → physical hardware notes
 
