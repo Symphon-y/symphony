@@ -21,7 +21,7 @@ shfmt -d "${shell_files[@]}"
 echo "==> JSON syntax"
 while IFS= read -r json; do
   jq empty "$json"
-done < <(find home -name '*.json')
+done < <(find home system -name '*.json')
 
 echo "==> identifiers"
 scripts/check-identifiers

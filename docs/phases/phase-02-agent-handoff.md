@@ -43,7 +43,9 @@ Recorded in `DECISIONS.md` at close-out.
 - **Amendment (user, 2026-09-13):** on-demand OpenSSH, reached from Unraid's web terminal;
   firewall source limited to Unraid's LAN IP; passphrase key on Unraid's flash;
   authorized keys as root-owned host config; gist relay removed. Supersedes D-0015.
-- Claude never uses sudo; deny rules for `sudo` and for reading credential files
+- Claude never uses sudo; deny rules for `sudo` and for reading credential files, in
+  root-owned managed settings (`/etc/claude-code/managed-settings.json`), so Claude can't
+  loosen them
 - `DISABLE_TELEMETRY` and `DISABLE_ERROR_REPORTING` set (Remote Control unavailable while set)
 - `home/<component>/` stow packages and `system/files.txt` manifest (refines D-0007 and D-0017)
 - CI in an `archlinux:latest` container, `actions/checkout` pinned by commit SHA
@@ -60,7 +62,7 @@ File: `tests/acceptance/phase-02.bats`. `phase-01.bats` runs alongside it as a r
 | tooling | shellcheck, shfmt, stow, tmux, jq, bats, git, gh installed; `scripts/check` passes on the VM |
 | system config | installed files match `system/files.txt` (content, mode, root ownership) |
 | home config | every file under `home/` is linked; `~/.claude` is a real directory |
-| claude code | runs; binary matches its GPG-signed manifest; `claude doctor` passes with auto-updates enabled; settings pin stable channel, telemetry off, deny rules present; authenticated (`claude -p` answers) |
+| claude code | runs; binary matches its GPG-signed manifest; `claude doctor` passes with auto-updates enabled; root-owned managed settings pin the stable channel, turn telemetry off, and hold the deny rules; personal settings aren't linked into the repo; authenticated (`claude -p` answers) |
 | ssh | sshd key-only, no root, no forwarding; authorized keys are root-owned system config; not enabled at boot; firewall opens port 22 only to listed sources |
 | github | `gh` authenticated; remote reachable; latest CI run on the branch succeeded |
 
@@ -235,6 +237,25 @@ Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
   - Cleanup: the backup bundle, rewrite rules, and history dumps were deleted from the
     scratchpad, and the local repo's old unreachable objects were pruned. GitHub may still
     serve cached old commits by hash for a while; GitHub Support can purge them if needed.
+- **Design fix — Claude's policy moved to root-owned managed settings (user decision).**
+  On the VM, `~/.claude/settings.json` was a stow link into the repo, and Claude Code
+  rewrote it (added `"theme"`, reordered keys), leaving the checkout dirty. Worse, the
+  file holding Claude's deny rules was writable by the account Claude runs as. Per
+  Claude Code's docs, `/etc/claude-code/managed-settings.json` outranks every user
+  setting and permission lists merge across levels, so managed deny rules always apply.
+  Changes:
+  - The policy file moved to `system/claude/managed-settings.json`, installed 0644 and
+    root-owned by `sync-system`. Claude Code exits if the file is unreadable, so it must
+    stay world-readable.
+  - The `home/claude` stow package is removed; personal settings (the theme, for example)
+    are Claude's own untracked file.
+  - Acceptance tests now read the managed file, check its root ownership, and check that
+    `~/.claude/settings.json` is not a link.
+  - The `link-home` unit tests use fixture packages in a throwaway repo, instead of
+    whatever real packages exist.
+  - `scripts/check` also validates JSON under `system/`.
+  - Runbook step 4 removes the old link before `link-home apply`. Otherwise Claude would
+    write through the dangling link and recreate a file inside the repo.
 
 ## VM → physical hardware notes
 

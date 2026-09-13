@@ -10,7 +10,8 @@ setup() {
   load '../helpers/system'
 }
 
-readonly SETTINGS="$HOME/.claude/settings.json"
+# Claude Code's policy lives in root-owned managed settings, which outrank user settings.
+readonly MANAGED_SETTINGS=/etc/claude-code/managed-settings.json
 
 # --- tooling ------------------------------------------------------------------
 
@@ -126,19 +127,28 @@ unrestricted_ssh_rules() {
   assert_output --regexp 'Auto-updates.*enabled'
 }
 
-@test "claude code: settings pin the stable channel and turn off telemetry" {
-  run jq -r '.autoUpdatesChannel' "$SETTINGS"
+@test "claude code: managed settings pin the stable channel and turn off telemetry" {
+  run jq -r '.autoUpdatesChannel' "$MANAGED_SETTINGS"
   assert_output "stable"
-  run jq -r '.env.DISABLE_TELEMETRY, .env.DISABLE_ERROR_REPORTING' "$SETTINGS"
+  run jq -r '.env.DISABLE_TELEMETRY, .env.DISABLE_ERROR_REPORTING' "$MANAGED_SETTINGS"
   assert_output "$(printf '1\n1')"
 }
 
-@test "claude code: settings deny sudo and reading credential files" {
+@test "claude code: managed settings deny sudo and reading credential files" {
   local rule
   for rule in 'Bash(sudo *)' 'Read(~/.claude/.credentials.json)' 'Read(~/.config/gh/**)'; do
-    run jq -e --arg rule "$rule" '.permissions.deny | index($rule)' "$SETTINGS"
+    run jq -e --arg rule "$rule" '.permissions.deny | index($rule)' "$MANAGED_SETTINGS"
     assert_success
   done
+}
+
+@test "claude code: managed settings are root-owned, so Claude can't loosen its own rules" {
+  run find "$MANAGED_SETTINGS" -user 0 -perm 0644
+  assert_output "$MANAGED_SETTINGS"
+}
+
+@test "claude code: personal settings are Claude's own file, not a link into the repo" {
+  assert [ ! -L "$HOME/.claude/settings.json" ]
 }
 
 @test "claude code: logged in and able to answer" {

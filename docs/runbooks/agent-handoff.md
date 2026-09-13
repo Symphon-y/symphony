@@ -59,6 +59,9 @@ anything overwrites it.
 ## 4. Link home config and install Claude Code (VM console)
 
 ```sh
+# Machines set up before Claude's policy moved to root-owned managed settings still have
+# an old link into the repo; remove it so Claude's own writes can't land in git.
+if [ -L ~/.claude/settings.json ]; then rm ~/.claude/settings.json; fi
 install/link-home apply
 install/link-home check                # expected: every file linked
 
