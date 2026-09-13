@@ -225,6 +225,16 @@ Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
     history.
   - Tooling note: the permission classifier blocked running `scripts/check` right after
     the rewrite, so its steps (unit tests, identifier scan) were run directly.
+  - **Force-pushed** by Claude with the user's permission (`--force-with-lease`). Every
+    replaced GitHub head matched the backup, so nothing unexpected was overwritten.
+  - **Verified on GitHub:** all three branch heads match local; no other branches,
+    tags, or pull requests pin the old commits. A fresh clone of GitHub (30 commits) has
+    no identifiers anywhere in its history, zero matches for the old email, and only the
+    noreply address as author or committer. CI is green on `502f78a` (69/69 unit tests,
+    identifier scan included).
+  - Cleanup: the backup bundle, rewrite rules, and history dumps were deleted from the
+    scratchpad, and the local repo's old unreachable objects were pruned. GitHub may still
+    serve cached old commits by hash for a while; GitHub Support can purge them if needed.
 
 ## VM → physical hardware notes
 
