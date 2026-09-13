@@ -8,18 +8,9 @@
 
 setup() {
   load '../helpers/common'
+  load '../helpers/system'
   # shellcheck source-path=SCRIPTDIR source=../../system/storage/layout.conf
   source "$REPO_ROOT/system/storage/layout.conf"
-}
-
-# Root-only checks: run directly when already root (the ISO), otherwise through
-# sudo without prompting, so an expired sudo timestamp fails instead of hanging.
-as_root() {
-  if ((EUID == 0)); then
-    "$@"
-  else
-    sudo -n "$@"
-  fi
 }
 
 layout_subvolumes() {

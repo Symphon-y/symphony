@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# gist-relay: move short-lived text between the VM console and another machine.
+#
+# Usage: scripts/gist-relay send-pane TARGET | receive
+#   send-pane TARGET  upload the text of tmux pane TARGET to a secret gist; print its id
+#   receive           load the newest relay gist into the tmux paste buffer, then delete it
+#
+# The text console has no clipboard. This carries a login URL out and a one-time login
+# code back in, through a secret (unlisted) gist that exists for about a minute.
+# Only relay short-lived, single-use text. Never relay tokens, keys, or passwords:
+# anything sent this way sits on GitHub until it is deleted.
+set -euo pipefail
+
+readonly DESCRIPTION=autarchy-relay
+
+die() {
+  printf 'gist-relay: %s\n' "$*" >&2
+  exit 1
+}
+
+usage() {
+  echo "usage: gist-relay send-pane TARGET | receive" >&2
+  echo "never relay tokens, keys, or passwords" >&2
+  exit 2
+}
+
+send_pane() {
+  local target=$1 url id
+  url=$(tmux capture-pane -p -J -t "$target" | gh gist create --desc "$DESCRIPTION" -)
+  id=${url##*/}
+  echo "sent relay gist $id"
+  echo "on the other machine: gh gist view $id --raw && gh gist delete $id --yes"
+}
+
+# Delete the relay gist however receive ends, so its text never lingers on GitHub.
+# RELAY_ID is global because the EXIT trap runs after receive's locals are gone.
+delete_relay_gist() {
+  gh gist delete "$RELAY_ID" --yes >/dev/null 2>&1 || true
+}
+
+receive() {
+  local content
+  RELAY_ID=$(gh api gists --jq "[.[] | select(.description == \"$DESCRIPTION\")][0].id // empty")
+  [[ -n $RELAY_ID ]] || die "no relay gist found"
+  trap delete_relay_gist EXIT
+
+  content=$(gh api "gists/$RELAY_ID" --jq '.files[].content')
+  printf '%s' "$content" | tmux load-buffer -
+  # Report only the length: the content may be a login code.
+  echo "received ${#content} characters into the tmux paste buffer; deleting the relay gist"
+}
+
+main() {
+  case ${1:-} in
+    send-pane)
+      (($# == 2)) || usage
+      send_pane "$2"
+      ;;
+    receive)
+      (($# == 1)) || usage
+      receive
+      ;;
+    *) usage ;;
+  esac
+}
+
+main "$@"

@@ -1,0 +1,16 @@
+# Root-owned system files: the single source of truth for install/sync-system.
+#
+# Format: <mode> <source, relative to system/> <absolute target>
+#
+# Targets are root-owned copies, never symlinks: a link into this user-owned
+# repository would let the user account (or an agent acting as it) change system
+# configuration without sudo.
+
+0644  mkinitcpio/10-autarchy.conf  /etc/mkinitcpio.conf.d/10-autarchy.conf
+0644  mkinitcpio/linux.preset      /etc/mkinitcpio.d/linux.preset
+0644  mkinitcpio/linux-lts.preset  /etc/mkinitcpio.d/linux-lts.preset
+0644  zram/zram-generator.conf     /etc/systemd/zram-generator.conf
+0644  resolved/10-autarchy.conf    /etc/systemd/resolved.conf.d/10-autarchy.conf
+0644  nftables/nftables.conf       /etc/nftables.conf
+0440  sudo/10-wheel                /etc/sudoers.d/10-wheel
+0644  boot/loader.conf             /efi/loader/loader.conf

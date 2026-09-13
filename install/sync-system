@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+# sync-system: copy the root-owned files listed in system/files.txt into a root filesystem.
+#
+# Usage: install/sync-system [--root DIR] apply|check
+#   apply       install every file whose content, mode, or owner differs
+#   check       report drift without changing anything; exit 1 if any file differs
+#   --root DIR  work on DIR instead of / (for example /mnt during installation)
+#
+# Files are copied, never symlinked: a link into this user-owned repository would let
+# the user account change system configuration without sudo. Sudoers files are
+# validated with visudo before anything is installed.
+set -euo pipefail
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+readonly REPO_ROOT
+readonly MANIFEST="$REPO_ROOT/system/files.txt"
+
+die() {
+  printf 'sync-system: %s\n' "$*" >&2
+  exit 1
+}
+
+usage() {
+  echo "usage: sync-system [--root DIR] apply|check" >&2
+  exit 2
+}
+
+is_root() {
+  (($(id -u) == 0))
+}
+
+# Manifest entries as "mode source target" lines; fails on malformed lines.
+manifest_entries() {
+  awk '
+    /^[[:space:]]*(#|$)/ { next }
+    NF != 3 {
+      printf "sync-system: %s:%d: expected <mode> <source> <target>\n", FILENAME, FNR > "/dev/stderr"
+      malformed = 1
+      next
+    }
+    { print $1, $2, $3 }
+    END { exit malformed }
+  ' "$MANIFEST"
+}
+
+# Why an installed file differs from its source; prints nothing when it matches.
+drift_reason() {
+  local mode=$1 source=$2 target=$3
+  if [[ ! -e $target ]]; then
+    echo missing
+  elif ! cmp -s "$source" "$target"; then
+    echo content
+  elif [[ -z $(find "$target" -prune -perm "$mode") ]]; then
+    echo mode
+  elif is_root && [[ -z $(find "$target" -prune -user 0) ]]; then
+    echo owner
+  fi
+}
+
+check() {
+  local mode source target reason drifted=0 total=0
+  while read -r mode source target; do
+    total=$((total + 1))
+    reason=$(drift_reason "$mode" "$REPO_ROOT/system/$source" "$ROOT$target")
+    if [[ -n $reason ]]; then
+      echo "$reason: $target"
+      drifted=$((drifted + 1))
+    fi
+  done <<<"$ENTRIES"
+
+  if ((drifted > 0)); then
+    echo "drift: $drifted of $total files"
+    return 1
+  fi
+  echo "in sync: $total files"
+}
+
+# Validate every sudoers source before touching anything, so a syntax error can't
+# lock the administrator out halfway through an apply.
+validate_sudoers() {
+  local mode source target
+  while read -r mode source target; do
+    case $target in
+      /etc/sudoers | /etc/sudoers.d/*)
+        visudo -cf "$REPO_ROOT/system/$source" >/dev/null ||
+          die "sudoers validation failed for system/$source; nothing was changed"
+        ;;
+    esac
+  done <<<"$ENTRIES"
+}
+
+apply() {
+  if [[ -z $ROOT ]] && ! is_root; then
+    die "apply to / must run as root (use sudo)"
+  fi
+  validate_sudoers
+
+  local mode source target updated=0 unchanged=0
+  while read -r mode source target; do
+    if [[ -z $(drift_reason "$mode" "$REPO_ROOT/system/$source" "$ROOT$target") ]]; then
+      unchanged=$((unchanged + 1))
+      continue
+    fi
+    mkdir -p "$(dirname "$ROOT$target")"
+    install -m "$mode" "$REPO_ROOT/system/$source" "$ROOT$target"
+    echo "updated: $target"
+    updated=$((updated + 1))
+  done <<<"$ENTRIES"
+
+  echo "applied: $updated updated, $unchanged unchanged"
+}
+
+main() {
+  ROOT=""
+  local command=""
+  while (($#)); do
+    case $1 in
+      --root)
+        (($# >= 2)) || usage
+        # "/" becomes "" so targets never start with "//".
+        ROOT=${2%/}
+        shift 2
+        ;;
+      apply | check)
+        command=$1
+        shift
+        ;;
+      *) usage ;;
+    esac
+  done
+  [[ -n $command ]] || usage
+
+  ENTRIES=$(manifest_entries)
+  "$command"
+}
+
+main "$@"

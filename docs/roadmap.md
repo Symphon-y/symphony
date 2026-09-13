@@ -25,7 +25,7 @@ outlines; their scope is finalized in their own plan mode.
   trust model), AUR helper or none, Claude's privilege model, dotfiles deployment
   mechanism (stow / symlink script / chezmoi). Found in Phase 1: how to use Claude Code
   when the VM is reachable only through the Unraid console (no SSH, and noVNC can't
-  paste and sometimes drops Shift); where `gh` stores its token without a keyring.
+  paste); where `gh` stores its token without a keyring.
 - **Phase 4:** session start (uwsm / greeter / TTY), acceptability of software
   rendering, whether GPU passthrough becomes its own side phase.
   Findings from the Phase 1 VM report: the display device is QXL with no DRM render

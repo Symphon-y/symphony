@@ -48,11 +48,9 @@ in_target() {
   arch-chroot "$TARGET" "$@"
 }
 
-# Copy a repo file to a path inside the target, creating parent directories.
-put_file() {
-  local mode=$1 src=$2 dest=$3
-  mkdir -p "$(dirname "$TARGET$dest")"
-  install -m "$mode" "$REPO_ROOT/$src" "$TARGET$dest"
+# Install the root-owned files from system/files.txt into the target.
+sync_system_files() {
+  "$REPO_ROOT/install/sync-system" --root "$TARGET" apply
 }
 
 load_config() {
@@ -89,14 +87,7 @@ preflight() {
 
 install_system_files() {
   log "Installing system configuration files"
-  put_file 644 system/mkinitcpio/10-autarchy.conf /etc/mkinitcpio.conf.d/10-autarchy.conf
-  put_file 644 system/mkinitcpio/linux.preset /etc/mkinitcpio.d/linux.preset
-  put_file 644 system/mkinitcpio/linux-lts.preset /etc/mkinitcpio.d/linux-lts.preset
-  put_file 644 system/zram/zram-generator.conf /etc/systemd/zram-generator.conf
-  put_file 644 system/resolved/10-autarchy.conf /etc/systemd/resolved.conf.d/10-autarchy.conf
-  put_file 644 system/nftables/nftables.conf /etc/nftables.conf
-  put_file 440 system/sudo/10-wheel /etc/sudoers.d/10-wheel
-  in_target visudo -cf /etc/sudoers.d/10-wheel
+  sync_system_files
 }
 
 # Uncomment exactly the chosen locale; examples and other locales stay commented.
@@ -140,8 +131,8 @@ configure_boot() {
   if ! in_target bootctl is-installed >/dev/null 2>&1; then
     in_target bootctl install
   fi
-  # After bootctl install, which writes its own default loader.conf.
-  put_file 644 system/boot/loader.conf "$ESP_MOUNT/loader/loader.conf"
+  # bootctl install may write its own default loader.conf; apply again so ours wins.
+  sync_system_files
 }
 
 create_user() {

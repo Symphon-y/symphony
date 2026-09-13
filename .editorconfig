@@ -8,8 +8,13 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 2
 
-# shfmt reads these settings
+# shfmt reads these settings. Scripts in scripts/ and install/ have no extension,
+# so they need their own section.
 [*.{sh,bash,bats}]
+indent_size = 2
+switch_case_indent = true
+
+[{scripts,install}/*]
 indent_size = 2
 switch_case_indent = true
 

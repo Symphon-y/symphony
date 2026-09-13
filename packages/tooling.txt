@@ -5,3 +5,8 @@ github-cli      # `gh`: HTTPS login to the private repo, no SSH keys needed
 bats            # test runner for unit and acceptance tests (D-0005)
 bats-assert     # assertion helpers used by every test suite
 bats-support    # required by bats-assert
+shellcheck      # static analysis for every shell script (scripts/check)
+shfmt           # shell formatting check (scripts/check)
+stow            # links home/ config into the home directory (install/link-home)
+tmux            # scrollback, a paste buffer, and windows on the text console
+jq              # JSON parsing: release manifests (install/claude-code), settings checks

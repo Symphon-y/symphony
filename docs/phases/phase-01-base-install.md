@@ -219,6 +219,8 @@ genuine assertion failure, with no load or syntax errors. · Green confirmed:
 - Console quirk: noVNC sometimes drops Shift (`+` came out as `=`, and `_` vanished).
   Workarounds: check Shift characters before pressing Enter, or avoid them (a regex `.`
   in place of `_`).
+  **Correction (2026-09-13, user):** the console does not drop Shift. Both incidents
+  were ordinary typos, so there is no console quirk to work around.
 - **Final green run** (after the fixes and a reboot, logged in as `travis`): 36/36 ok
   (`222644a`), including the new fstab test. Close-out: D-0009 to D-0017 written,
   Omarchy influences recorded, roadmap and README updated, branch merged to `main`.
