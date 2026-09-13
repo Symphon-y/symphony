@@ -1,0 +1,86 @@
+1..35
+ok 1 boot: firmware is 64-bit UEFI
+ok 2 boot: systemd-boot is installed on the ESP
+ok 3 boot: unified kernel images exist for linux and linux-lts
+ok 4 boot: the boot menu does not allow editing the kernel command line
+ok 5 boot: the kernel command line unlocks root through sd-encrypt
+ok 6 storage: / is btrfs on the LUKS mapping
+ok 7 storage: the root mapping is LUKS2 with discards allowed
+ok 8 storage: every subvolume in the layout is mounted where declared
+ok 9 storage: the ESP is vfat at the ESP mountpoint and not world-readable
+ok 10 storage: periodic TRIM is enabled
+ok 11 swap: zram swap is active
+not ok 12 snapshots: snapper root config exists with timeline snapshots off
+# (in test file tests/acceptance/phase-01.bats, line 121)
+#   `assert_line "TIMELINE_CREATE,no"' failed
+#
+# -- output does not contain line --
+# line : TIMELINE_CREATE,no
+# output (26 lines):
+#   key,value
+#   ALLOW_GROUPS,
+#   ALLOW_USERS,
+#   BACKGROUND_COMPARISON,yes
+#   EMPTY_PRE_POST_CLEANUP,yes
+#   EMPTY_PRE_POST_MIN_AGE,3600
+#   FREE_LIMIT,0.2
+#   FSTYPE,btrfs
+#   NUMBER_CLEANUP,yes
+#   NUMBER_LIMIT,10
+#   NUMBER_LIMIT_IMPORTANT,10
+#   NUMBER_MIN_AGE,3600
+#   QGROUP,
+#   SPACE_LIMIT,0.5
+#   SUBVOLUME,/
+#   SYNC_ACL,no
+#   TIMELINE_CLEANUP,yes
+#   TIMELINE_CREAT,no
+#   TIMELINE_CREATE,yes
+#   TIMELINE_LIMIT_DAILY,10
+#   TIMELINE_LIMIT_HOURLY,10
+#   TIMELINE_LIMIT_MONTHLY,10
+#   TIMELINE_LIMIT_QUARTERLY,0
+#   TIMELINE_LIMIT_WEEKLY,0
+#   TIMELINE_LIMIT_YEARLY,10
+#   TIMELINE_MIN_AGE,3600
+# --
+#
+ok 13 snapshots: old snapshots are cleaned up on a timer
+ok 14 snapshots: pacman transactions are snapshotted by snap-pac
+ok 15 identity: hostname is set and is not the installer's
+ok 16 identity: a UTF-8 locale is configured
+ok 17 identity: a console keymap is configured
+ok 18 identity: timezone is set and the clock is NTP-synchronized
+ok 19 network: NetworkManager and systemd-resolved are active
+ok 20 network: resolv.conf points at the systemd-resolved stub
+ok 21 network: public DNS names resolve
+ok 22 network: HTTPS to archlinux.org works
+ok 23 packages: the pacman database is consistent
+ok 24 packages: no foreign (AUR or hand-built) packages are installed
+ok 25 packages: every explicitly installed package is declared in packages/
+ok 26 security: tests run as a non-root member of wheel
+ok 27 security: the root account is locked
+not ok 28 security: sudo never skips the password
+# (in test file tests/acceptance/phase-01.bats, line 220)
+#   `assert_output ""' failed
+#
+# -- output differs --
+# expected :
+# actual   : /etc/sudoers:# %wheel ALL=(ALL:ALL) NOPASSWD: ALL
+# --
+#
+ok 29 security: the sudoers configuration is valid
+not ok 30 security: the firewall drops unsolicited inbound traffic
+# (in test file tests/acceptance/phase-01.bats, line 230)
+#   `assert_output "active"' failed
+#
+# -- output differs --
+# expected : active
+# actual   : inactive
+# --
+#
+ok 31 security: nothing listens beyond loopback except DHCP clients
+ok 32 security: no SSH server is installed
+ok 33 health: no systemd units have failed
+ok 34 health: the system reports itself fully running
+ok 35 vm: the QEMU guest agent is active
