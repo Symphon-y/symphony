@@ -238,9 +238,12 @@ public_listeners() {
 }
 
 @test "security: the firewall drops unsolicited inbound traffic" {
-  run systemctl is-active nftables
-  assert_output "active"
+  # Arch's nftables.service is a oneshot without RemainAfterExit: it loads the rules and
+  # then reports inactive. So check what matters: it loads at boot, and the rules are live.
+  run systemctl is-enabled nftables
+  assert_output "enabled"
   run as_root nft list chain inet filter input
+  assert_success
   assert_output --partial "policy drop"
 }
 

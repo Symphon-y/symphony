@@ -196,17 +196,29 @@ _pending (installed system)_
   run predates the fstab test (35 tests), because the fstab fix commits weren't on
   GitHub yet when the VM clone was made. Failures:
   - **12 snapper timeline off:** console typo. `set-config TIMELINE_CREAT=no` created a
-    meaningless key, and `TIMELINE_CREATE` stayed `yes`. Fix on the VM: `set-config`
-    again, and remove the stray key (pending).
+    meaningless key, and `TIMELINE_CREATE` stayed `yes`. Fixed on the VM: `set-config`
+    again, and the stray key removed (`TIMELINE_CREATE,no` is the only match).
   - **28 sudo never skips the password:** a test bug. It matched the commented-out
     `# %wheel ALL=(ALL:ALL) NOPASSWD: ALL` example in the stock `/etc/sudoers`. The test
     now ignores comment lines, and was checked on the Mac to still catch an active
     NOPASSWD rule.
-  - **30 firewall:** `nftables` reports `inactive` but not failed, even though
-    `configure-base-system` enabled it. Under investigation.
-- The user asked whether to rename the account from `Travis` to `travis`.
-  Recommendation: yes, now (lowercase is the portable convention, and renaming only
-  gets harder later). Decision pending. The tests don't hardcode usernames.
+  - **30 firewall:** a test bug. On the VM, `nftables` is `enabled`, and its boot run
+    exited `0/SUCCESS`, then it shows `inactive (dead)`. Arch's packaged unit
+    (nftables 1.1.7-3, checked in the Arch packaging repo) is `Type=oneshot` with
+    no `RemainAfterExit` and no `ExecStop`. It loads the rules into the kernel and
+    exits, and the rules stay loaded. The test now asserts that the unit is enabled and
+    that the `inet filter input` chain is live with `policy drop`, not `is-active`. No
+    unit drop-in was added: overriding the packaged unit only to change its status
+    display isn't worth owning.
+- The account was renamed from `Travis` to `travis` on the user's decision (lowercase is
+  the portable convention, and renaming only gets harder later). Method: a transient
+  `systemd-run` unit that ends the user's session and then runs `usermod -l … -d … -m`
+  plus `groupmod -n`. Worth remembering: **`usermod -l` does not rename
+  `/etc/subuid` and `/etc/subgid` entries**; they were fixed with `sed`. The tests don't
+  hardcode usernames.
+- Console quirk: noVNC sometimes drops Shift (`+` came out as `=`, and `_` vanished).
+  Workarounds: check Shift characters before pressing Enter, or avoid them (a regex `.`
+  in place of `_`).
 
 ## VM → physical hardware notes
 
