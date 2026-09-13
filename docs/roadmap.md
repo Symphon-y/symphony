@@ -7,7 +7,7 @@ outlines; their scope is finalized in their own plan mode.
 | # | Phase | Layer | Driver | Exit signal | Status |
 |---|---|---|---|---|---|
 | 0 | [Foundation](phases/phase-00-foundation.md) — repo, docs, standing orders, roadmap | — | Claude (Mac, docs only) | Private GitHub repo with core docs | Complete (2026-09-12) |
-| 1 | Environment inspection + base Arch install | 1 | **User** (runbook) | Boots to TTY; user login; network + pacman work; `tests/acceptance/phase-01.bats` passes | Not started |
+| 1 | Environment inspection + base Arch install | 1 | **User** (runbook) | Boots to TTY; user login; network + pacman work; `tests/acceptance/phase-01.bats` passes | Complete (2026-09-13) |
 | 2 | Agent handoff + developer bootstrap | 1/5 | User → Claude | Claude Code runs as user in VM; repo cloned; bats/shellcheck/shfmt; deploy mechanism chosen; CI (static + unit) | Not started |
 | 3 | Omarchy research | all | Claude | `docs/omarchy-influences.md` classifies components | Not started |
 | 4 | Minimal Hyprland session | 2 | Claude | Hyprland login; terminal, audio, portals, polkit agent, notifications, idle/lock, wallpaper | Not started |
@@ -20,12 +20,12 @@ outlines; their scope is finalized in their own plan mode.
 
 ## Decisions deferred to their phase's plan mode
 
-- **Phase 1:** firmware (OVMF/UEFI expected), partition layout, filesystem (Btrfs +
-  snapshots?), LUKS, bootloader, kernel, NetworkManager, locale/time, sudo policy,
-  sshd policy, driving over SSH from the Mac vs. the VNC console.
+- **Phase 1:** resolved; see D-0008 to D-0017.
 - **Phase 2:** Claude Code install method (AUR vs. npm vs. native installer, under the
   trust model), AUR helper or none, Claude's privilege model, dotfiles deployment
-  mechanism (stow / symlink script / chezmoi).
+  mechanism (stow / symlink script / chezmoi). Found in Phase 1: how to use Claude Code
+  when the VM is reachable only through the Unraid console (no SSH, and noVNC can't
+  paste and sometimes drops Shift); where `gh` stores its token without a keyring.
 - **Phase 4:** session start (uwsm / greeter / TTY), acceptability of software
   rendering, whether GPU passthrough becomes its own side phase.
   Findings from the Phase 1 VM report: the display device is QXL with no DRM render

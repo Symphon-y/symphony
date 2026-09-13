@@ -60,6 +60,6 @@ first needs them, not in advance.
 
 ## Status
 
-Phase 0 (foundation) complete. Next: Phase 1, environment inspection and base Arch
-install. The lab VM is booted into the Arch installer on an Unraid server; nothing is
-installed yet. See [`docs/roadmap.md`](docs/roadmap.md).
+Phase 1 (base install) complete. The lab VM on Unraid runs an encrypted Btrfs Arch base
+booted by systemd-boot, verified by 36 acceptance tests. Next: Phase 2, agent handoff
+and developer bootstrap. See [`docs/roadmap.md`](docs/roadmap.md).

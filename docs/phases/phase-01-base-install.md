@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Status** | In progress |
+| **Status** | Complete |
 | **Driver** | Claude (Mac preparation) → **User** (runbook in the VM) |
 | **Branch** | `phase/01-base-install` |
 | **Started** | 2026-09-12 |
-| **Completed** | — |
+| **Completed** | 2026-09-13 |
 
 ## Goal
 
@@ -69,7 +69,7 @@ Unit tests: `tests/unit/pkglist.bats`.
 Red confirmed: 2026-09-13 on the live ISO (`2d90890`): 23 not ok, 12 ok. The ISO
 already provides some checked pieces (resolved, sudo, guest agent). Every failure is a
 genuine assertion failure, with no load or syntax errors. · Green confirmed:
-_pending (installed system)_
+2026-09-13 on the installed system after a reboot (`222644a`): **36/36 ok**, 0 skipped.
 
 ## Tasks
 
@@ -82,16 +82,16 @@ _pending (installed system)_
 - [x] `packages/*.txt` (all 25 names verified against archlinux.org package search), `system/*` files
 - [x] `tests/acceptance/phase-01.bats` runs on the Mac and fails cleanly, with no errors (33 fail, 1 pass, 1 skip; shellcheck clean)
 - [x] `docs/runbooks/base-install.md` and `base-install.vars.example`
-- [ ] Commit; user pushes the branch
+- [x] Commit; user pushes the branch
 
 **VM (user, following the runbook)**
-- [ ] 0. Unraid prerequisites
+- [x] 0. Unraid prerequisites
 - [x] 1. Repo cloned on the live ISO
 - [x] 2. `system-report` committed (`9b601ab`); Claude reviewed the gates: all pass
 - [x] 3. Red run committed (`docs/phases/evidence/phase-01-red.tap`, `2d90890`)
-- [ ] 4–7. Partition, encrypt, Btrfs, pacstrap, configure, reboot
-- [ ] 8. First boot: snapper, repo clone, green run committed (`phase-01-green.tap`)
-- [ ] 9. `linux-lts` entry boots; snap-pac pre/post snapshots observed
+- [x] 4–7. Partition, encrypt, Btrfs, pacstrap, configure (`install/configure-base-system`), reboot
+- [x] 8. First boot: snapper, repo clone, green run committed (`phase-01-green.tap`)
+- [x] 9. `linux-lts` entry boots; snap-pac pre/post snapshots observed (reported by the user)
 
 ## Implementation log
 
@@ -219,6 +219,10 @@ _pending (installed system)_
 - Console quirk: noVNC sometimes drops Shift (`+` came out as `=`, and `_` vanished).
   Workarounds: check Shift characters before pressing Enter, or avoid them (a regex `.`
   in place of `_`).
+- **Final green run** (after the fixes and a reboot, logged in as `travis`): 36/36 ok
+  (`222644a`), including the new fstab test. Close-out: D-0009 to D-0017 written,
+  Omarchy influences recorded, roadmap and README updated, branch merged to `main`.
+  **Phase 1 complete.**
 
 ## VM → physical hardware notes
 
@@ -230,10 +234,10 @@ _pending (installed system)_
 
 ## Exit criteria
 
-- [ ] All acceptance tests pass on the installed system (green TAP committed)
-- [ ] Unit tests pass; shellcheck and shfmt clean
-- [ ] `linux-lts` boot entry verified
-- [ ] `DECISIONS.md` updated
-- [ ] `docs/omarchy-influences.md` updated
-- [ ] `docs/roadmap.md` status updated
-- [ ] Branch merged to `main`
+- [x] All acceptance tests pass on the installed system (green TAP committed: 36/36)
+- [x] Unit tests pass (19/19); shellcheck and shfmt clean
+- [x] `linux-lts` boot entry verified
+- [x] `DECISIONS.md` updated (D-0008 to D-0017)
+- [x] `docs/omarchy-influences.md` updated (installer, disk/boot, firewall, services)
+- [x] `docs/roadmap.md` status updated
+- [x] Branch merged to `main`
