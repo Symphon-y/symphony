@@ -55,9 +55,10 @@ Phase 1 (acceptance) and Phase 2 (unit tests, CI). Verification is manual:
 - [x] Write `docs/omarchy-influences.md` (framework + research list)
 - [x] Write `docs/phases/_template.md`
 - [x] Write `.gitignore` and `.editorconfig`
-- [ ] `git init -b main` and initial commit
-- [ ] Create private GitHub repo and push
-- [ ] Verify visibility is private
+- [x] `git init -b main` and initial commit
+- [x] Private GitHub repo exists (`Symphon-y/autarchy`)
+- [x] Verify visibility is private
+- [ ] Push `main` to origin
 
 ## Implementation log
 
@@ -65,6 +66,13 @@ Phase 1 (acceptance) and Phase 2 (unit tests, CI). Verification is manual:
 - Mac inspected: Apple M2, 8 GB — control host only. Lab VM is on a remote Unraid
   server, booted into the Arch ISO (kernel 7.2.2-arch1-1), nothing installed.
 - Roadmap planned in plan mode and approved. Wrote core documents.
+- **Deviation:** planned `gh repo create`, but `Symphon-y/autarchy` already existed
+  (empty, created minutes earlier, **public**). With the user's approval, switched it to
+  private (verified `PRIVATE`) instead of creating a new repo.
+- First push failed: `remote: Your repository is disabled` (HTTP 403), right after the
+  visibility change. The API then reported `disabled: false`, which suggests GitHub was
+  still processing the change. Claude's retry was blocked by the permission policy
+  (out-of-place publication); the push is left for the user to run.
 
 ## VM → physical hardware notes
 
