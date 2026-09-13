@@ -7,7 +7,9 @@ check.
 
 **Conventions**
 - VM steps run **as your user** (`travis`) from `~/Projects/autarchy`. Unraid steps run
-  in Unraid's web terminal (`<internal-hostname>`, the `>_` button in the top right).
+  in Unraid's web terminal (Unraid's web UI, the `>_` button in the top right).
+- `<vm-lan-ip>` and `<unraid-lan-ip>` are the machines' LAN addresses. Look them up on
+  the machines; **never write them into the repo** (enforced by `scripts/check-identifiers`).
 - Anything unexpected: stop, take a screenshot, and don't improvise changes.
 - CI must be green on GitHub for this branch before each VM `git pull`.
 
@@ -43,7 +45,7 @@ sudo install/sync-system check
 ```
 
 Expected: `in sync`, or only `missing:` lines for files the repo has added since this
-machine was set up (for example `/etc/profile.d/local-bin.sh`). Install those with:
+machine was set up. Install those with:
 
 ```sh
 sudo install/sync-system apply
@@ -73,37 +75,38 @@ If that happens, screenshot it. **Never** fall back to `curl | bash`.
 Copy and paste work in Unraid's web terminal because it runs in the browser. SSH from
 there to the VM gives you a session with copy and paste. Nothing is exposed beyond
 Unraid: sshd is key-only, never allows root, only starts when you start it, and the VM
-firewall accepts SSH only from Unraid's LAN IP.
+admits SSH only from Unraid's address (firewall rule and a restriction on the key).
 
 **5a. Unraid: create the key.**
 
 ```sh
 ls -la /root/.ssh                      # expect: /root/.ssh -> /boot/config/ssh/root (persists on flash)
 ssh-keygen -t ed25519 -f /root/.ssh/autarchy-vm -C unraid-to-autarchy-vm   # set a passphrase
-cat /root/.ssh/autarchy-vm.pub
-ip -4 -br addr show br0
+cat /root/.ssh/autarchy-vm.pub         # send this public key to Claude
+ip -4 -br addr show br0                # note Unraid's address; keep it out of the repo
 ```
 
-Send Claude the public key line and Unraid's `br0` IP. **Never** share
-`/root/.ssh/autarchy-vm` (the private key). Claude commits them as machine-specific
-config in `system/hosts/autarchy-vm/`.
+Claude commits only the **public key** (`system/hosts/autarchy-vm/ssh/`). **Never**
+share `/root/.ssh/autarchy-vm` (the private key).
 
 **5b. VM console, once that commit is green in CI:**
 
 ```sh
 git pull
 sudo pacman -S --needed $(scripts/pkglist packages/*.txt)   # adds openssh
-sudo install/sync-system check         # expect only missing: lines for the new ssh/firewall files
+sudo install/sync-system check         # expect only missing: lines for new files
 sudo install/sync-system apply
+sudo install/ssh-jump-host <unraid-lan-ip>   # machine-local: firewall rule + key restriction
 sudo systemctl restart nftables        # load the new firewall rule
 sudo systemctl start sshd              # on demand; it is never enabled at boot
 ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub   # note this fingerprint
+ip -4 -br addr                         # note the VM's <vm-lan-ip>
 ```
 
 **5c. Unraid: connect.**
 
 ```sh
-ssh -i /root/.ssh/autarchy-vm travis@<ipv4>
+ssh -i /root/.ssh/autarchy-vm travis@<vm-lan-ip>
 ```
 
 On the first connection, SSH shows the VM's host key fingerprint. **Accept it only if it
@@ -128,17 +131,20 @@ Leave Claude running in tmux window 0. Press `Ctrl-b c` for window 1:
 
 ```sh
 cd ~/Projects/autarchy
+# Commits from this machine use your GitHub noreply address, not a personal email.
+git config user.email "$(gh api user --jq '"\(.id)+\(.login)@users.noreply.github.com"')"
 claude doctor
 sudo -v
 bats --formatter tap tests/acceptance | tee docs/phases/evidence/phase-02-green.tap
+scripts/check-identifiers docs/phases/evidence/phase-02-green.tap   # must pass before committing
 git add docs/phases/evidence/phase-02-green.tap
 git commit -m "Phase 2: acceptance tests green after handoff"
 git push
 ```
 
 sshd must be running for the SSH tests (you're connected through it, so it is).
-If anything is `not ok`, push the TAP file anyway. Claude on the Mac fixes the cause,
-and you `git pull` and re-run.
+If anything is `not ok`, push the TAP file anyway (after the identifier check). Claude
+on the Mac fixes the cause, and you `git pull` and re-run.
 
 ## 8. Handoff
 
@@ -157,12 +163,13 @@ and you run it in window 1.
 ## Every later session
 
 1. **VM console:** `sudo systemctl start sshd`
-2. **Unraid terminal:** `ssh -i /root/.ssh/autarchy-vm travis@<ipv4>`, then
+2. **Unraid terminal:** `ssh -i /root/.ssh/autarchy-vm travis@<vm-lan-ip>`, then
    `tmux attach || tmux`
 3. **When done:** detach (`Ctrl-b d`), `exit`, and in the VM `sudo systemctl stop sshd`.
 
-The VM's IP comes from DHCP. Reserve `<ipv4>` for it in the router, or check the
-IP on Unraid's VM page, which the guest agent reports.
+The VM's address comes from DHCP. Reserve it in the router, or check it on Unraid's VM
+page, which the guest agent reports. If Unraid's own address changes, re-run
+`sudo install/ssh-jump-host <unraid-lan-ip>` and restart nftables.
 
 ## Working with tmux
 

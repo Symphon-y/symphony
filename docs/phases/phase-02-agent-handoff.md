@@ -158,9 +158,9 @@ Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
 - CI green for the PATH fix (`746ccb3`, run 34762221157).
 - **Amendment — copy/paste via on-demand SSH from Unraid** (planned and approved in plan
   mode). Before logging in, the user asked for RDP-style copy/paste. Findings:
-  `<internal-hostname>` and `<internal-hostname>` both resolve to Unraid's tailnet IP
-  (nginx and AdGuard handle HTTP only); the Mac is remote on an overlapping
-  `<ipv4>/24`; Unraid advertises no subnet routes. RDP needs a desktop, which
+  the user's internal hostnames for the VM and for Unraid both resolve to Unraid's
+  tailnet address (nginx and AdGuard handle HTTP only); the Mac is remote, on a subnet
+  that overlaps the home LAN; Unraid advertises no subnet routes. RDP needs a desktop, which
   arrives in Phase 4 (likely wayvnc). User decisions: no SSH *into* Unraid; Unraid's
   browser terminal as the jump host; source limited to Unraid's LAN IP; sshd started on
   demand; passphrase key on Unraid's flash; remove the gist relay.
@@ -176,13 +176,37 @@ Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
   and reports exactly the values the acceptance tests expect.
 - Unraid (runbook step 5a, user): `/root/.ssh` is a symlink to `/boot/config/ssh/root/`
   (persistent). Key `unraid-to-autarchy-vm` (ed25519, with passphrase) created. Unraid's
-  LAN IP is `<ipv4>`.
-- Host files `system/hosts/autarchy-vm/`: a firewall rule allowing tcp/22 from
-  <ipv4> only, and root-owned authorized keys for `travis`. **Addition beyond the
-  plan:** the key line carries `from="<ipv4>",restrict,pty`, so sshd itself also
-  accepts the key only from Unraid (defense in depth behind the firewall). `restrict`
-  turns off every kind of forwarding for the key; `pty` keeps interactive sessions
-  working.
+  LAN address stays on the machines only (see below), never in git.
+- **User objection: no network identifiers in git, even in a private repo.** The first
+  host files (unpushed) committed Unraid's LAN address. An audit also found the VM
+  system report (already pushed to `main` and the branch) listing LAN addresses and a
+  MAC address. All 28 commits carried a personal author email.
+- **User decisions:** rewrite history and force-push; add an automated scanner; use the
+  GitHub noreply email from now on. Before the rewrite, a full local bundle backup was
+  taken (outside the repo).
+- **Redesign:**
+  - The jump host's address is machine-local state. `install/ssh-jump-host <address>`
+    writes the firewall rule (`/etc/nftables.d/ssh-jump-host.nft`) and root-owned
+    authorized keys, each restricted with `from="<address>",restrict,pty`. That keeps a
+    defense-in-depth check in sshd behind the firewall; `pty` keeps interactive sessions
+    working.
+  - The repo keeps only the public key (`system/hosts/autarchy-vm/ssh/authorized_keys.travis`).
+  - `scripts/check-identifiers` (IPv4, MAC, IPv6 global/ULA/link-local, email; loopback,
+    unspecified, and documentation ranges allowed; never prints the value) runs in
+    `scripts/check` and CI, and `system-report` masks the same patterns
+    (`scripts/lib/identifiers.bash`).
+  - How a target's hostname is read is shared by `sync-system` and `ssh-jump-host`
+    (`scripts/lib/host.bash`).
+- Test-first results for the redesign. Red: `identifiers` 7/7 and `ssh-jump-host` 8/8
+  failed because the scripts were missing, and the 4 `sync-system` host tests failed on the
+  missing shared library. Green: 7/7, 8/8, 16/16, with `configure-base-system` still
+  12/12. Test fixtures are assembled at runtime or use documentation address ranges, so
+  the test files pass the scanner themselves.
+- `docs/environment/vm-lab.md` masked in place with `redact_identifiers`: interface
+  names, states, and prefix lengths are kept, and the addresses are gone. `system-report`
+  now masks its own output.
+- Repo-local `user.email` on the Mac set to the GitHub noreply address. The VM runbook
+  sets the same before its commits.
 
 ## VM → physical hardware notes
 

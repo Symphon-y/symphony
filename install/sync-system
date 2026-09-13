@@ -16,6 +16,8 @@ REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO_ROOT
 readonly MANIFEST="$REPO_ROOT/system/files.txt"
 readonly HOSTS_DIR="$REPO_ROOT/system/hosts"
+# shellcheck source-path=SCRIPTDIR source=../scripts/lib/host.bash
+source "$REPO_ROOT/scripts/lib/host.bash"
 
 die() {
   printf 'sync-system: %s\n' "$*" >&2
@@ -53,14 +55,9 @@ read_manifest() {
 manifest_entries() {
   read_manifest "$MANIFEST" "" || return 1
 
-  local hostname=""
-  if [[ -r $ROOT/etc/hostname ]]; then
-    hostname=$(tr -d '[:space:]' <"$ROOT/etc/hostname")
-  fi
-  # A plain hostname only, so the name can never point outside system/hosts/.
-  [[ $hostname =~ ^[A-Za-z0-9][A-Za-z0-9-]*$ ]] || return 0
-
-  if [[ -f $HOSTS_DIR/$hostname/files.txt ]]; then
+  local hostname
+  hostname=$(target_hostname "$ROOT")
+  if [[ -n $hostname && -f $HOSTS_DIR/$hostname/files.txt ]]; then
     read_manifest "$HOSTS_DIR/$hostname/files.txt" "hosts/$hostname/" || return 1
   fi
 }

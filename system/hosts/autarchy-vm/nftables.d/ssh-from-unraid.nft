@@ -1,5 +1,0 @@
-# Target: /etc/nftables.d/ssh-from-unraid.nft (included at the end of /etc/nftables.conf)
-#
-# Unraid (<ipv4>) is this VM's only SSH jump host: its browser terminal is where
-# copy/paste works. Nothing else may reach sshd. Unraid's LAN IP must stay fixed.
-add rule inet filter input ip saddr <ipv4> tcp dport 22 accept

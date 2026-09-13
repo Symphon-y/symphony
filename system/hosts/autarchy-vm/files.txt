@@ -1,7 +1,0 @@
-# autarchy-vm (the lab VM on Unraid): machine-specific system files.
-#
-# Same format as system/files.txt; sources are relative to this directory.
-# install/sync-system adds these when the target's /etc/hostname is "autarchy-vm".
-
-0644  nftables.d/ssh-from-unraid.nft  /etc/nftables.d/ssh-from-unraid.nft
-0644  ssh/authorized_keys.travis      /etc/ssh/authorized_keys/travis

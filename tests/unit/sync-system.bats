@@ -148,8 +148,9 @@ manifest_entries() {
 # tests never depend on (or add to) the real repository's hosts.
 make_repo_copy() {
   REPO_COPY="$BATS_TEST_TMPDIR/repo"
-  mkdir -p "$REPO_COPY/install"
+  mkdir -p "$REPO_COPY/install" "$REPO_COPY/scripts"
   cp "$SCRIPT" "$REPO_COPY/install/sync-system"
+  cp -R "$REPO_ROOT/scripts/lib" "$REPO_COPY/scripts/"
   cp -R "$REPO_ROOT/system" "$REPO_COPY/"
   mkdir -p "$REPO_COPY/system/hosts/testhost/ssh"
   echo "ssh-ed25519 AAAAtest alice@jumphost" >"$REPO_COPY/system/hosts/testhost/ssh/authorized_keys.alice"

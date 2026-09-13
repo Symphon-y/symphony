@@ -73,6 +73,17 @@ unrestricted_ssh_rules() {
   assert_output "$keys"
 }
 
+@test "ssh: every authorized key is restricted to a source address" {
+  local keys
+  keys="/etc/ssh/authorized_keys/$(id -un)"
+  # No key line without a from= restriction...
+  run as_root grep -Evc '^[[:space:]]*(#|$)|^from="[^"]+",' "$keys"
+  assert_output "0"
+  # ...and at least one restricted key.
+  run as_root grep -Ec '^from="[^"]+",' "$keys"
+  refute_output "0"
+}
+
 @test "ssh: the server is not started at boot" {
   run systemctl is-enabled sshd
   refute_output "enabled"

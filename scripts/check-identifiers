@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# check-identifiers: fail when files contain network or personal identifiers.
+#
+# Usage: scripts/check-identifiers [FILE...]   (default: every file tracked by git)
+#
+# IP, MAC, and email addresses don't belong in this repository, even though it is
+# private: machine-specific values stay on the machine. scripts/lib/identifiers.bash
+# defines what is detected and what is allowed. Findings name the file, line, and kind,
+# never the value.
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+# shellcheck source-path=SCRIPTDIR source=lib/identifiers.bash
+source scripts/lib/identifiers.bash
+
+files=("$@")
+if (($# == 0)); then
+  while IFS= read -r file; do
+    if [[ -f $file ]]; then
+      files+=("$file")
+    fi
+  done < <(git ls-files)
+fi
+
+if ((${#files[@]} == 0)); then
+  echo "no files to check"
+  exit 0
+fi
+
+findings=$(find_identifiers "${files[@]}")
+if [[ -n $findings ]]; then
+  printf '%s\n' "$findings"
+  echo "check-identifiers: remove these identifiers; machine-specific values stay on the machine" >&2
+  exit 1
+fi
+echo "no identifiers in ${#files[@]} files"
