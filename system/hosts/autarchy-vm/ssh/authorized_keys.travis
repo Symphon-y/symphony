@@ -1,0 +1,6 @@
+# Target: /etc/ssh/authorized_keys/travis (root-owned; see system/ssh/10-autarchy.conf)
+#
+# The only key allowed to log in as travis: Unraid's passphrase-protected jump key.
+# from=: sshd itself accepts this key only from Unraid, a second check behind the firewall.
+# restrict,pty: no forwarding of any kind, but interactive terminal sessions still work.
+from="<ipv4>",restrict,pty ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP1kO14vqM5R1zCWyGNWACQhuCQx99qcn/y8/3YCjrI6 unraid-to-autarchy-vm

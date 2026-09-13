@@ -172,7 +172,17 @@ Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
   `/etc/nftables.d/*.nft`. `openssh` is declared. New phase-02 SSH acceptance tests.
   Phase-01's "no SSH server installed" is now "not started at boot", and its listener
   test allows `:22`. The gist relay (script, unit tests, acceptance test, runbook step)
-  is removed.
+  is removed. Unit tests 54/54; `sshd -T` (OpenSSH 10.3 on the Mac) reads the drop-in
+  and reports exactly the values the acceptance tests expect.
+- Unraid (runbook step 5a, user): `/root/.ssh` is a symlink to `/boot/config/ssh/root/`
+  (persistent). Key `unraid-to-autarchy-vm` (ed25519, with passphrase) created. Unraid's
+  LAN IP is `<ipv4>`.
+- Host files `system/hosts/autarchy-vm/`: a firewall rule allowing tcp/22 from
+  <ipv4> only, and root-owned authorized keys for `travis`. **Addition beyond the
+  plan:** the key line carries `from="<ipv4>",restrict,pty`, so sshd itself also
+  accepts the key only from Unraid (defense in depth behind the firewall). `restrict`
+  turns off every kind of forwarding for the key; `pty` keeps interactive sessions
+  working.
 
 ## VM → physical hardware notes
 
