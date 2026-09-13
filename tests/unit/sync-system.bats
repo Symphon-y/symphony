@@ -54,9 +54,21 @@ manifest_entries() {
   while read -r mode source target; do
     run cmp "$REPO_ROOT/system/$source" "$ROOT$target"
     assert_success
-    run find "$ROOT$target" -perm "$mode"
-    assert_output "$ROOT$target"
+    # "-" marks a filesystem without per-file permissions (the vfat ESP).
+    if [[ $mode != - ]]; then
+      run find "$ROOT$target" -perm "$mode"
+      assert_output "$ROOT$target"
+    fi
   done < <(manifest_entries)
+}
+
+@test "check ignores the mode of files marked '-' (the ESP has no Unix permissions)" {
+  "$SCRIPT" --root "$ROOT" apply
+  # On a vfat ESP mounted with fmask=0077, every file reports mode 0700.
+  chmod 0700 "$ROOT/efi/loader/loader.conf"
+  run "$SCRIPT" --root "$ROOT" check
+  assert_success
+  assert_output --partial "in sync"
 }
 
 @test "check passes right after apply" {

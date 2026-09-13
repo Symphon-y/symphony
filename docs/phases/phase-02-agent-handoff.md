@@ -126,6 +126,16 @@ Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
   installed files really are root-owned and `check` correctly said `in sync`. The test
   now hands the file to uid 65534 when it runs as real root, so it checks the same
   thing on any runner. The script itself was right.
+- **Third CI run (`112bcc7`, run 34758550075): 55/55 green.**
+- **Red on the VM** (`748af22`): 50 tests; phase-01 36/36 still ok; phase-02 11 not ok,
+  3 ok. The 3 are expected: `gh` was already logged in, CI is green, and no relay gists
+  exist. No load or syntax errors.
+- **Real finding from the red run — `mode: /efi/loader/loader.conf` drift.** The ESP is
+  vfat, so file modes come from the mount options (`fmask=0077`), not the file. The
+  manifest's `0644` could never match, and `apply` could fail trying to set it. Fix,
+  test-first: a manifest mode of `-` means "no per-file permissions: don't check or set
+  a mode". Owner checking still applies. The user was asked to pause before runbook
+  step 3 until the fix passes CI.
 
 ## VM → physical hardware notes
 

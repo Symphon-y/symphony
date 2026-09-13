@@ -50,7 +50,7 @@ drift_reason() {
     echo missing
   elif ! cmp -s "$source" "$target"; then
     echo content
-  elif [[ -z $(find "$target" -prune -perm "$mode") ]]; then
+  elif [[ $mode != - && -z $(find "$target" -prune -perm "$mode") ]]; then
     echo mode
   elif is_root && [[ -z $(find "$target" -prune -user 0) ]]; then
     echo owner
@@ -102,7 +102,12 @@ apply() {
       continue
     fi
     mkdir -p "$(dirname "$ROOT$target")"
-    install -m "$mode" "$REPO_ROOT/system/$source" "$ROOT$target"
+    if [[ $mode == - ]]; then
+      # No per-file permissions on this filesystem (the vfat ESP): copy content only.
+      cp "$REPO_ROOT/system/$source" "$ROOT$target"
+    else
+      install -m "$mode" "$REPO_ROOT/system/$source" "$ROOT$target"
+    fi
     echo "updated: $target"
     updated=$((updated + 1))
   done <<<"$ENTRIES"
