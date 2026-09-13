@@ -28,6 +28,9 @@ outlines; their scope is finalized in their own plan mode.
   mechanism (stow / symlink script / chezmoi).
 - **Phase 4:** session start (uwsm / greeter / TTY), acceptability of software
   rendering, whether GPU passthrough becomes its own side phase.
+  Findings from the Phase 1 VM report: the display device is QXL with no DRM render
+  node (compare virtio-gpu), and the VM has no audio device (add a virtual sound card in
+  Unraid before testing PipeWire).
 
 ## Cross-cutting concerns (checked in every phase)
 

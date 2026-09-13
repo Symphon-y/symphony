@@ -83,8 +83,8 @@ Red confirmed: _pending (live ISO)_ · Green confirmed: _pending (installed syst
 
 **VM (user, following the runbook)**
 - [ ] 0. Unraid prerequisites
-- [ ] 1. Repo cloned on the live ISO
-- [ ] 2. `system-report` committed; Claude reviews the gates
+- [x] 1. Repo cloned on the live ISO
+- [x] 2. `system-report` committed (`9b601ab`); Claude reviewed the gates: all pass
 - [ ] 3. Red run committed (`docs/phases/evidence/phase-01-red.tap`)
 - [ ] 4–7. Partition, encrypt, Btrfs, pacstrap, configure, reboot
 - [ ] 8. First boot: snapper, repo clone, green run committed (`phase-01-green.tap`)
@@ -130,6 +130,19 @@ Red confirmed: _pending (live ISO)_ · Green confirmed: _pending (installed syst
   blocked by non-migratable CPU device (invtsc flag)`. The VM's CPU is deliberately
   non-migratable. User decision: hypervisor snapshots are not integral. Removed from
   CLAUDE.md, the phase template, this doc, and the runbook.
+
+### 2026-09-13
+- Runbook steps 1–2 done by the user on the live ISO; report at
+  [`docs/environment/vm-lab.md`](../environment/vm-lab.md). **All 5 install gates pass.**
+- Review: OVMF (EDK II) UEFI 64-bit on Q35; 8 vCPUs (i9-13900K host), 15 GiB RAM;
+  `vda` 128 GiB virtio with discard support (512B granularity), so TRIM reaches the host;
+  `enp1s0` DHCP IPv4 plus IPv6 addresses from router advertisements; NTP synced. Nothing
+  changes the Phase 1 design. `DISK=/dev/vda` is correct.
+- Findings for Phase 4 (recorded in `docs/roadmap.md`): the display device is **QXL** with
+  no DRM render node, and the VM has **no audio device**.
+- Git: the report was pushed from the ISO before `50ceacc` was pushed from the Mac.
+  Resolved by rebasing the unpushed Mac commit (now `b9243fc`); the ISO clone needs
+  `git pull` before its next commit.
 
 ## VM → physical hardware notes
 
