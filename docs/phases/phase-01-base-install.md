@@ -180,6 +180,18 @@ _pending (installed system)_
   root filesystem could lose `noatime`. Runbook step 4 now checks `findmnt /mnt` is
   empty after `umount`, and step 5 checks for exactly 6 `UUID=` entries. The VM fstab
   is cleaned to the 6 correct entries (backup kept at `/etc/fstab.bak`).
+- **Second effect of the stacked mount — compression never enabled.** No Btrfs entry
+  in the VM fstab has `compress=zstd:1`. Compression is a filesystem-wide option,
+  fixed by the first mount of the volume: the leftover top-level mount had no options,
+  so the later subvolume mounts couldn't turn compression on (per-mount `noatime` did
+  apply). pacstrap therefore wrote uncompressed data. The cleanup also adds
+  `compress=zstd:1` to every Btrfs entry, and a remount of `/` turns it on. Existing files
+  stay uncompressed, which is harmless; new writes are compressed. The cleanup was tested
+  on the Mac against a replica of the VM fstab: 6 entries, no duplicates, no top-level
+  entry, compression on all Btrfs lines, and running it twice gives the same file.
+- Follow-up (not done now): `install/configure-base-system` preflight could validate the
+  fstab (one entry per mountpoint, no top-level subvolume, Btrfs compression present),
+  which would have caught this before reboot. Candidate for Phase 8.
 
 ## VM → physical hardware notes
 
