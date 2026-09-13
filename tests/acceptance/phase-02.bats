@@ -44,6 +44,16 @@ readonly SETTINGS="$HOME/.claude/settings.json"
   assert [ ! -L "$HOME/.claude" ]
 }
 
+# --- shell --------------------------------------------------------------------
+
+@test "shell: login shells put ~/.local/bin on PATH, after the system directories" {
+  # A clean environment, so a PATH exported by hand can't make this pass.
+  # shellcheck disable=SC2016 # $PATH must expand inside the login shell, not here
+  run env -i HOME="$HOME" USER="$USER" bash -lc 'printf "%s" "$PATH"'
+  assert_success
+  assert_output --regexp "(^|:)/usr/bin:(.*:)?$HOME/\.local/bin(:|$)"
+}
+
 # --- claude code --------------------------------------------------------------
 
 @test "claude code: the claude command runs" {

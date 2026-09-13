@@ -4,13 +4,13 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-shell_files=(scripts/* install/* tests/helpers/*.bash tests/unit/*.bats tests/acceptance/*.bats)
+shell_files=(scripts/* install/* system/*/*.sh tests/helpers/*.bash tests/unit/*.bats tests/acceptance/*.bats)
 
 echo "==> shellcheck"
 shellcheck -x "${shell_files[@]}"
 
 echo "==> shfmt"
-shfmt -d scripts install tests
+shfmt -d "${shell_files[@]}"
 
 echo "==> JSON syntax"
 while IFS= read -r json; do

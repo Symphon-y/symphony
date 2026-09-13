@@ -43,8 +43,17 @@ This adds shellcheck, shfmt, stow, tmux and jq.
 sudo install/sync-system check
 ```
 
-Expected: `in sync`. If it lists drift, **stop and take a screenshot**. Don't run
-`apply` without reviewing what changed.
+Expected: `in sync`, or only `missing:` lines for files the repo has added since this
+machine was set up (for example `/etc/profile.d/local-bin.sh`). Install those with:
+
+```sh
+sudo install/sync-system apply
+sudo install/sync-system check         # now: in sync
+```
+
+If `check` shows any `content:`, `mode:`, or `owner:` drift, **stop and take a
+screenshot**. That means something changed a system file, and it needs review before
+anything overwrites it.
 
 ## 4. Link home config and install Claude Code
 

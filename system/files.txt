@@ -17,4 +17,5 @@
 0644  resolved/10-autarchy.conf    /etc/systemd/resolved.conf.d/10-autarchy.conf
 0644  nftables/nftables.conf       /etc/nftables.conf
 0440  sudo/10-wheel                /etc/sudoers.d/10-wheel
+0644  profile/local-bin.sh         /etc/profile.d/local-bin.sh
 -     boot/loader.conf             /efi/loader/loader.conf

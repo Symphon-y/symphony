@@ -136,6 +136,19 @@ Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
   test-first: a manifest mode of `-` means "no per-file permissions: don't check or set
   a mode". Owner checking still applies. The user was asked to pause before runbook
   step 3 until the fix passes CI.
+- ESP fix green: 56/56 locally and in CI (`fe6d857`, run 34759175572). On the VM,
+  `sync-system check` now reports `in sync: 8 files`.
+- Step 2 had been skipped at first (`stow: command not found`); after running it, all
+  six tools were present.
+- **Finding — `claude` not on PATH after install.** The native installer puts its
+  launcher in `~/.local/bin`, which Arch's `/etc/profile` doesn't add. The user worked
+  around it with `export PATH`, which counts as this fix's red run. Durable fix: a new
+  system file `/etc/profile.d/local-bin.sh` (deployed by `sync-system`) that **appends**
+  `~/.local/bin`, so a user-writable directory can never shadow system commands such
+  as `sudo`. A new acceptance test checks a clean login shell's PATH order.
+  `scripts/check` now lints `system/*/*.sh`. The runbook's step 3 now says that
+  `missing:` lines for new repo files may be applied, while any content, mode, or
+  owner drift is a stop.
 
 ## VM → physical hardware notes
 
