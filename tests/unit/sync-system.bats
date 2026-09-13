@@ -141,3 +141,62 @@ manifest_entries() {
   assert_failure 1
   assert_output --partial "root"
 }
+
+# --- machine-specific files: system/hosts/<hostname>/files.txt ------------------
+
+# A throwaway copy of the script and system/ with one extra host, "testhost", so the
+# tests never depend on (or add to) the real repository's hosts.
+make_repo_copy() {
+  REPO_COPY="$BATS_TEST_TMPDIR/repo"
+  mkdir -p "$REPO_COPY/install"
+  cp "$SCRIPT" "$REPO_COPY/install/sync-system"
+  cp -R "$REPO_ROOT/system" "$REPO_COPY/"
+  mkdir -p "$REPO_COPY/system/hosts/testhost/ssh"
+  echo "ssh-ed25519 AAAAtest alice@jumphost" >"$REPO_COPY/system/hosts/testhost/ssh/authorized_keys.alice"
+  printf '%s\n' '# testhost only' '0644  ssh/authorized_keys.alice  /etc/ssh/authorized_keys/alice' \
+    >"$REPO_COPY/system/hosts/testhost/files.txt"
+  COPY_SCRIPT="$REPO_COPY/install/sync-system"
+}
+
+set_hostname() {
+  mkdir -p "$ROOT/etc"
+  echo "$1" >"$ROOT/etc/hostname"
+}
+
+@test "apply installs the host's own files when the root's hostname matches" {
+  make_repo_copy
+  set_hostname testhost
+  run "$COPY_SCRIPT" --root "$ROOT" apply
+  assert_success
+  assert_line "updated: /etc/ssh/authorized_keys/alice"
+  run cmp "$REPO_COPY/system/hosts/testhost/ssh/authorized_keys.alice" "$ROOT/etc/ssh/authorized_keys/alice"
+  assert_success
+  run cmp "$REPO_COPY/system/nftables/nftables.conf" "$ROOT/etc/nftables.conf"
+  assert_success
+}
+
+@test "apply ignores files that belong to other hosts" {
+  make_repo_copy
+  set_hostname otherhost
+  run "$COPY_SCRIPT" --root "$ROOT" apply
+  assert_success
+  assert [ ! -e "$ROOT/etc/ssh/authorized_keys/alice" ]
+  assert [ -e "$ROOT/etc/nftables.conf" ]
+}
+
+@test "without a hostname file only the base files are managed" {
+  make_repo_copy
+  run "$COPY_SCRIPT" --root "$ROOT" apply
+  assert_success
+  assert [ ! -e "$ROOT/etc/ssh/authorized_keys/alice" ]
+}
+
+@test "check reports drift in the host's own files" {
+  make_repo_copy
+  set_hostname testhost
+  "$COPY_SCRIPT" --root "$ROOT" apply
+  echo "ssh-ed25519 AAAAintruder mallory" >>"$ROOT/etc/ssh/authorized_keys/alice"
+  run "$COPY_SCRIPT" --root "$ROOT" check
+  assert_failure 1
+  assert_line "content: /etc/ssh/authorized_keys/alice"
+}

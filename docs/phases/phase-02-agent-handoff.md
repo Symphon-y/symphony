@@ -17,7 +17,8 @@ stow and a copy script, and CI runs static checks and unit tests on every push.
 ## Scope
 
 **In scope**
-- `install/claude-code` (verified native install), `scripts/gist-relay` (login without paste)
+- `install/claude-code` (verified native install)
+- On-demand SSH from Unraid's web terminal for copy/paste (amendment; replaces the gist relay)
 - `install/sync-system` + `system/files.txt`; `install/link-home` + `home/`
 - `scripts/check` and GitHub Actions CI; tooling packages
 - Runbook [`docs/runbooks/agent-handoff.md`](../runbooks/agent-handoff.md); handoff of the driver role
@@ -38,7 +39,10 @@ Recorded in `DECISIONS.md` at close-out.
 - GNU stow for home config; a root copy script for system files
 
 **Resolved (plan)**
-- Login via tmux paste buffer plus a short-lived secret gist relay (short-lived codes only)
+- ~~Login via tmux and a short-lived secret gist relay~~, superseded by the SSH amendment (below)
+- **Amendment (user, 2026-09-13):** on-demand OpenSSH, reached from Unraid's web terminal;
+  firewall source limited to Unraid's LAN IP; passphrase key on Unraid's flash;
+  authorized keys as root-owned host config; gist relay removed. Supersedes D-0015.
 - Claude never uses sudo; deny rules for `sudo` and for reading credential files
 - `DISABLE_TELEMETRY` and `DISABLE_ERROR_REPORTING` set (Remote Control unavailable while set)
 - `home/<component>/` stow packages and `system/files.txt` manifest (refines D-0007 and D-0017)
@@ -57,7 +61,8 @@ File: `tests/acceptance/phase-02.bats`. `phase-01.bats` runs alongside it as a r
 | system config | installed files match `system/files.txt` (content, mode, root ownership) |
 | home config | every file under `home/` is linked; `~/.claude` is a real directory |
 | claude code | runs; binary matches its GPG-signed manifest; `claude doctor` passes with auto-updates enabled; settings pin stable channel, telemetry off, deny rules present; authenticated (`claude -p` answers) |
-| github | `gh` authenticated; remote reachable; latest CI run on the branch succeeded; no relay gists left |
+| ssh | sshd key-only, no root, no forwarding; authorized keys are root-owned system config; not enabled at boot; firewall opens port 22 only to listed sources |
+| github | `gh` authenticated; remote reachable; latest CI run on the branch succeeded |
 
 Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
 
@@ -76,7 +81,8 @@ Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
 **VM (user, following the runbook)**
 - [ ] 1. Switch to the branch; red run committed
 - [ ] 2–4. Packages, system config check, home links, Claude Code install
-- [ ] 5. Login through tmux and the gist relay
+- [ ] 5. SSH from Unraid: key on Unraid, host files committed, on-demand sshd, fingerprint verified
+- [ ] 6. Claude Code login inside the SSH session
 - [ ] 6. Green run committed
 - [ ] 7. Handoff: Claude in the VM updates `CLAUDE.md` and pushes
 
@@ -149,6 +155,24 @@ Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
   `scripts/check` now lints `system/*/*.sh`. The runbook's step 3 now says that
   `missing:` lines for new repo files may be applied, while any content, mode, or
   owner drift is a stop.
+- CI green for the PATH fix (`746ccb3`, run 34762221157).
+- **Amendment — copy/paste via on-demand SSH from Unraid** (planned and approved in plan
+  mode). Before logging in, the user asked for RDP-style copy/paste. Findings:
+  `<internal-hostname>` and `<internal-hostname>` both resolve to Unraid's tailnet IP
+  (nginx and AdGuard handle HTTP only); the Mac is remote on an overlapping
+  `<ipv4>/24`; Unraid advertises no subnet routes. RDP needs a desktop, which
+  arrives in Phase 4 (likely wayvnc). User decisions: no SSH *into* Unraid; Unraid's
+  browser terminal as the jump host; source limited to Unraid's LAN IP; sshd started on
+  demand; passphrase key on Unraid's flash; remove the gist relay.
+- Implementation, test-first: `sync-system` gains per-host manifests
+  (`system/hosts/<hostname>/files.txt`), unit-tested against a throwaway repo copy.
+  Portable sshd drop-in (`system/ssh/10-autarchy.conf`): keys only, no root, no
+  forwarding, and root-owned `AuthorizedKeysFile /etc/ssh/authorized_keys/%u`, so an
+  agent running as the user can't grant itself SSH access. `nftables.conf` includes
+  `/etc/nftables.d/*.nft`. `openssh` is declared. New phase-02 SSH acceptance tests.
+  Phase-01's "no SSH server installed" is now "not started at boot", and its listener
+  test allows `:22`. The gist relay (script, unit tests, acceptance test, runbook step)
+  is removed.
 
 ## VM → physical hardware notes
 

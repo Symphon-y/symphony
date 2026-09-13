@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# sync-system: copy the root-owned files listed in system/files.txt into a root filesystem.
+# sync-system: copy the root-owned files listed in system/files.txt (plus the target
+# machine's own system/hosts/<hostname>/files.txt) into a root filesystem.
 #
 # Usage: install/sync-system [--root DIR] apply|check
 #   apply       install every file whose content, mode, or owner differs
@@ -14,6 +15,7 @@ set -euo pipefail
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO_ROOT
 readonly MANIFEST="$REPO_ROOT/system/files.txt"
+readonly HOSTS_DIR="$REPO_ROOT/system/hosts"
 
 die() {
   printf 'sync-system: %s\n' "$*" >&2
@@ -29,18 +31,38 @@ is_root() {
   (($(id -u) == 0))
 }
 
-# Manifest entries as "mode source target" lines; fails on malformed lines.
-manifest_entries() {
-  awk '
+# One manifest's entries as "mode source target", with each source made relative to
+# system/ by PREFIX; fails on malformed lines.
+read_manifest() {
+  local manifest=$1 prefix=$2
+  awk -v prefix="$prefix" '
     /^[[:space:]]*(#|$)/ { next }
     NF != 3 {
       printf "sync-system: %s:%d: expected <mode> <source> <target>\n", FILENAME, FNR > "/dev/stderr"
       malformed = 1
       next
     }
-    { print $1, $2, $3 }
+    { print $1, prefix $2, $3 }
     END { exit malformed }
-  ' "$MANIFEST"
+  ' "$manifest"
+}
+
+# The base manifest plus, when the root's /etc/hostname names a directory under
+# system/hosts/, that machine's own manifest (engineering rule 14: machine-specific
+# config stays separate from portable config).
+manifest_entries() {
+  read_manifest "$MANIFEST" "" || return 1
+
+  local hostname=""
+  if [[ -r $ROOT/etc/hostname ]]; then
+    hostname=$(tr -d '[:space:]' <"$ROOT/etc/hostname")
+  fi
+  # A plain hostname only, so the name can never point outside system/hosts/.
+  [[ $hostname =~ ^[A-Za-z0-9][A-Za-z0-9-]*$ ]] || return 0
+
+  if [[ -f $HOSTS_DIR/$hostname/files.txt ]]; then
+    read_manifest "$HOSTS_DIR/$hostname/files.txt" "hosts/$hostname/" || return 1
+  fi
 }
 
 # Why an installed file differs from its source; prints nothing when it matches.

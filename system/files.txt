@@ -6,6 +6,10 @@
 # repository would let the user account (or an agent acting as it) change system
 # configuration without sudo.
 #
+# Machine-specific files live in system/hosts/<hostname>/files.txt, in the same format
+# with sources relative to that host's directory. They are added when the target's
+# /etc/hostname names that host.
+#
 # A mode of "-" means the target filesystem has no per-file Unix permissions. The ESP
 # is vfat: its files' modes come from its mount options (fmask/dmask=0077, checked by
 # the Phase 1 acceptance tests), so no mode is checked or set for them.
@@ -18,4 +22,5 @@
 0644  nftables/nftables.conf       /etc/nftables.conf
 0440  sudo/10-wheel                /etc/sudoers.d/10-wheel
 0644  profile/local-bin.sh         /etc/profile.d/local-bin.sh
+0644  ssh/10-autarchy.conf         /etc/ssh/sshd_config.d/10-autarchy.conf
 -     boot/loader.conf             /efi/loader/loader.conf

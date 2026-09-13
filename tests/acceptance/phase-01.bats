@@ -28,11 +28,12 @@ undeclared_packages() {
 }
 
 # Listening sockets not bound to loopback. DHCP clients (ports 68 and 546) keep a
-# socket open to receive lease renewals; they are clients, not services.
+# socket open to receive lease renewals; they are clients, not services. sshd (22)
+# may be running on demand; phase-02.bats proves the firewall restricts who can reach it.
 public_listeners() {
   ss -Htuln | awk '{ print $5 }' |
     grep -Ev '^(127\.|\[::1\]|\[::ffff:127\.)' |
-    grep -Ev ':(68|546)$'
+    grep -Ev ':(22|68|546)$'
 }
 
 # --- boot ---------------------------------------------------------------------
@@ -238,16 +239,18 @@ public_listeners() {
   assert_output --partial "policy drop"
 }
 
-@test "security: nothing listens beyond loopback except DHCP clients" {
+@test "security: nothing listens beyond loopback except DHCP clients and on-demand sshd" {
   run ss -Htuln
   assert_success
   run public_listeners
   assert_output ""
 }
 
-@test "security: no SSH server is installed" {
-  run command -v sshd
-  assert_failure
+@test "security: the SSH server is not started at boot" {
+  # D-0015 (no SSH server) was superseded in Phase 2: sshd exists for on-demand
+  # sessions from a trusted jump host, but must never start on its own.
+  run systemctl is-enabled sshd
+  refute_output "enabled"
 }
 
 # --- health -------------------------------------------------------------------

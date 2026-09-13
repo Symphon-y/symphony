@@ -44,6 +44,48 @@ readonly SETTINGS="$HOME/.claude/settings.json"
   assert [ ! -L "$HOME/.claude" ]
 }
 
+# --- ssh (on demand, from a trusted jump host) ---------------------------------
+
+# Firewall rules that open SSH without restricting the source address.
+unrestricted_ssh_rules() {
+  as_root nft list chain inet filter input | grep -E 'dport (22|ssh)\b' | grep -v 'saddr' || true
+}
+
+@test "ssh: the server accepts keys only, never root, and forwards nothing" {
+  run as_root sshd -T
+  assert_success
+  assert_line "passwordauthentication no"
+  assert_line "kbdinteractiveauthentication no"
+  assert_line "permitrootlogin no"
+  assert_line "authenticationmethods publickey"
+  assert_line "allowagentforwarding no"
+  assert_line "allowtcpforwarding no"
+  assert_line "x11forwarding no"
+  assert_line "permittunnel no"
+}
+
+@test "ssh: authorized keys are root-owned system config, not user-editable files" {
+  run as_root sshd -T
+  assert_line "authorizedkeysfile /etc/ssh/authorized_keys/%u"
+  local keys
+  keys="/etc/ssh/authorized_keys/$(id -un)"
+  run as_root find "$keys" -user 0 ! -perm -g=w ! -perm -o=w
+  assert_output "$keys"
+}
+
+@test "ssh: the server is not started at boot" {
+  run systemctl is-enabled sshd
+  refute_output "enabled"
+}
+
+@test "ssh: the firewall opens port 22 only to specific source addresses" {
+  run as_root nft list chain inet filter input
+  assert_success
+  assert_output --regexp 'saddr .* dport (22|ssh)'
+  run unrestricted_ssh_rules
+  assert_output ""
+}
+
 # --- shell --------------------------------------------------------------------
 
 @test "shell: login shells put ~/.local/bin on PATH, after the system directories" {
@@ -109,10 +151,4 @@ readonly SETTINGS="$HOME/.claude/settings.json"
   cd "$REPO_ROOT"
   run gh run list --workflow check.yml --branch "$branch" --limit 1 --json conclusion --jq '.[0].conclusion'
   assert_output "success"
-}
-
-@test "github: no login relay gists are left behind" {
-  run gh api gists --jq '[.[] | select(.description == "autarchy-relay")] | length'
-  assert_success
-  assert_output "0"
 }
