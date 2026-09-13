@@ -31,6 +31,7 @@ and the old entry is marked `Superseded by D-XXXX`.
 - **Status:** Accepted (2026-09-12, Phase 0)
 - **Decision:** Develop in an x86_64 Arch VM on a remote Unraid server (KVM/libvirt),
   using Unraid VM snapshots as rollback points. The Mac is the control host.
+  _(Snapshot clause superseded by D-0008.)_
 - **Alternatives considered:**
   - Local VM on the Mac — Apple Silicon (M2) would require emulating x86_64 or using
     Arch Linux ARM, neither representative of the eventual workstation.
@@ -67,6 +68,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   starts with its own plan mode, and every plan produces a tracking document in
   `docs/phases/` that records implementation progress. Every VM-changing phase starts
   from a named Unraid snapshot. One Git branch per phase. Full lifecycle in `CLAUDE.md`.
+  _(Snapshot requirement superseded by D-0008.)_
 - **Alternatives considered:**
   - One big up-front plan — decisions made before the information exists.
   - Ad-hoc work — produces "a pile of dotfiles" with no reasoning trail.
@@ -128,3 +130,26 @@ and the old entry is marked `Superseded by D-XXXX`.
   components replaceable, and avoids committing to choices prematurely.
 - **Consequences:** The deployment mechanism (Phase 2) maps component directories to
   their target locations.
+
+## D-0008 — No hypervisor snapshots: recovery lives inside the system and the repo
+
+- **Status:** Accepted (2026-09-12, Phase 1). Supersedes the snapshot parts of D-0002
+  and D-0004.
+- **Decision:** Unraid VM snapshots are not part of the phase lifecycle and no plan
+  depends on them. Recovery is, in order: snapper snapshots (snap-pac pre/post around
+  every pacman transaction); the `linux-lts` and fallback UKI boot entries; the ISO
+  recovery chroot in the runbook; reinstalling from the runbook and this repo.
+- **Alternatives considered:**
+  - Unraid snapshots before each phase. The first attempt failed: `cannot migrate
+    domain: State blocked by non-migratable CPU device (invtsc flag)`. The VM's CPU
+    is deliberately configured as non-migratable.
+  - Make the VM CPU migratable. This changes a deliberate VM setting only to get a
+    VM-only safety net.
+  - Manual vdisk file copies before each phase. Manual, slow, and with no equivalent on
+    physical hardware.
+- **Reasoning:** The user's decision is that snapshots are not integral. Recovery that
+  also works on physical hardware is worth more than a VM-only one, and relying on
+  rebuilds pushes the project toward its reproducibility goal (Phase 8).
+- **Consequences:** A failed install in the VM means reinstalling from the runbook.
+  Risky in-system changes should be preceded by a manual `snapper create`. Tracking docs
+  no longer record snapshot names.

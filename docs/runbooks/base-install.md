@@ -29,9 +29,8 @@ In the VM's settings in Unraid:
 | Memory / CPUs | **≥ 4 GiB** / **≥ 2** | live ISO runs in RAM; Hyprland later |
 | Graphics | leave the default VNC display | no GPU passthrough in Phase 1 |
 
-Then **prove snapshots work before relying on them**: take a snapshot of the blank VM
-in Unraid. If Unraid refuses because the vDisk is raw, recreate the vDisk as **qcow2**.
-It is blank, so this costs nothing. Record the snapshot name in the tracking doc.
+No Unraid snapshots are needed (D-0008). If an install goes wrong, recover using the
+section at the end of this runbook, or reinstall from step 1.
 
 ## 1. Get the repo onto the live ISO
 
@@ -301,10 +300,6 @@ uname -r                               # check: ends in -lts
 ```
 
 Reboot again into the default entry.
-
-## 10. Snapshot
-
-Take an Unraid snapshot named **`phase-01-base`** and record it in the tracking doc.
 
 ---
 

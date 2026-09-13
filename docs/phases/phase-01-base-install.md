@@ -5,7 +5,6 @@
 | **Status** | In progress |
 | **Driver** | Claude (Mac preparation) → **User** (runbook in the VM) |
 | **Branch** | `phase/01-base-install` |
-| **Snapshot** | Blank-disk test snapshot: _pending_ · Exit snapshot: `phase-01-base` _pending_ |
 | **Started** | 2026-09-12 |
 | **Completed** | — |
 
@@ -37,6 +36,7 @@ Recorded in `DECISIONS.md` at close-out.
 - Unraid console only: no SSH server; repo reaches the VM through `gh` over HTTPS;
   evidence comes back as commits
 - Homebrew test tooling on the Mac
+- No Unraid snapshots; recovery is in-system or a reinstall (D-0008)
 
 **Resolved (plan)**
 - Manual install, no archinstall
@@ -82,14 +82,13 @@ Red confirmed: _pending (live ISO)_ · Green confirmed: _pending (installed syst
 - [ ] Commit; user pushes the branch
 
 **VM (user, following the runbook)**
-- [ ] 0. Unraid prerequisites; blank-disk test snapshot works
+- [ ] 0. Unraid prerequisites
 - [ ] 1. Repo cloned on the live ISO
 - [ ] 2. `system-report` committed; Claude reviews the gates
 - [ ] 3. Red run committed (`docs/phases/evidence/phase-01-red.tap`)
 - [ ] 4–7. Partition, encrypt, Btrfs, pacstrap, configure, reboot
 - [ ] 8. First boot: snapper, repo clone, green run committed (`phase-01-green.tap`)
 - [ ] 9. `linux-lts` entry boots; snap-pac pre/post snapshots observed
-- [ ] 10. Unraid snapshot `phase-01-base`
 
 ## Implementation log
 
@@ -126,6 +125,11 @@ Red confirmed: _pending (live ISO)_ · Green confirmed: _pending (installed syst
   and did not count; it was redone after the fix.
 - Acceptance suite on the Mac: 33 not ok, 1 ok (HTTPS works on any machine), 1 skip
   (not a VM). The only bats warnings are BW01 for Linux commands absent on macOS.
+- **Change — Unraid snapshots removed from the plan (D-0008).** The blank-VM test
+  snapshot failed with `Requested operation is not valid: cannot migrate domain: State
+  blocked by non-migratable CPU device (invtsc flag)`. The VM's CPU is deliberately
+  non-migratable. User decision: hypervisor snapshots are not integral. Removed from
+  CLAUDE.md, the phase template, this doc, and the runbook.
 
 ## VM → physical hardware notes
 
@@ -143,5 +147,4 @@ Red confirmed: _pending (live ISO)_ · Green confirmed: _pending (installed syst
 - [ ] `DECISIONS.md` updated
 - [ ] `docs/omarchy-influences.md` updated
 - [ ] `docs/roadmap.md` status updated
-- [ ] Unraid snapshot `phase-01-base` recorded
 - [ ] Branch merged to `main`

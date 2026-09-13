@@ -31,8 +31,9 @@ Update this section when the handoff happens.
 2. **Tracking doc** — on approval, record the plan as
    `docs/phases/phase-NN-<slug>.md` from `docs/phases/_template.md`. That file is the
    single record of the phase's progress; keep it current while implementing.
-3. **Snapshot** — before any VM change, the user takes an Unraid VM snapshot (or vdisk
-   copy). Record its name in the tracking doc.
+3. **Recovery** — hypervisor snapshots are not part of the lifecycle (D-0008). Recovery
+   relies on the system itself (snapper snapshots, fallback kernel, ISO chroot) and on
+   rebuilding from this repo. Never make a plan depend on Unraid snapshots.
 4. **Red** — write the phase's acceptance tests first and confirm they fail.
 5. **Green** — implement task by task, ticking the checklist and logging deviations.
 6. **Close** — update `DECISIONS.md`, `docs/omarchy-influences.md`, the VM → hardware
