@@ -227,7 +227,8 @@ public_listeners() {
 }
 
 @test "security: sudo never skips the password" {
-  run as_root grep -rEs 'NOPASSWD|!authenticate' /etc/sudoers /etc/sudoers.d
+  # Only active rules count: the stock /etc/sudoers ships a commented-out NOPASSWD example.
+  run as_root grep -rEs '^[^#]*(NOPASSWD|!authenticate)' /etc/sudoers /etc/sudoers.d
   assert_output ""
 }
 

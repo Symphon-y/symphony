@@ -192,6 +192,21 @@ _pending (installed system)_
 - Follow-up (not done now): `install/configure-base-system` preflight could validate the
   fstab (one entry per mountpoint, no top-level subvolume, Btrfs compression present),
   which would have caught this before reboot. Candidate for Phase 8.
+- Steps 8–9 done by the user; first green run pushed (`498465e`): **32/35 ok**. That
+  run predates the fstab test (35 tests), because the fstab fix commits weren't on
+  GitHub yet when the VM clone was made. Failures:
+  - **12 snapper timeline off:** console typo. `set-config TIMELINE_CREAT=no` created a
+    meaningless key, and `TIMELINE_CREATE` stayed `yes`. Fix on the VM: `set-config`
+    again, and remove the stray key (pending).
+  - **28 sudo never skips the password:** a test bug. It matched the commented-out
+    `# %wheel ALL=(ALL:ALL) NOPASSWD: ALL` example in the stock `/etc/sudoers`. The test
+    now ignores comment lines, and was checked on the Mac to still catch an active
+    NOPASSWD rule.
+  - **30 firewall:** `nftables` reports `inactive` but not failed, even though
+    `configure-base-system` enabled it. Under investigation.
+- The user asked whether to rename the account from `Travis` to `travis`.
+  Recommendation: yes, now (lowercase is the portable convention, and renaming only
+  gets harder later). Decision pending. The tests don't hardcode usernames.
 
 ## VM → physical hardware notes
 
