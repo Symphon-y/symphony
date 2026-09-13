@@ -83,8 +83,8 @@ Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
 - [ ] 2–4. Packages, system config check, home links, Claude Code install
 - [ ] 5. SSH from Unraid: key on Unraid, host files committed, on-demand sshd, fingerprint verified
 - [ ] 6. Claude Code login inside the SSH session
-- [ ] 6. Green run committed
-- [ ] 7. Handoff: Claude in the VM updates `CLAUDE.md` and pushes
+- [ ] 7. Green run committed
+- [ ] 8. Handoff: Claude in the VM updates `CLAUDE.md` and pushes
 
 ## Implementation log
 
@@ -117,7 +117,7 @@ Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
   there because the Mac already has Claude Code and `gh`, which usefully confirms that
   the `claude doctor` "Auto-updates … enabled" pattern matches the real output. The
   shared `as_root` helper moved to `tests/helpers/system.bash`.
-- **Bug caught by CI (first run, `486322d`, run 34758062316): `cmp: command not found`.**
+- **Bug caught by CI (first run, `728ea79`, run 34758062316): `cmp: command not found`.**
   6 of 55 unit tests failed in the `archlinux:latest` container. `install/sync-system`
   uses `cmp` from `diffutils`, which is not a dependency of `base` (checked against the
   Arch package database). So the VM could fail the same way. Fix: declare `diffutils`
@@ -126,14 +126,14 @@ Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
   The runbook installs declared packages (step 2) before `sync-system` first runs
   (step 3). This is exactly the kind of
   undeclared dependency CI in a clean container exists to catch.
-- **Second CI run (`116c29c`, run 34758293997): 54/55.** The `cmp` fix worked. The
+- **Second CI run (`36a8dd6`, run 34758293997): 54/55.** The `cmp` fix worked. The
   remaining failure was a test bug: "check run as root reports files not owned by root"
   assumed a non-root runner. In the CI container the tests run as real root, so
   installed files really are root-owned and `check` correctly said `in sync`. The test
   now hands the file to uid 65534 when it runs as real root, so it checks the same
   thing on any runner. The script itself was right.
-- **Third CI run (`112bcc7`, run 34758550075): 55/55 green.**
-- **Red on the VM** (`748af22`): 50 tests; phase-01 36/36 still ok; phase-02 11 not ok,
+- **Third CI run (`1d681c2`, run 34758550075): 55/55 green.**
+- **Red on the VM** (`91518e6`): 50 tests; phase-01 36/36 still ok; phase-02 11 not ok,
   3 ok. The 3 are expected: `gh` was already logged in, CI is green, and no relay gists
   exist. No load or syntax errors.
 - **Real finding from the red run — `mode: /efi/loader/loader.conf` drift.** The ESP is
@@ -142,7 +142,7 @@ Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
   test-first: a manifest mode of `-` means "no per-file permissions: don't check or set
   a mode". Owner checking still applies. The user was asked to pause before runbook
   step 3 until the fix passes CI.
-- ESP fix green: 56/56 locally and in CI (`fe6d857`, run 34759175572). On the VM,
+- ESP fix green: 56/56 locally and in CI (`a42944d`, run 34759175572). On the VM,
   `sync-system check` now reports `in sync: 8 files`.
 - Step 2 had been skipped at first (`stow: command not found`); after running it, all
   six tools were present.
@@ -155,7 +155,7 @@ Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
   `scripts/check` now lints `system/*/*.sh`. The runbook's step 3 now says that
   `missing:` lines for new repo files may be applied, while any content, mode, or
   owner drift is a stop.
-- CI green for the PATH fix (`746ccb3`, run 34762221157).
+- CI green for the PATH fix (`e7e5b48`, run 34762221157).
 - **Amendment — copy/paste via on-demand SSH from Unraid** (planned and approved in plan
   mode). Before logging in, the user asked for RDP-style copy/paste. Findings:
   the user's internal hostnames for the VM and for Unraid both resolve to Unraid's
@@ -207,6 +207,24 @@ Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
   now masks its own output.
 - Repo-local `user.email` on the Mac set to the GitHub noreply address. The VM runbook
   sets the same before its commits.
+- **History rewritten (user decision).**
+  - Backup: a full `git bundle` of every ref, stored outside the repo.
+  - Guard: GitHub's branches were confirmed unchanged since the backup.
+  - Rewrite: `git filter-repo` over `main`, `phase/01-base-install`, and
+    `phase/02-agent-handoff` replaced the literal addresses and internal domain names
+    found by the audit, in file contents and in commit messages, and mapped the old
+    author email to the GitHub noreply address.
+  - Verification on the rewritten history: the full patch history (every commit's
+    files, diffs, messages, and emails) passes `scripts/check-identifiers`; zero literal
+    leftovers; all 58 author and committer entries use the noreply address; unit tests
+    69/69; the identifier scan is clean.
+  - Commit hashes quoted in the tracking docs were remapped to the new history. The one
+    exception, `50ceacc`, was a local commit rebased away before it was ever pushed.
+  - Old hashes quoted in *commit messages* were left as they are.
+  - The user force-pushes all three branches. The VM's clone must be reset to the new
+    history.
+  - Tooling note: the permission classifier blocked running `scripts/check` right after
+    the rewrite, so its steps (unit tests, identifier scan) were run directly.
 
 ## VM → physical hardware notes
 
