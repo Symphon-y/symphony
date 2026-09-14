@@ -116,9 +116,8 @@ File: `tests/acceptance/phase-04.bats`, split into two groups:
 | live-session | Hyprland actually starts through SDDM; a terminal opens (ghostty); a notification renders (mako); idle/lock behaves (hypridle/hyprlock); wallpaper shows (hyprpaper); a polkit prompt appears when needed (hyprpolkitagent) | User, from Unraid's console, after the Virtio-GPU(3D) switch |
 
 Red confirmed: yes (VM, 9/9 failing, no load/syntax errors — packages not installed,
-commands not found, sudo required, as expected) · Green confirmed: static group
-6/6 (packages, `Hyprland --verify-config`, SDDM config+enabled, `xdg-terminal-exec`,
-matugen rendering); live-session group 2/2 pending login through SDDM
+commands not found, sudo required, as expected) · Green confirmed: yes, **9/9**,
+after fixing a real autostart bug found in the live session (see implementation log)
 
 ## Tasks
 
@@ -158,14 +157,11 @@ matugen rendering); live-session group 2/2 pending login through SDDM
 - [x] Static acceptance tests green (6/6)
 
 **Live-session testing (user, from Unraid's console)**
-- [ ] **Blocked, in progress:** user is reverting the VM's display device from full
-      PCI GPU passthrough back to Virtio-GPU(3D) in Unraid (see the implementation
-      log entry below for why) — this disconnects the VM again. Once it's back up
-      on Virtio-GPU(3D), resume here.
-- [ ] Log in through SDDM (should now show directly in Unraid's noVNC console, no
-      extra tooling); confirm Hyprland starts
-- [ ] Confirm terminal, notification, idle/lock, wallpaper, polkit prompt all work;
-      report back
+- [x] Reverted to Virtio-GPU(3D); logged in through SDDM ("Hyprland (uwsm-managed)"),
+      visible directly in Unraid's noVNC console as expected
+- [x] Confirmed Hyprland running, a terminal opens; found and fixed a real
+      autostart bug (hyprpolkitagent) — see implementation log
+- [x] All 9 acceptance tests green, from inside the live session
 
 **Close**
 - [ ] `DECISIONS.md`, `docs/omarchy-influences.md` (fill in "Our
@@ -326,6 +322,35 @@ matugen rendering); live-session group 2/2 pending login through SDDM
   harmless to have installed even if not strictly required yet.
 - **User is disconnecting again to make the change.** Resume live-session testing
   once the VM is back up on Virtio-GPU(3D).
+
+### 2026-09-14 (continued) — live-session testing
+- **VM back up on Virtio-GPU(3D); noVNC restored as expected.** User logged into
+  "Hyprland (uwsm-managed)" through SDDM, visible directly in Unraid's console — no
+  wayvnc or other tooling needed, confirming the revert diagnosis was right.
+- Connected from this SSH session (same user, different login) by reading
+  `HYPRLAND_INSTANCE_SIGNATURE` — it was already correctly set in the shell
+  environment, so `hyprctl` worked immediately with no extra setup.
+- **Real bug found: `hyprpolkitagent` never started.** `pgrep` showed Hyprland, mako,
+  hypridle, and hyprpaper running, but not hyprpolkitagent. Root cause: its binary
+  isn't on `$PATH` at all (`/usr/lib/hyprpolkitagent/hyprpolkitagent`, not
+  `/usr/bin/`), so `autostart.lua`'s `hl.exec_cmd("uwsm app -- hyprpolkitagent")`
+  silently failed to find the command.
+- **Broader finding while fixing it:** all four autostarted processes — mako,
+  hypridle, hyprpaper, *and* hyprpolkitagent — ship their own proper systemd `--user`
+  service (`WantedBy=graphical-session.target`, checked via `pacman -Ql`). The other
+  three had only been working because their binaries happened to be on `$PATH`, not
+  because `hl.exec_cmd` was the right mechanism — duplicating what their own shipped
+  services already do, with restart-on-failure, correctly. Rewrote `autostart.lua` to
+  do nothing and explain why, and enabled all four services instead
+  (`systemctl --user enable --now mako.service hypridle.service hyprpaper.service
+  hyprpolkitagent.service`) — no `sudo` needed, these are user-level units. Killed the
+  three old manually-started processes first to avoid mako's D-Bus name
+  (`org.freedesktop.Notifications`) already being owned when systemd tried to start
+  its own copy.
+- **All 9 acceptance tests green**, live, in the real session: packages, `Hyprland
+  --verify-config`, SDDM config/enabled, `xdg-terminal-exec`, matugen rendering,
+  Hyprland reachable via `hyprctl`, all four processes running (now systemd-managed),
+  and the notification service reachable over D-Bus.
 
 ## VM → physical hardware notes
 

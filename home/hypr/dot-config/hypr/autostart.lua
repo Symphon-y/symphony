@@ -1,12 +1,14 @@
 -- Target: ~/.config/hypr/autostart.lua
 --
--- Each process launched through `uwsm app --`, so it gets its own systemd scope
--- under the session (uwsm's whole point), instead of living in the compositor's
--- own cgroup.
-
-hl.on("hyprland.start", function()
-  hl.exec_cmd("uwsm app -- mako")
-  hl.exec_cmd("uwsm app -- hypridle")
-  hl.exec_cmd("uwsm app -- hyprpaper")
-  hl.exec_cmd("uwsm app -- hyprpolkitagent")
-end)
+-- Nothing to autostart from here: mako, hypridle, hyprpaper, and hyprpolkitagent
+-- each ship their own systemd --user service (WantedBy=graphical-session.target),
+-- so systemd starts them itself once uwsm reaches that target -- restart-on-failure
+-- included, and no risk of double-starting them from here too.
+--
+-- An earlier version of this file launched all four with hl.exec_cmd, copying
+-- Omarchy's exec-once pattern. That was wrong on inspection: hyprpolkitagent's
+-- binary isn't even on $PATH (it lives at /usr/lib/hyprpolkitagent/hyprpolkitagent),
+-- so that line silently did nothing, and the other three worked by coincidence of
+-- being on $PATH while duplicating what their own shipped services already do
+-- properly. Enable the four services instead:
+--   systemctl --user enable mako.service hypridle.service hyprpaper.service hyprpolkitagent.service
