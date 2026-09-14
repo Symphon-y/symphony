@@ -266,6 +266,21 @@ matugen rendering); live-session group 2/2 pending login through SDDM
 - Only the two genuine live-session checks (Hyprland actually running, the four
   autostarted processes alive) remain, pending an actual login through SDDM from
   Unraid's console.
+- **CI caught red, three commits deep, before I'd checked it** (should have watched
+  it after every push, not just at commit time on the VM). `error: target not found:
+  yay` — I'd fixed the *convention* (the VM's bulk install now uses `yay -S`) but
+  never updated `.github/workflows/check.yml`, which installs
+  `packages/tooling.txt` with plain `pacman -Syu` in a container that only needs
+  enough tooling to run `scripts/check`, never the desktop stack. Declaring `yay`
+  (and its own build chain: `go`, `fakeroot`, `make`, `scdoc`, `debugedit`, `gcc`)
+  in `tooling.txt` broke that command outright, since pacman can't resolve an
+  AUR-only name and CI's install step doesn't go through yay at all.
+  **Fix:** moved all seven lines from `packages/tooling.txt` to `packages/
+  desktop.txt` instead of touching the workflow — `tooling.txt` goes back to being
+  100% official-repo (CI-safe with plain pacman), and these packages live next to
+  the thing they exist to support (`xdg-terminal-exec`). The VM's own bulk-install
+  convention (`yay -S --needed $(scripts/pkglist packages/*.txt)`) is unaffected,
+  since it processes every list either way.
 
 ## VM → physical hardware notes
 
