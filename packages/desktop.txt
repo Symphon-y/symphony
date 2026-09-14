@@ -20,3 +20,18 @@ xdg-desktop-portal-gtk        # portal backend: file chooser fallback
 matugen                       # single palette -> per-tool templates (D-0025)
 vulkan-intel                  # Vulkan driver for the Intel iGPU
 xdg-terminal-exec             # resolves the $terminal role; AUR (yay), see packages/external.md
+
+# yay itself, plus its own build prerequisites: none of this belongs in packages/
+# tooling.txt, which CI installs with plain `pacman -S` in a container that never
+# touches the desktop stack -- an AUR-only name there breaks that command outright
+# (found the hard way: CI red on "target not found: yay"). The VM's own bulk install
+# uses `yay -S --needed $(scripts/pkglist packages/*.txt)` (D-0025/Phase 4), which
+# handles official-repo and AUR packages the same way, so these can live wherever;
+# desktop.txt is where the thing they exist for (xdg-terminal-exec) already is.
+yay                            # AUR helper; bootstrapped manually (packages/external.md)
+go                             # builds yay itself (its only real makedepend, go>=1.24)
+fakeroot                       # makepkg needs it to fake file ownership when packaging, for any build
+make                           # runs yay's and xdg-terminal-exec's Makefiles
+scdoc                          # renders xdg-terminal-exec's man page (a makepkg makedepend of that AUR package)
+debugedit                      # makepkg needs it to build debug packages (Arch's current default)
+gcc                            # C compiler; yay's build uses cgo (Go's C interop) despite being a Go program
