@@ -1,3 +1,4 @@
 # Networking. DNS (systemd-resolved) and time sync (systemd-timesyncd) ship with systemd.
 
 networkmanager  # one network stack for wired, Wi-Fi, and VPNs, in the VM and on real hardware
+openssh         # sshd for on-demand admin sessions from a trusted jump host; never started at boot

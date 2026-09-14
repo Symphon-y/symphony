@@ -70,10 +70,10 @@ vda      128G disk                                                1      512B
 ## Network
 
 ```text
-lo               UNKNOWN        00:00:00:00:00:00 <LOOPBACK,UP,LOWER_UP> 
+lo               UNKNOWN        <mac> <LOOPBACK,UP,LOWER_UP> 
 enp1s0           UP             <mac> <BROADCAST,MULTICAST,UP,LOWER_UP> 
 
-lo               UNKNOWN        127.0.0.1/8 ::1/128 
+lo               UNKNOWN        <ipv4>/8 ::1/128 
 enp1s0           UP             <ipv4>/24 metric 100 <ipv6>/64 <ipv6>/64 <ipv6>/64 
 
 default via <ipv4> dev enp1s0 proto dhcp src <ipv4> metric 100 

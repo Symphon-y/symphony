@@ -1,0 +1,37 @@
+# Static analysis and unit tests on every push and pull request.
+# Runs in an Arch container so the tools match the workstation's packages.
+name: check
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container: archlinux:latest
+    steps:
+      # Without git in the container, actions/checkout downloads a tarball with no .git,
+      # and every check that asks git which files are tracked silently sees none.
+      - name: Install git before checkout
+        run: pacman -Sy --noconfirm --needed git
+
+      # Pinned by commit: a tag can be moved to different code, a commit cannot.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The container runs as root but the checkout belongs to the runner's user, so git
+      # refuses to treat it as a repository ("dubious ownership") until it is marked safe.
+      - name: Trust the checked-out repository
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install the tooling declared in packages/tooling.txt
+        run: pacman -Syu --noconfirm --needed $(scripts/pkglist packages/tooling.txt)
+
+      - name: Static checks and unit tests
+        run: scripts/check

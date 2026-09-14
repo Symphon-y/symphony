@@ -53,6 +53,7 @@ make_stubs() {
   stub "$bin/systemctl" 'echo "systemctl $*" >>"$STUB_LOG"'
   stub "$bin/mountpoint" 'echo "mountpoint $*" >>"$STUB_LOG"; exit "${STUB_MOUNTPOINT_RC:-0}"'
   stub "$bin/blkid" 'echo "blkid $*" >>"$STUB_LOG"; echo "1111-2222"'
+  stub "$bin/visudo" 'echo "visudo $*" >>"$STUB_LOG"'
   stub "$bin/id" 'if [[ ${1:-} == -u ]]; then echo 0; else exec /usr/bin/id "$@"; fi'
 
   # arch-chroot TARGET CMD...: answers the "is it already done?" queries from
@@ -139,7 +140,8 @@ calls() {
   run find "$TARGET/etc/sudoers.d/10-wheel" -perm 0440
   assert_output "$TARGET/etc/sudoers.d/10-wheel"
   run calls
-  assert_line "arch-chroot $TARGET visudo -cf /etc/sudoers.d/10-wheel"
+  # System files come from install/sync-system, which validates sudoers before installing.
+  assert_line "visudo -cf $REPO_ROOT/system/sudo/10-wheel"
 }
 
 @test "writes hostname, locale, keymap, and timezone from the vars file" {
