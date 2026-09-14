@@ -1,0 +1,30 @@
+# Target: ~/.config/matugen/config.toml (linked by install/link-home)
+#
+# Phase 4: one placeholder palette (a seed color, no wallpaper-derived generation
+# yet), wired into the three components this phase themes. The full theme system --
+# named themes, a switcher, every component -- is Phase 6 (D-0025).
+#
+# Run: matugen color hex "#1e1e2e"
+#
+# Output paths are absolute (~/...), not relative to this file: config.toml is a
+# stow symlink, and matugen resolves relative paths against the symlink's real
+# target inside the repo checkout, not $HOME -- a relative output_path would write
+# generated files into the git working tree instead of the actual app configs.
+# (Confirmed empirically: matugen does expand ~ in paths.) Template input_path stays
+# relative, since the template sources genuinely live next to this file either way.
+
+[config]
+fallback_color = "#1e1e2e"
+
+[templates.mako]
+input_path = "./templates/mako.ini"
+output_path = "~/.config/mako/config"
+post_hook = "makoctl reload || true"
+
+[templates.hyprlock]
+input_path = "./templates/hyprlock.conf"
+output_path = "~/.config/hypr/hyprlock.conf"
+
+[templates.ghostty]
+input_path = "./templates/ghostty.conf"
+output_path = "~/.config/ghostty/config"

@@ -48,16 +48,16 @@ assumed.
 | Claude Code CLI integration | — | 2 | DEFER / REJECT (D-0018) |
 | Dotfiles / config deployment | — | 2 | REJECT (D-0020) |
 | Desktop shell architecture (bar/notify/launcher/menus/idle-lock/wallpaper/clipboard/polkit, as a whole) | 2, 3 | 3 | REJECT unified shell; ADAPT via matugen (D-0025) |
-| Login / session start | 2 | 4 | ADAPT |
+| Login / session start | 2 | 4 | ADAPT (D-0026) |
 | Hyprland config structure | 2 | 4 | ADOPT |
-| Audio, portals, polkit | 2 | 4 | ADOPT (audio, portals); ADAPT (polkit agent) |
-| Notifications | 2 | 4 | ADAPT (D-0025) |
-| Idle management and locking | 2 | 4 | ADAPT (D-0025) |
-| Wallpaper | 2 | 4, 6 | ADAPT (D-0025) |
+| Audio, portals, polkit | 2 | 4 | ADOPT (audio, portals); ADAPT polkit (D-0029) |
+| Notifications | 2 | 4 | ADAPT (D-0025, D-0031) |
+| Idle management and locking | 2 | 4 | ADAPT (D-0025, D-0031) |
+| Wallpaper | 2 | 4, 6 | ADAPT (D-0025, D-0028) |
 | Application launcher | 3 | 5 | ADAPT (D-0025) |
 | Menus (system / power / utility) | 3 | 5 | ADAPT idea; REJECT plugin engine (D-0025) |
 | Keybinding scheme | 3 | 5 | ADAPT |
-| Terminal | 3 | 4, 5 | ADAPT |
+| Terminal | 3 | 4, 5 | ADAPT (D-0027, D-0030) |
 | Clipboard | 3 | 5 | ADAPT (D-0025) |
 | Screenshots / screen recording | 3 | 5 | ADOPT |
 | Status bar | 3 | 5 | ADAPT (D-0025) |
@@ -240,12 +240,13 @@ below are current as of that branch unless a component explicitly discusses v3
 - Better modern alternatives: none needed beyond uwsm + a standard greeter; this is
   already close to current best practice.
 - Our decision: **ADAPT**
-- Our implementation: decided in Phase 4 (greeter vs. TTY, autologin policy — already
-  flagged as an open Phase 4 question on the roadmap, together with the VM's QXL
-  display having no DRM render node).
-- Reason: `uwsm` is worth adopting regardless of the greeter choice; the greeter-vs-TTY
-  question is genuinely undecided and belongs to Phase 4, which already owns it.
-- Related decision: Phase 4
+- Our implementation: SDDM configured for Wayland only (`system/sddm/
+  10-wayland.conf`, just `DisplayServer=wayland`, no forced default session), the
+  `hyprland` package's own shipped `hyprland-uwsm.desktop` picked at the greeter.
+- Reason: `uwsm` is worth adopting regardless of the greeter choice; SDDM won the
+  greeter-vs-TTY question on convention and documentation, not a technical
+  requirement.
+- Related decision: D-0026
 
 ### Hyprland config structure
 - Omarchy approach: config is Lua, not the old `hyprland.conf` DSL. `config/hypr/
@@ -266,15 +267,16 @@ below are current as of that branch unless a component explicitly discusses v3
   independent of the shell-architecture fork above.
 - Better modern alternatives: none — Lua's `require()` is now the standard mechanism.
 - Our decision: **ADOPT**
-- Our implementation: modular files under `~/.config/hypr/` using Lua `require()`,
-  split by concern (monitors, input, bindings, look-and-feel, autostart) the same way
-  CLAUDE.md's engineering-principles table already calls for — its current wording
-  cites `source =`, the old hyprlang syntax; that wording gets a small update at
-  close-out since the underlying principle (modular files, not one big file) carries
-  over unchanged to Lua's module system.
+- Our implementation: `home/hypr/dot-config/hypr/{hyprland,monitors,input,
+  looknfeel,bindings,autostart}.lua`, `hyprland.lua` doing nothing but `require()`
+  the rest — written against Hyprland's own real `hl.*` API (fetched from
+  `hyprwm/Hyprland`'s official example config directly, not Omarchy's), validated
+  with `Hyprland --verify-config`. CLAUDE.md's principle-table wording was updated
+  (`source =` → Lua `require()` modules) back in Phase 3.
 - Reason: adopting Hyprland's own recommended, actively-maintained config path costs
   nothing and avoids maintaining anything against a deprecated format.
-- Related decision: Phase 4
+- Related decision: none new — Phase 3's ADOPT call needed no further decision to
+  implement, just execution
 
 ### Audio, portals, polkit
 - Omarchy approach: PipeWire + WirePlumber (standard packages, package-default user
@@ -301,11 +303,16 @@ below are current as of that branch unless a component explicitly discusses v3
   or `lxqt-policykit`) started via `exec-once`, since we're not building a shell to
   host its own.
 - Our decision: **ADOPT** (PipeWire/WirePlumber, portals); **ADAPT** (polkit agent)
-- Our implementation: audio/portal packages and the two WirePlumber snippets adopted
-  as-is in Phase 4; specific polkit agent binary chosen in Phase 4.
+- Our implementation: `pipewire`+`pipewire-pulse`+`pipewire-alsa`+`wireplumber`,
+  `xdg-desktop-portal-hyprland`+`-gtk`; the two WirePlumber conf.d snippets rewritten
+  against WirePlumber 0.5's actual current rule syntax (`monitor.alsa.rules`/
+  `monitor.bluez.rules`, not the old 0.4 Lua scripts Omarchy's version used) and
+  verified by actually starting the service. Polkit: **hyprpolkitagent** (D-0029),
+  not one of the four originally compared — found during research as Hyprland's own
+  native agent.
 - Reason: audio and portals are unaffected by the shell-architecture decision (D-0025)
   either way; polkit needs a standalone replacement now that no shell will host it.
-- Related decision: Phase 4
+- Related decision: D-0029
 
 ### Notifications
 - Omarchy approach (v4): mako is gone. The shell is the notification daemon —
@@ -331,12 +338,15 @@ below are current as of that branch unless a component explicitly discusses v3
   notification daemon that implements the same `org.freedesktop.Notifications`
   interface, themed via a matugen template instead of shell IPC.
 - Our decision: **ADAPT**
-- Our implementation: mako, config templated by matugen; a thin sender script
-  following Omarchy's `busctl`-over-`notify-send` pattern. Actual adoption decided in
-  Phase 4.
+- Our implementation: mako, started via its own shipped systemd `--user` service
+  (D-0031) rather than an `exec-once` line, config fully generated by a matugen
+  template (`home/matugen/.../templates/mako.ini`) — no separate sender script yet;
+  Omarchy's `busctl`-over-`notify-send` pattern is worth adopting whenever this
+  project sends its own notifications (Phase 9-ish, personal automation), not needed
+  for Phase 4.
 - Reason: matches D-0025 — the interface apps notify through is unchanged; only the
   renderer needs to be a standard, independently-replaceable program.
-- Related decision: D-0025, Phase 4
+- Related decision: D-0025, D-0031
 
 ### Idle management and locking
 - Omarchy approach (v4): hypridle and hyprlock are gone (confirmed retired by
@@ -360,11 +370,14 @@ below are current as of that branch unless a component explicitly discusses v3
   maintained pair for exactly this (idle detection dispatching to any lock command;
   lock-screen rendering as its own program), themed via matugen templates for each.
 - Our decision: **ADAPT**
-- Our implementation: hypridle + hyprlock, matugen-templated; actual timeout values
-  and lock behavior decided in Phase 4.
+- Our implementation: hypridle (`home/hypridle/.../hypridle.conf`, plain hyprlang
+  syntax — screensaver/lock/suspend listeners) + hyprlock (matugen-templated,
+  `home/matugen/.../templates/hyprlock.conf` → `~/.config/hypr/hyprlock.conf`,
+  never stow-linked directly). hypridle started via its own shipped systemd
+  `--user` service (D-0031).
 - Reason: two small, standard, independently-replaceable programs over one shell
   feature, per D-0025.
-- Related decision: D-0025, Phase 4
+- Related decision: D-0025, D-0031
 
 ### Wallpaper
 - Omarchy approach (v4): swaybg is gone (confirmed retired). The shell renders
@@ -381,17 +394,20 @@ below are current as of that branch unless a component explicitly discusses v3
 - Coupling to other Omarchy components: rendering is coupled to the shell
   architecture (rejected above); the "wallpaper is a per-theme bundled asset, cycled by
   a small CLI script repointing a symlink" idea is not.
-- Better modern alternatives: **swaybg** (static images) as the default, with the
-  symlink-and-cycle-script idea kept as-is; video wallpaper support noted as a
+- Better modern alternatives: **hyprpaper** (Hyprland-native, IPC-controlled) —
+  picked over swaybg once actually deciding, for the same "native ecosystem family"
+  reasoning applied to the polkit agent (D-0029); video wallpaper support noted as a
   DEFERrable nice-to-have (e.g. `mpvpaper`) rather than a Phase 4/6 requirement.
 - Our decision: **ADAPT**
-- Our implementation: swaybg (or equivalent) plus a small cycling script following
-  Omarchy's symlink pattern; video wallpaper support DEFERred. Actual tool and
-  behavior decided in Phase 4/6.
+- Our implementation: hyprpaper (D-0028), pointed at a generated solid-color
+  placeholder PNG (`~/.local/share/backgrounds/placeholder.png`) rather than
+  Omarchy's symlink-and-cycle-script pattern — that pattern is worth adopting once
+  Phase 6 actually has multiple named themes/backgrounds to cycle between; Phase 4
+  has exactly one placeholder image, so there's nothing yet to cycle.
 - Reason: the reusable idea (theme-bundled backgrounds, symlink + cycle script) doesn't
   need a shell process; static wallpaper covers the common case, and video wallpaper
   can be added later without redesigning anything.
-- Related decision: D-0025, Phase 4/6
+- Related decision: D-0025, D-0028
 
 ### Application launcher
 - Omarchy approach (v4): Walker and Elephant (the v3 launcher daemon pair) are
@@ -504,12 +520,14 @@ below are current as of that branch unless a component explicitly discusses v3
   `xdg-terminal-exec` already supports this without any of Omarchy's multi-terminal
   scaffolding.
 - Our decision: **ADAPT**
-- Our implementation: `xdg-terminal-exec` + `~/.config/xdg-terminals.list`; specific
-  terminal decided in Phase 4/5.
+- Our implementation: `xdg-terminal-exec` (genuinely AUR-only, D-0030) +
+  `home/terminal/.../xdg-terminals.list` → **ghostty** (D-0027,
+  `com.mitchellh.ghostty.desktop` — not `ghostty.desktop`, found the hard way by
+  actually running `xdg-terminal-exec --print-id`).
 - Reason: matches an already-decided project principle; REJECT only the
   parallel-four-terminals scope, which exists for Omarchy's broad user base, not a
   single machine.
-- Related decision: Phase 4/5
+- Related decision: D-0027, D-0030
 
 ### Clipboard
 - Omarchy approach (v4): clipboard history is a shell panel
