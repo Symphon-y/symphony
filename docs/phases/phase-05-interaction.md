@@ -69,7 +69,10 @@ File: `tests/acceptance/phase-05.bats`, same two groups as Phase 4:
 | live-session | Launcher opens and finds apps; power menu works; clipboard history captures and pastes; a screenshot produces a real file; waybar is visible and themed; workspace/window rules behave as expected | User, from Unraid's console |
 
 Red confirmed: yes (VM, 6/6 failing, no load/syntax errors — nothing installed yet,
-as expected) · Green confirmed: _pending_
+as expected) · Green confirmed: yes, automated group 6/6 (full suite across every
+phase: 72/72, no regressions); genuinely-interactive checks (launcher finding apps,
+power menu, screenshot annotation UI, waybar theme colors, PIP float/pin, web-app
+launcher) still need the user's own visual confirmation — see live-session tasks
 
 ## Tasks
 
@@ -108,11 +111,14 @@ as expected) · Green confirmed: _pending_
       `home/` (only `scripts/`, `install/`) -- extended it, and extended
       `.editorconfig`'s `switch_case_indent` the same way Phase 2 did for
       `scripts`/`install`
-- [ ] User: `yay -S --needed $(scripts/pkglist packages/*.txt)`, then
-      `systemctl --user enable cliphist.service` (the fifth shipped service, joining
-      Phase 4's four)
-- [ ] Static acceptance tests green
-- [ ] Live-session testing (user)
+- [x] User: `yay -S --needed $(scripts/pkglist packages/*.txt)`, then enabled
+      `cliphist.service` — caught during verification that **waybar was never
+      wired up at all** (it also ships its own systemd service, missed entirely
+      until "waybar is running" failed); enabled it too
+- [x] Static + automated live-session acceptance tests green (72/72, full suite,
+      no regressions). Also fixed a real test hang (`wl-copy` forking to
+      background kept bats's output pipe open after all 6 results printed)
+- [ ] Live-session testing (user): genuinely-interactive visual checks
 - [ ] Close: `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md`
 - [ ] Merge to `main`
 
@@ -150,6 +156,26 @@ as expected) · Green confirmed: _pending_
   `require`) verified against `Hyprland --verify-config`: config ok.
 - Waiting on the user: `yay -S --needed $(scripts/pkglist packages/*.txt)`, then
   enabling `cliphist.service`.
+- **Packages installed, cliphist enabled.** Verification found two more real bugs:
+  - **waybar was never actually wired up.** Completely missed that it ships its
+    own systemd `--user` service like everything else in `autostart.lua`'s
+    growing list — only caught because "live-session: waybar is running" failed.
+    Enabled `waybar.service` alongside `cliphist.service` (both needed `--now`
+    too, since `graphical-session.target` had already been reached before they
+    were enabled) and documented it.
+  - **The clipboard test hung the whole suite.** `wl-copy` forks to background by
+    design; the forked process kept bats's output pipe open even after all 6
+    results had printed, so the command never returned control (confirmed by
+    reading the background task's own output file: all 6 `ok` lines were there,
+    it just hadn't exited). Fixed with `--paste-once` (serve exactly one paste
+    request then exit) wrapped in a 5s `timeout`, so a not-yet-running watcher
+    fails the test cleanly instead of hanging.
+  - Full acceptance suite re-run across every phase: **72/72 green**, no
+    regressions.
+- Remaining: genuinely-interactive checks that need the user's own eyes (launcher
+  finding apps, power menu, screenshot annotation UI, waybar theme colors, PIP
+  float/pin, web-app launcher end to end) — automated tests can confirm processes
+  run and files get created, not that the UI actually looks/behaves right.
 
 ## VM → physical hardware notes
 
