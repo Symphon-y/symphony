@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| **Status** | Planned |
+| **Status** | In progress |
 | **Driver** | Claude |
 | **Branch** | `phase/04-minimal-hyprland-session` |
-| **Started** | — |
+| **Started** | 2026-09-14 |
 | **Completed** | — |
 
 ## Goal
@@ -18,12 +18,12 @@ portals, a polkit agent, notifications, idle/lock, and a wallpaper all working.
 **In scope**
 - Packages: `hyprland`, `uwsm`, `sddm`, `ghostty`, `mako`, `hypridle`, `hyprlock`,
   `hyprpaper`, `hyprpolkitagent`, `pipewire`, `wireplumber`,
-  `xdg-desktop-portal-hyprland`, `xdg-desktop-portal-gtk`, `matugen` (AUR via yay),
-  `yay` itself.
+  `xdg-desktop-portal-hyprland`, `xdg-desktop-portal-gtk`, `matugen`, `vulkan-intel`
+  — **all confirmed in Arch's official `extra` repo** directly against this VM's
+  pacman database (correcting the plan's original research, which wrongly claimed
+  matugen was AUR-only). No AUR helper needed for this phase.
 - System config (root-owned, via `install/sync-system`): SDDM's `/etc/sddm.conf.d/*`
-  drop-ins. `yay` bootstrap needs care around the no-`sudo`-for-Claude rule (building
-  an AUR package needs `sudo pacman -U` at the end) — worked out during
-  implementation, likely a user-run step similar to Phase 2's SSH/login steps.
+  drop-ins.
 - Home config (via `install/link-home`, one stow package per component): Hyprland
   (Lua `require()`-based, per Phase 3's ADOPT decision), ghostty, mako, hypridle,
   hyprlock, hyprpaper, hyprpolkitagent's autostart, WirePlumber user conf.d snippets
@@ -74,11 +74,13 @@ portals, a polkit agent, notifications, idle/lock, and a wallpaper all working.
   dependency, the idiomatic choice for a bare Hyprland session. Chosen over
   polkit-gnome (older, GTK2, what Omarchy v3 used), polkit-kde-agent, lxqt-policykit,
   and mate-polkit (all researched and compared).
-- **AUR helper: yay**, adopted now — resolves the standing "AUR helper or none"
-  question generally (flagged but never resolved back in Phase 2), not just for this
-  phase. Needed because matugen (D-0025's theming tool) is AUR-only; every other
-  Phase 4 package is confirmed in Arch's official `extra` repo (checked directly
-  against the Arch package database).
+- **AUR helper: deferred, not adopted.** The plan's original research claimed
+  matugen (D-0025's theming tool) was AUR-only, which was wrong — checked directly
+  against this VM's live pacman database, matugen is in the official `extra` repo
+  (v4.2.0-1, packaged by an Arch Trusted User), same as every other Phase 4 package.
+  With the only justification for an AUR helper gone, the user chose to defer "AUR
+  helper or none" again rather than adopt yay/paru with no immediate job — revisit
+  whenever an actual AUR-only package is needed.
 
 **Resolved (plan)**
 - Notifications (mako), idle/lock (hypridle + hyprlock), audio
@@ -86,7 +88,7 @@ portals, a polkit agent, notifications, idle/lock, and a wallpaper all working.
   already classified ADAPT/ADOPT in Phase 3 (`docs/omarchy-influences.md`) — this
   phase implements those directly, no new decision needed.
 - Recorded in `DECISIONS.md` at close-out (likely D-0026 onward): session-start
-  mechanism, terminal, wallpaper tool, polkit agent, AUR helper.
+  mechanism, terminal, wallpaper tool, polkit agent.
 
 **Known testing caveat, not a blocker**
 - The VM also has no audio device at all (separate from the display issue). Audio
@@ -109,14 +111,19 @@ Red confirmed: _pending_ · Green confirmed: _pending_
 ## Tasks
 
 **Prerequisite (user)**
-- [ ] Switch the VM's display device to Virtio-GPU(3D) in Unraid and restart the VM
+- [x] Switch the VM's display device in Unraid and restart the VM — user did GPU
+      passthrough (real Intel UHD Graphics 770, Raptor Lake-S GT1) rather than the
+      virtio-gpu-3D fallback the plan suggested, with some hiccups troubleshooted
+      along the way. Verified: `lspci` shows the Intel VGA controller bound to `i915`
+      (modules `i915`, `xe`); `/dev/dri/renderD128` exists, group `render`. This is a
+      real DRM render node, better fidelity to eventual physical hardware than
+      virtio-gpu-3D would have been.
 
 **Implementation (Claude)**
 - [ ] Branch, tracking doc (this file)
 - [ ] Red: `tests/acceptance/phase-04.bats` (static group) + any new script's unit
       tests; confirm red
-- [ ] `packages/desktop.txt` (new category) + declare `yay`
-- [ ] Bootstrap `yay` (shape TBD around the no-`sudo`-for-Claude rule)
+- [ ] `packages/desktop.txt` (new category)
 - [ ] `system/sddm/` drop-ins, added to `system/files.txt`
 - [ ] `home/hypr/` (Lua-based, modular)
 - [ ] `home/ghostty/`, `home/mako/`, `home/hypridle/`, `home/hyprlock/`,
@@ -147,18 +154,34 @@ Red confirmed: _pending_ · Green confirmed: _pending_
   unsupported without one. Recommended fix: Unraid Graphics Card = Virtual, Video
   Driver = Virtio(3D) — low-risk, reversible, needs a VM shutdown.
 - User decisions locked: Virtio-GPU(3D) switch first; SDDM+uwsm; ghostty; hyprpaper;
-  hyprpolkitagent; yay adopted as the general AUR helper.
+  hyprpolkitagent; yay adopted as the general AUR helper (later corrected — see below).
 - **User is restarting the VM with the display-device change before implementation
   begins.** This session ends here; implementation (branch, Red, Green) starts once
   the VM is back up on Virtio-GPU(3D).
+- **VM back up.** User did real GPU passthrough (Intel UHD Graphics 770) rather than
+  virtio-gpu-3D, after some troubleshooting. Confirmed via `lspci`/`/dev/dri`: a real
+  `i915`/`xe`-driven render node exists. Implementation starts now.
+- **Research correction:** checked the actual Phase 4 package list directly against
+  this VM's live pacman database (`pacman -Si`) before writing anything, rather than
+  trusting the plan's WebSearch-derived claim. Every package, including matugen, is in
+  the official `extra` repo — the "matugen is AUR-only" research from planning was
+  wrong. Told the user immediately rather than quietly installing yay for no reason;
+  **user decision: defer the AUR-helper question again**, since nothing in this phase
+  needs one. Added `vulkan-intel` to the package list (not in the original plan) once
+  real Intel GPU passthrough was confirmed, for a proper Vulkan driver alongside
+  mesa's OpenGL/EGL support.
 
 ## VM → physical hardware notes
 
-- The Virtio-GPU(3D) requirement is VM-specific — real hardware will have an actual
-  GPU (or the eventual laptop's integrated graphics) and won't need this substitution.
-  Revisit whether any VM-only workarounds (e.g. `cursor:no_hardware_cursors` for
-  virtualized GPUs lacking hardware cursor scanout) are still needed once on physical
-  hardware.
+- Superseded by events: the user did real GPU passthrough (Intel UHD Graphics 770,
+  `i915`/`xe`) instead of the planned virtio-gpu-3D fallback, so this VM now runs
+  against real Intel graphics rather than a virtualized display device. Workarounds
+  that exist specifically for virtualized GPUs without hardware cursor scanout
+  (`cursor:no_hardware_cursors`) likely aren't needed here — confirm during
+  implementation rather than assuming either way, and note whether Hyprland needs it
+  regardless once tested. If the eventual physical workstation uses different (e.g.
+  discrete NVIDIA/AMD) graphics, driver packages will need revisiting then; if it's
+  also Intel, this VM's config should carry over close to as-is.
 - Revisit the audio testing caveat once a virtual sound card exists in Unraid, and
   again once on physical hardware with real audio devices.
 
