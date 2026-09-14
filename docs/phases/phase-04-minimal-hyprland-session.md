@@ -167,7 +167,7 @@ after fixing a real autostart bug found in the live session (see implementation 
 - [x] `DECISIONS.md` (D-0026 through D-0032), `docs/omarchy-influences.md` (filled in
       "Our implementation"/"Related decision" for the six Phase 3 components this
       phase built, plus Terminal), `docs/roadmap.md`, VM → hardware notes
-- [ ] Merge to `main`
+- [x] Merge to `main`
 
 ## Implementation log
 
@@ -388,4 +388,4 @@ after fixing a real autostart bug found in the live session (see implementation 
 - [x] Static and live-session acceptance tests both pass (9/9)
 - [x] `scripts/check` green
 - [x] `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md` updated
-- [ ] Branch merged to `main`
+- [x] Branch merged to `main`
