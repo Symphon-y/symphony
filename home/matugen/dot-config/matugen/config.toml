@@ -1,8 +1,9 @@
 # Target: ~/.config/matugen/config.toml (linked by install/link-home)
 #
 # Phase 4: one placeholder palette (a seed color, no wallpaper-derived generation
-# yet), wired into the three components this phase themes. The full theme system --
-# named themes, a switcher, every component -- is Phase 6 (D-0025).
+# yet), wired into the three components that phase themed. Phase 5 adds fuzzel and
+# waybar. The full theme system -- named themes, a switcher, every component -- is
+# Phase 6 (D-0025).
 #
 # Run: matugen color hex "#1e1e2e"
 #
@@ -28,3 +29,12 @@ output_path = "~/.config/hypr/hyprlock.conf"
 [templates.ghostty]
 input_path = "./templates/ghostty.conf"
 output_path = "~/.config/ghostty/config"
+
+[templates.fuzzel]
+input_path = "./templates/fuzzel.ini"
+output_path = "~/.config/fuzzel/fuzzel.ini"
+
+[templates.waybar]
+input_path = "./templates/waybar.css"
+output_path = "~/.config/waybar/colors.css"
+post_hook = "pkill -SIGUSR2 waybar || true"
