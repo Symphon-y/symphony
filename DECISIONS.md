@@ -252,7 +252,7 @@ and the old entry is marked `Superseded by D-XXXX`.
 
 ## D-0015 — Network exposure: nftables denies inbound; no SSH server
 
-- **Status:** Accepted (2026-09-13, Phase 1)
+- **Status:** Accepted (2026-09-13, Phase 1). _(SSH clause superseded by D-0021.)_
 - **Decision:** `/etc/nftables.conf` drops unsolicited inbound traffic. It allows
   established/related, loopback, ICMP/ICMPv6, and DHCPv6 replies; forwarding is dropped
   and outbound traffic is allowed. `openssh` is not installed. An acceptance test forbids
@@ -299,3 +299,154 @@ and the old entry is marked `Superseded by D-XXXX`.
 - **Consequences:** `system/` files are deployed explicitly by `configure-base-system`
   until Phase 2 chooses a mechanism. Choosing lists per machine (`vm.txt` or hardware
   lists) is Phase 8/10 work.
+
+## D-0018 — Claude Code: native binary, verified manifest, sudo denied by root-owned policy
+
+- **Status:** Accepted (2026-09-13, Phase 2)
+- **Decision:** Install Claude Code with Anthropic's official native installer. An
+  acceptance test checks the installed binary against the release's signed manifest
+  (the installer itself verifies only the SHA256 checksum, not the manifest's detached
+  signature — a gap found in `install.sh`, worth knowing about rather than trusting
+  blindly). Claude runs as the normal user with `DISABLE_TELEMETRY` and
+  `DISABLE_ERROR_REPORTING` set. Its policy — auto-update channel, telemetry, and deny
+  rules for `Bash(sudo *)` and for reading `~/.claude/.credentials.json` and
+  `~/.config/gh/**` — lives in `/etc/claude-code/managed-settings.json`, root-owned and
+  0644, installed by `sync-system`. Managed settings outrank user settings and merge
+  permission lists across levels, so the deny rules always apply.
+- **Alternatives considered:**
+  - The AUR `claude-code` package: a third-party build step, not the vendor's signed
+    artifact.
+  - npm global install: adds Node as a standing dependency for no benefit here.
+  - Keeping the policy in `~/.claude/settings.json`: the account Claude runs as could
+    edit its own restrictions.
+- **Reasoning:** D-0016 already established that neither a compromised session nor an
+  agent acting as the user should silently gain privilege. A root-owned file Claude
+  cannot write is what makes "Claude never uses `sudo`" enforced rather than merely
+  agreed to.
+- **Consequences:** Remote Control is unavailable while telemetry is disabled (see
+  D-0024). `claude doctor` and the acceptance suite are the ongoing check that the
+  binary and manifest still match after auto-updates.
+
+## D-0019 — `gh` authentication: keep the existing broad-scope OAuth login
+
+- **Status:** Accepted (2026-09-13, Phase 2)
+- **Decision:** Keep the `gh` OAuth login set up in Phase 1, rather than re-scoping it
+  for Claude's use.
+- **Alternatives considered:** A fine-grained personal access token scoped to just this
+  repo — safer, but more setup and rotation overhead than the phase needed to resolve.
+- **Reasoning:** The user accepted the broad-scope risk for now to keep the handoff
+  moving. The token lives in `gh`'s own storage, which Claude's managed settings already
+  deny reading (`Read(~/.config/gh/**)`, D-0018).
+- **Consequences:** Revisit the token's scope and storage once a keyring exists (VM →
+  hardware notes, `docs/phases/phase-02-agent-handoff.md`).
+
+## D-0020 — Config deployment: GNU stow for home, a root-owned copy script for system files
+
+- **Status:** Accepted (2026-09-13, Phase 2). Refines D-0007 and D-0017.
+- **Decision:** `home/<component>/` stow packages, applied by `install/link-home`, link
+  dotfiles into `$HOME` with no folding. Root-owned files are managed by
+  `install/sync-system` against a manifest (`system/files.txt`, with per-host manifests
+  at `system/hosts/<hostname>/files.txt`), which checks and applies content, mode, and
+  ownership. A manifest mode of `-` means "no per-file permissions: don't check or set a
+  mode," for filesystems that have none (the vfat ESP).
+- **Alternatives considered:**
+  - chezmoi: templating not needed yet, and another tool to trust.
+  - A hand-rolled symlink script for home config: stow already solves conflict
+    detection and folding.
+  - Deploying system files the same way as home files: system files need root ownership
+    and mode checks that stow doesn't do.
+- **Reasoning:** Two different trust boundaries — the user's own files and root-owned
+  system config — get two narrowly-scoped tools rather than one tool stretched to cover
+  both (interface segregation).
+- **Consequences:** `~/.claude/settings.json` must never be a stow link (see D-0018).
+  `link-home apply` needs a stale link removed first when a package's ownership model
+  changes, or Claude would write through the dangling link back into the repo.
+
+## D-0021 — On-demand SSH from Unraid as the copy/paste jump host
+
+- **Status:** Accepted (2026-09-13, Phase 2). Supersedes the SSH clause of D-0015.
+- **Decision:** sshd starts on demand, not at boot, reached only from Unraid's LAN
+  address. `install/ssh-jump-host <address>` writes both the firewall rule
+  (`/etc/nftables.d/ssh-jump-host.nft`) and root-owned `authorized_keys`, with every key
+  restricted `from="<address>",restrict,pty`. The drop-in (`system/ssh/10-autarchy.conf`)
+  allows keys only, no root login, no forwarding. The passphrase-protected private key
+  lives on Unraid's flash, never in the VM or the repo; the repo keeps only the public
+  key (`system/hosts/autarchy-vm/ssh/authorized_keys.travis`).
+- **Alternatives considered:**
+  - A short-lived secret-gist relay for copy/paste: the original Phase 2 plan, dropped
+    once SSH from Unraid was on the table.
+  - SSH from the Mac directly: the Mac is remote on a subnet that overlaps the home LAN,
+    and Unraid advertises no routes, so this path doesn't route cleanly; it would also
+    mean trusting a remote network path instead of a LAN-only one.
+  - RDP-style clipboard sharing: needs a desktop, which is Phase 4.
+- **Reasoning:** copy/paste without opening the VM to the internet or standing up a
+  desktop early. Restricting both the firewall rule and every key's `from=` to one known
+  LAN address keeps the exposure to "reachable only from a machine already inside the
+  house."
+- **Consequences:** `docs/environment/vm-lab.md` and `scripts/system-report` mask
+  addresses before anything reaches git (D-0022). No SSH or remote-desktop access beyond
+  this jump-host path until Phase 4.
+
+## D-0022 — No network or personal identifiers in git — automated scanner, and a rewritten history
+
+- **Status:** Accepted (2026-09-13, Phase 2)
+- **Decision:** `scripts/check-identifiers` scans every tracked file and the full commit
+  history (contents and messages) for IPv4/IPv6/MAC addresses and email addresses,
+  allowing only loopback, unspecified, and documentation ranges plus SSH algorithm names,
+  and never prints the matched value. It fails closed: no git repository, or nothing to
+  scan, is an error rather than a silent pass. It runs in `scripts/check` and in CI (which
+  installs git before `actions/checkout`, or the checkout is a tarball with no `.git` and
+  the scanner would wrongly report nothing to check). `scripts/system-report` masks the
+  same patterns in its own output (`scripts/lib/identifiers.bash`). When an audit found
+  Unraid's LAN address and a VM MAC address already committed — some already pushed — and
+  all 28 prior commits carrying the user's personal email, `git filter-repo` rewrote every
+  literal address and internal domain name and remapped every author/committer email to
+  the GitHub noreply address, across `main` and both phase branches, after a full local
+  bundle backup and a guard check that GitHub's branch heads hadn't moved since the
+  backup.
+- **Alternatives considered:**
+  - Scrubbing only new commits going forward, leaving the already-pushed leak: rejected
+    by the user — a private repo is not a reason to accept an identifier leak.
+  - A pre-commit hook alone, no CI enforcement: wouldn't have caught branches already
+    pushed, and a hook can be skipped.
+- **Reasoning:** the user's standing rule that no network identifiers belong in git, even
+  privately. A scanner that fails open — as the first CI attempt did (D-0023) — is worse
+  than no scanner, because it looks like protection.
+- **Consequences:** commit hashes quoted in tracking docs before the rewrite were
+  remapped to the new history; hashes quoted inside commit messages were left as they
+  are. The force-push used `--force-with-lease` after verifying every replaced branch
+  head matched the backup, confirmed again against GitHub afterward. GitHub may serve
+  old commits by hash from cache for a while.
+
+## D-0023 — CI hardening: pinned checkout, git available for the identifier scanner
+
+- **Status:** Accepted (2026-09-13, Phase 2)
+- **Decision:** CI runs in an `archlinux:latest` container. `actions/checkout` is pinned
+  by commit SHA, not a floating tag. git is installed in the container before the
+  checkout step, so `actions/checkout` produces a real repository the identifier scanner
+  (D-0022) can walk, instead of a tarball with no `.git`.
+- **Alternatives considered:**
+  - Pinning `actions/checkout` by version tag: a tag can be moved.
+  - Running the identifier scan only locally, never in CI: already shown to miss commits
+    the user hadn't scanned by hand (D-0022's audit).
+- **Reasoning:** a pinned SHA can't be silently retagged. Catching an undeclared
+  dependency or a silently-passing check in a clean container is exactly what CI in a
+  minimal base image is for — the same run also caught a missing `diffutils` dependency
+  (`cmp`) this way.
+- **Consequences:** any new script dependency must be declared in `packages/tooling.txt`,
+  the one list both CI and the VM installer use.
+
+## D-0024 — Claude Code sandboxing, Remote Control, and console font: deferred
+
+- **Status:** Accepted (2026-09-13, Phase 2)
+- **Decision:** Not built in Phase 2: a bubblewrap sandbox around Claude Code's tool
+  execution; Remote Control (needs a full claude.ai login, which conflicts with the
+  telemetry variables set in D-0018); a console font or kmscon for the text console.
+- **Alternatives considered:** n/a — these are scoped out of this phase, not chosen
+  against.
+- **Reasoning:** each depends on groundwork this phase doesn't build. Sandboxing needs a
+  threat model beyond "no `sudo`"; Remote Control needs telemetry back on; a console font
+  is only worth it if the default console proves hard to read.
+- **Consequences:** revisit bubblewrap once Claude's tool surface is better understood;
+  revisit Remote Control if telemetry is ever turned back on; leave the console font
+  alone unless legibility becomes a real problem.

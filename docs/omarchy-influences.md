@@ -45,6 +45,8 @@ assumed.
 | Disk layout, encryption, snapshots, bootloader | 1 | 1 | ADAPT (D-0010–D-0012) |
 | Firewall | 1 | 1 | ADAPT (D-0015) |
 | Base services | 1 | 1 | ADAPT (D-0014) |
+| Claude Code CLI integration | — | 2 | DEFER / REJECT (D-0018) |
+| Dotfiles / config deployment | — | 2 | REJECT (D-0020) |
 | Login / session start | 2 | 4 | — |
 | Hyprland config structure | 2 | 4 | — |
 | Audio, portals, polkit | 2 | 4 | — |
@@ -135,3 +137,39 @@ Phase 1 entries, researched from source on 2026-09-12 (`omacom/omarchy-iso` and
   timesyncd, nftables, systemd-boot-update, fstrim.timer, and paccache.timer.
 - Reason: no listening services or daemons without a job on this machine.
 - Related decision: D-0014
+
+### Claude Code CLI integration
+- Omarchy approach: bundles theme sync (matching Claude Code's UI to the desktop
+  palette) and a usage-panel widget for its status bar. The Claude *desktop app*
+  installer is a separate, optional component from this CLI integration.
+- Problem it solves: makes the CLI feel native to Omarchy's desktop.
+- Why it is interesting: theme sync is worth having once a palette source exists.
+- Coupling to other Omarchy components: Omarchy's palette/theme system and status bar.
+- Better modern alternatives: none needed — Claude Code's own settings and hooks cover
+  this without extra scripts.
+- Our decision: **DEFER** (theme sync, until Phase 6's palette source exists); **REJECT**
+  (the desktop app installer — this project runs the CLI only, and any GUI integration
+  is a Phase 4/6 decision on its own terms, not something borrowed from Omarchy).
+- Our implementation: none yet; Claude Code is installed and run per D-0018, independent
+  of any desktop theme.
+- Reason: theme sync only makes sense once a palette exists; nothing else here should
+  wait for it.
+- Related decision: D-0018
+
+### Dotfiles / config deployment
+- Omarchy approach: copies/symlinks its own dotfiles from its repo during its one-shot
+  install, with no separate manifest and no drift check — the installer is the source of
+  truth, run once.
+- Problem it solves: gets Omarchy's opinionated config onto disk during install.
+- Why it is interesting: nothing beyond "it works for a single install."
+- Coupling to other Omarchy components: its installer/bootstrap flow (already REJECT,
+  see above).
+- Better modern alternatives: GNU stow for symlink management (conflict detection, no
+  folding), plus an explicit manifest with a drift check for root-owned files — neither
+  of which a one-shot copy needs, since it's never re-applied.
+- Our decision: **REJECT**
+- Our implementation: `install/link-home` (stow) and `install/sync-system` (manifest-
+  checked copy); see D-0020.
+- Reason: this repo's config is applied repeatedly — every phase, every re-sync — not
+  once at install time, so it needs drift detection Omarchy's approach doesn't have.
+- Related decision: D-0020
