@@ -126,7 +126,7 @@ launcher) still need the user's own visual confirmation — see live-session tas
       `docs/omarchy-influences.md` (filled in for launcher/menus/keybindings/
       clipboard/screenshots/status-bar/web-apps; corrected an overclaim about
       QR-capture clipboard-history exclusion along the way), `docs/roadmap.md`
-- [ ] Merge to `main`
+- [x] Merge to `main`
 
 ## Implementation log
 
@@ -205,4 +205,4 @@ launcher) still need the user's own visual confirmation — see live-session tas
       every phase; genuinely-interactive pieces confirmed by the user)
 - [x] `scripts/check` green
 - [x] `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md` updated
-- [ ] Branch merged to `main`
+- [x] Branch merged to `main`
