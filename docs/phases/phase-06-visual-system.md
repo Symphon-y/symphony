@@ -103,7 +103,7 @@ Red confirmed: · Green confirmed:
       renders for the first time, `wallpaper-random` bind works)
 - [x] Close: `DECISIONS.md` (D-0037–D-0042), `docs/omarchy-influences.md` (theme
       system + fonts/GTK/Qt/icons/cursors entries filled in), `docs/roadmap.md`
-- [ ] Merge to `main`
+- [x] Merge to `main`
 
 ## Implementation log
 
@@ -184,4 +184,15 @@ Red confirmed: · Green confirmed:
 - [x] Static and live-session acceptance tests both pass
 - [x] `scripts/check` green
 - [x] `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md` updated
-- [ ] Branch merged to `main`
+- [x] Branch merged to `main`
+
+## Post-merge follow-up (not this phase's scope)
+
+- The user asked about better remote GUI access (RDP or a browser client with
+  proper Super/Meta key forwarding, instead of noVNC's on-screen key panel).
+  Nothing on the roadmap covers this yet -- closest related context is D-0032's
+  Consequences section (full PCI passthrough breaks Unraid's noVNC; pairing it with
+  `wayvnc` hits `AllowTcpForwarding no`, D-0021) and D-0021 itself (SSH is a narrow,
+  LAN-restricted jump host, not general tunneling). Worth checking first whether
+  Unraid's noVNC has a fullscreen/Keyboard-Lock-API mode that fixes this with zero
+  VM-side changes, before treating it as a new phase.
