@@ -46,7 +46,7 @@ phase exit.
 | Principle | Meaning in this repo |
 |---|---|
 | **S**ingle responsibility | One component per directory; one script does one job. |
-| **O**pen/closed | Extend through drop-ins (Hyprland `source =`, systemd drop-ins, `conf.d/`) rather than editing core files. Machine-specific settings live in drop-ins. |
+| **O**pen/closed | Extend through drop-ins (Hyprland's Lua `require()` modules, systemd drop-ins, `conf.d/`) rather than editing core files. Machine-specific settings live in drop-ins. |
 | **L**iskov substitution | A replaceable component satisfies its role's contract (e.g. any terminal behind the terminal role supports `-e <cmd>`). Prefer existing standards (xdg-terminal-exec, xdg-mime) over custom wrappers. |
 | **I**nterface segregation | Many small scripts with narrow jobs, not one monolithic CLI. |
 | **D**ependency inversion | Keybindings and menus call *roles* (`$terminal`, `$launcher`), never hardcoded executables. |
