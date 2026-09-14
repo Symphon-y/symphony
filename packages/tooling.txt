@@ -16,3 +16,4 @@ go              # builds yay itself (makepkg makedepends); not in any repo pacma
 fakeroot        # makepkg needs it to fake file ownership when packaging, for any build (yay included)
 make            # runs xdg-terminal-exec's Makefile when yay builds it from AUR
 scdoc           # renders xdg-terminal-exec's man page (a makepkg makedepend of that AUR package)
+debugedit       # makepkg needs it to build debug packages (Arch's current default); missing it aborts any build
