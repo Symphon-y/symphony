@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Status** | In progress |
+| **Status** | Complete |
 | **Driver** | Claude |
 | **Branch** | `phase/04-minimal-hyprland-session` |
 | **Started** | 2026-09-14 |
-| **Completed** | — |
+| **Completed** | 2026-09-14 |
 
 ## Goal
 
@@ -164,9 +164,9 @@ after fixing a real autostart bug found in the live session (see implementation 
 - [x] All 9 acceptance tests green, from inside the live session
 
 **Close**
-- [ ] `DECISIONS.md`, `docs/omarchy-influences.md` (fill in "Our
-      implementation"/"Related decision" for the six components this phase builds),
-      `docs/roadmap.md`, VM → hardware notes
+- [x] `DECISIONS.md` (D-0026 through D-0032), `docs/omarchy-influences.md` (filled in
+      "Our implementation"/"Related decision" for the six Phase 3 components this
+      phase built, plus Terminal), `docs/roadmap.md`, VM → hardware notes
 - [ ] Merge to `main`
 
 ## Implementation log
@@ -385,7 +385,7 @@ after fixing a real autostart bug found in the live session (see implementation 
 
 ## Exit criteria
 
-- [ ] Static and live-session acceptance tests both pass
-- [ ] `scripts/check` green
-- [ ] `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md` updated
+- [x] Static and live-session acceptance tests both pass (9/9)
+- [x] `scripts/check` green
+- [x] `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md` updated
 - [ ] Branch merged to `main`

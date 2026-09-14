@@ -497,3 +497,161 @@ and the old entry is marked `Superseded by D-XXXX`.
   (DEFER, not REJECT). This can be revisited if the decoupled-tools experience proves
   disjointed in practice — Noctalia or a from-scratch shell stay on the table then, not
   ruled out permanently.
+
+## D-0026 — Session start: SDDM + uwsm
+
+- **Status:** Accepted (2026-09-14, Phase 4)
+- **Decision:** A conventional graphical greeter (SDDM), configured for Wayland only,
+  autologin into one uwsm-managed session — `/etc/sddm.conf.d/10-wayland.conf` sets
+  `DisplayServer=wayland` and nothing else; no forced default session name. The
+  `hyprland` package ships its own `hyprland-uwsm.desktop` ("Hyprland (uwsm-managed)",
+  `Exec=uwsm start -e -D Hyprland hyprland.desktop`), so no custom session file was
+  needed.
+- **Alternatives considered:** `greetd`+`tuigreet` (smaller footprint, idiomatic in the
+  Hyprland/wlroots community, no reported uwsm friction); `ly` (very small, ~1.8MB,
+  minimal deps); plain TTY autologin + uwsm (the only option with zero extra
+  always-on daemon, matching this project's general minimalism, but needs manual PAM
+  tuning a display manager gives for free). All three researched and compared in the
+  phase's plan mode.
+- **Reasoning:** the most conventional, best-documented path, and what Omarchy itself
+  ships — worth the heavier footprint and extra daemon for the reduced friction on a
+  system that's still being built out. Revisit if the daemon footprint or uwsm-DM
+  interop friction reported elsewhere actually bites.
+- **Consequences:** an always-on `sddm.service`. Session picking happens at the
+  greeter, not forced by config — verified by confirming `hyprland-uwsm.desktop` was
+  already correct rather than assuming a custom file was needed.
+
+## D-0027 — Terminal: ghostty
+
+- **Status:** Accepted (2026-09-14, Phase 4)
+- **Decision:** ghostty behind the `$terminal` role, resolved via `xdg-terminal-exec`
+  + `~/.config/xdg-terminals.list` (already CLAUDE.md's own Liskov-substitution
+  example) — never hardcoded into a keybinding or script.
+- **Alternatives considered:** foot (software-rendered by design, no GPU dependency
+  at all, Omarchy's current default specifically for resource efficiency); alacritty
+  (GPU, very mature, lowest RAM among GPU terminals); kitty (GPU, feature-rich, decent
+  software-rendering fallback). All four researched and compared, including
+  specifically how each behaves without GPU acceleration, before the VM had a real
+  render node.
+- **Reasoning:** user preference, made viable by the Virtio-GPU(3D) display fix
+  landing first — ghostty has no robust software-rendering fallback, so this pick
+  depended on that groundwork.
+- **Consequences:** none beyond the role indirection already established; swapping
+  terminals later is a one-line change to `xdg-terminals.list`.
+
+## D-0028 — Wallpaper: hyprpaper
+
+- **Status:** Accepted (2026-09-14, Phase 4)
+- **Decision:** hyprpaper, IPC-controlled, pointed at a generated solid-color
+  placeholder PNG (`~/.local/share/backgrounds/placeholder.png`, hand-crafted via
+  Python's `zlib`+`struct` since neither ImageMagick nor PIL were available) — proves
+  the mechanism; real curated wallpapers are Phase 6's job.
+- **Alternatives considered:** swaybg (the Phase 3 placeholder pick — simpler, no
+  IPC, kill+respawn to change wallpaper, which the theme-switching pattern would need
+  anyway).
+- **Reasoning:** hyprpaper is Hyprland-authored, same ecosystem family as
+  hypridle/hyprlock/hyprpolkitagent — the same "native over generic" reasoning
+  already applied to the polkit agent (D-0029) — and its IPC control avoids the
+  kill+respawn cycle swaybg needs to change wallpaper.
+- **Consequences:** wallpaper needs an actual image file to reference (unlike
+  swaybg, which can fill a solid color with no file at all) — hence the generated
+  placeholder PNG. Video wallpaper support (which Omarchy's shell had) stays
+  deferred, not ruled out.
+
+## D-0029 — Polkit agent: hyprpolkitagent
+
+- **Status:** Accepted (2026-09-14, Phase 4)
+- **Decision:** hyprpolkitagent, Hyprland's own native polkit authentication agent,
+  enabled as its shipped systemd `--user` service (see D-0031) rather than a
+  standalone `exec-once`-style launch.
+- **Alternatives considered:** polkit-gnome (older, GTK2, what Omarchy v3 used, still
+  packaged); polkit-kde-agent; lxqt-policykit; mate-polkit. All four researched and
+  compared (dependency footprint, launch style, Arch packaging status) before
+  hyprpolkitagent was found as a fifth option not in the original comparison.
+- **Reasoning:** no legacy GTK2/KDE toolkit dependency, and it's the idiomatic choice
+  for a bare Hyprland session with no other desktop-environment libraries pulled in.
+- **Consequences:** none beyond the general "prefer native ecosystem tools" pattern
+  this also applied to hyprpaper.
+
+## D-0030 — AUR helper: yay, adopted for a real need
+
+- **Status:** Accepted (2026-09-14, Phase 4). Supersedes the Phase 4 planning-time
+  deferral (matugen's AUR-only claim turned out to be wrong).
+- **Decision:** yay, bootstrapped manually (`git clone` + `makepkg -si`, a user-run
+  step since the final `pacman -U` needs `sudo`) because `xdg-terminal-exec` — the
+  exact mechanism CLAUDE.md already names for the `$terminal` role — is genuinely
+  AUR-only, confirmed against both the live pacman database and its AUR PKGBUILD.
+  From here on, the VM's bulk-install command is `yay -S --needed
+  $(scripts/pkglist packages/*.txt)`, not plain `pacman -S` — yay handles official
+  and AUR packages identically, so every package stays in the same declared lists.
+- **Alternatives considered:** vendoring `xdg-terminal-exec` like `install/claude-code`
+  (a small, source-reviewed installer for a ~1500-line POSIX script) — reuses an
+  established pattern, no AUR helper needed, but doesn't generalize to any other
+  AUR-only tool that comes up later; one-off `makepkg -si` per AUR package with no
+  persistent helper — repeats manual work indefinitely.
+- **Reasoning:** the standing "AUR helper or none" question (flagged in Phase 2,
+  never resolved) needed answering once a real, unavoidable AUR-only dependency
+  showed up, rather than solving this one case narrowly and leaving the general
+  question open again for the next one.
+- **Consequences:** `yay` and `xdg-terminal-exec`, plus yay's own build chain (`go`,
+  `fakeroot`, `make`, `scdoc`, `debugedit`, `gcc` — found one at a time from real
+  `makepkg -si` failures, not predicted in advance), are declared in
+  `packages/desktop.txt`, not `packages/tooling.txt` — CI installs only
+  `tooling.txt` with plain `pacman`, in a container that never touches the desktop
+  stack, and an AUR-only name there breaks that command outright (caught this the
+  hard way: CI red on "target not found: yay" before catching and fixing it).
+  `packages/external.md` documents both.
+
+## D-0031 — Autostart via shipped systemd `--user` services, not `exec-once`/`hl.exec_cmd`
+
+- **Status:** Accepted (2026-09-14, Phase 4)
+- **Decision:** mako, hypridle, hyprpaper, and hyprpolkitagent are started by
+  enabling their own shipped systemd `--user` services
+  (`WantedBy=graphical-session.target`, confirmed present for all four via
+  `pacman -Ql`), not by launching them from Hyprland's `autostart.lua`.
+- **Alternatives considered:** the initial implementation used
+  `hl.exec_cmd("uwsm app -- <name>")` for all four, copying the `exec-once` pattern
+  common in Hyprland dotfiles (Omarchy's own included). This silently failed for
+  hyprpolkitagent, whose binary isn't on `$PATH` at all
+  (`/usr/lib/hyprpolkitagent/hyprpolkitagent`) — found by actually logging in and
+  running `pgrep`, not by inspection. The other three only "worked" by coincidence of
+  being on `$PATH`, duplicating what their own services already do correctly
+  (restart-on-failure included).
+- **Reasoning:** prefer the standard primitive a package already ships over
+  reimplementing process supervision by hand (this project's general DRY/no-custom-
+  abstraction stance) — systemd already knows the right path, restart policy, and
+  target dependency for each of these.
+- **Consequences:** `autostart.lua` is now an explanatory comment with nothing to
+  run. Any future Hyprland-ecosystem component should be checked for a shipped
+  `systemd/user/*.service` file (`pacman -Ql <pkg> | grep systemd/user`) before
+  writing a manual autostart line for it.
+
+## D-0032 — VM display device: Virtio-GPU(3D), not full PCI GPU passthrough
+
+- **Status:** Accepted (2026-09-14, Phase 4). Supersedes the mid-phase detour into
+  full passthrough.
+- **Decision:** the VM's display device is Virtio-GPU(3D) (Unraid's Graphics
+  Card=Virtual, Video Driver=Virtio(3D) — paravirtualized, host-rendered via
+  `virgl`), not full PCI passthrough of the physical Intel GPU.
+- **Alternatives considered:** full PCI passthrough — tried first during
+  troubleshooting (for terminal GPU acceleration and a suspected other dependency),
+  and it does give a real DRM render node, but it also hands the display output
+  straight to the guest, bypassing Unraid's own display pipeline entirely: noVNC
+  console access disappeared, leaving only RDP (useless with no GUI session yet
+  running to serve it). Considered pairing passthrough with `wayvnc` (a Wayland-
+  native VNC server; well-documented for exactly this scenario) to work around the
+  lost console, but that runs into `AllowTcpForwarding no` (D-0021, deliberate) for
+  reaching it from outside the VM, and is a workaround for a self-inflicted
+  complication rather than the direct path.
+- **Reasoning:** checked what Phase 4 actually needs against real package
+  dependencies (`pacman -Si`), not assumption: Hyprland, hyprlock, hyprpaper, and
+  ghostty all depend on OpenGL/EGL, not Vulkan — `virgl`'s OpenGL-only
+  paravirtualization covers everything currently in scope. Virtio-GPU(3D) restores
+  the plain "look at Unraid's noVNC console" experience with zero extra tooling,
+  which is what should have been true from the start.
+- **Consequences:** if Phase 5's `gpu-screen-recorder` turns out to need Vulkan for
+  good capture quality, revisit then — either enabling Venus (Vulkan-over-virtio,
+  needs manual libvirt XML edits beyond Unraid's simple toggle) or accepting full
+  passthrough's console tradeoff deliberately, paired with `wayvnc` this time. Real
+  hardware won't have this problem at all — a physical display has no host display
+  pipeline to disconnect from.
