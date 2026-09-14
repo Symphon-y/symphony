@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Status** | In progress |
+| **Status** | Complete |
 | **Driver** | Claude (Mac preparation) → **User** (runbook in the VM console) → Claude (in the VM) |
 | **Branch** | `phase/02-agent-handoff` |
 | **Started** | 2026-09-13 |
-| **Completed** | — |
+| **Completed** | 2026-09-14 |
 
 ## Goal
 
@@ -66,7 +66,9 @@ File: `tests/acceptance/phase-02.bats`. `phase-01.bats` runs alongside it as a r
 | ssh | sshd key-only, no root, no forwarding; authorized keys are root-owned system config; not enabled at boot; firewall opens port 22 only to listed sources |
 | github | `gh` authenticated; remote reachable; latest CI run on the branch succeeded |
 
-Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
+Red confirmed: yes (VM, `91518e6`: 50 tests; phase-01 36/36; phase-02 11 not ok) ·
+Green confirmed: yes (VM, 57/57 across both suites, after the SSH case-sensitivity,
+scanner allowlist, and CI checkout fixes)
 
 ## Tasks
 
@@ -78,15 +80,15 @@ Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
 - [x] `gist-relay` tests → red (6/6) → implementation → green (6/6)
 - [x] `scripts/check`, CI workflow, tooling packages, `packages/external.md`
 - [x] Acceptance tests run on the Mac and fail cleanly, with no errors (50 tests); runbook written
-- [ ] Commit; user pushes; CI green on GitHub
+- [x] Commit; user pushes; CI green on GitHub
 
 **VM (user, following the runbook)**
-- [ ] 1. Switch to the branch; red run committed
-- [ ] 2–4. Packages, system config check, home links, Claude Code install
-- [ ] 5. SSH from Unraid: key on Unraid, host files committed, on-demand sshd, fingerprint verified
-- [ ] 6. Claude Code login inside the SSH session
-- [ ] 7. Green run committed
-- [ ] 8. Handoff: Claude in the VM updates `CLAUDE.md` and pushes
+- [x] 1. Switch to the branch; red run committed
+- [x] 2–4. Packages, system config check, home links, Claude Code install
+- [x] 5. SSH from Unraid: key on Unraid, host files committed, on-demand sshd, fingerprint verified
+- [x] 6. Claude Code login inside the SSH session
+- [x] 7. Green run committed
+- [x] 8. Handoff: Claude in the VM updates `CLAUDE.md` and pushes
 
 ## Implementation log
 
@@ -282,6 +284,18 @@ Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
   - Fixes verified on the Mac: 71/71 unit tests (the two new tests failed first),
     shellcheck and shfmt clean, the identifier scan passes on all 66 tracked files
     including the green TAP, and the workflow is valid YAML.
+- **Close-out.** `CLAUDE.md`'s "Current driver" section rewritten from the Mac-prep
+  wording to reflect Claude driving inside the VM (`fdd51b8`), authored with the noreply
+  email, verified before push; CI green (run 34794767229). `scripts/check` reconfirmed
+  green on the VM (71/71 unit tests, shellcheck/shfmt/JSON clean, identifier scan clean)
+  by Claude in the VM. The sudo-gated half of the acceptance suite can't be run by Claude
+  (`Bash(sudo *)` is denied by design, D-0018); the user ran
+  `sudo -v && bats tests/acceptance/phase-01.bats tests/acceptance/phase-02.bats` in their
+  own tmux window and confirmed **57/57**. `DECISIONS.md` gained D-0018 through D-0024
+  for Phase 2's resolved and deferred decisions, and a superseded-clause note on D-0015.
+  `docs/omarchy-influences.md` gained the Claude Code CLI integration and dotfiles-
+  deployment entries. `docs/roadmap.md` marks Phase 2 complete and points its deferred-
+  decisions line at D-0018–D-0024.
 
 ## VM → physical hardware notes
 
@@ -291,8 +305,8 @@ Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
 
 ## Exit criteria
 
-- [ ] Acceptance tests green on the VM (phase-01 + phase-02)
-- [ ] `scripts/check` green on the Mac, on the VM, and in CI
-- [ ] Claude Code in the VM has committed and pushed the `CLAUDE.md` handoff
-- [ ] `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md` updated
+- [x] Acceptance tests green on the VM (phase-01 + phase-02) — 57/57
+- [x] `scripts/check` green on the Mac, on the VM, and in CI
+- [x] Claude Code in the VM has committed and pushed the `CLAUDE.md` handoff
+- [x] `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md` updated
 - [ ] Branch merged to `main`
