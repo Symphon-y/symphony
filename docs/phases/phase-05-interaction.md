@@ -68,13 +68,17 @@ File: `tests/acceptance/phase-05.bats`, same two groups as Phase 4:
 | static | Packages declared+installed; config files linked; `Hyprland --verify-config` passes; waybar's JSON config is valid; matugen renders the waybar template | Claude, no live session needed |
 | live-session | Launcher opens and finds apps; power menu works; clipboard history captures and pastes; a screenshot produces a real file; waybar is visible and themed; workspace/window rules behave as expected | User, from Unraid's console |
 
-Red confirmed: _pending_ · Green confirmed: _pending_
+Red confirmed: yes (VM, 6/6 failing, no load/syntax errors — nothing installed yet,
+as expected) · Green confirmed: _pending_
 
 ## Tasks
 
 - [x] Branch, tracking doc
-- [ ] Red: `tests/acceptance/phase-05.bats` (static group); confirm red
-- [ ] `packages/desktop.txt` additions, verified against the live pacman database
+- [x] Red: `tests/acceptance/phase-05.bats`; confirmed 6/6 failing, no load/syntax
+      errors
+- [x] `packages/desktop.txt` additions, verified against the live pacman database
+      (also resolved D-0032's Vulkan question for real: gpu-screen-recorder has no
+      Vulkan dependency, uses VAAPI via intel-media-driver instead)
 - [ ] `home/fuzzel/`
 - [ ] `home/waybar/` + matugen template, wired into `home/matugen/.../config.toml`
 - [ ] Power/system menu script
