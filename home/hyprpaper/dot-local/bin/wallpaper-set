@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/wallpaper-set (linked by install/link-home)
+#
+# Points hyprpaper at <path> (repointing ~/.local/share/backgrounds/current.png, so
+# the same file survives future logins via hyprpaper.conf's static config), pushes it
+# live over hyprpaper's IPC, then re-derives the whole system's palette from that same
+# image via matugen. The wallpaper *is* the theme (Phase 6: no named-theme library,
+# just whatever's currently on screen) -- every matugen template re-renders here.
+set -euo pipefail
+
+if [[ $# -ne 1 ]]; then
+  echo "usage: wallpaper-set <path>" >&2
+  exit 1
+fi
+
+path=$(realpath "$1")
+if [[ ! -f "$path" ]]; then
+  echo "wallpaper-set: no such file: $path" >&2
+  exit 1
+fi
+
+backgrounds_dir="$HOME/.local/share/backgrounds"
+mkdir -p "$backgrounds_dir"
+ln -sfn "$path" "$backgrounds_dir/current.png"
+
+# Empty monitor field = all monitors. hyprpaper's IPC apply() step only accepts an
+# empty string or a real, currently-registered monitor name -- "*" (the config file's
+# own preferred wildcard spelling) is rejected here with "Invalid monitor", confirmed
+# by actually running it.
+hyprctl hyprpaper wallpaper ",$path,cover"
+
+# --source-color-index 0 (most dominant color) skips matugen's interactive
+# source-color prompt, which would otherwise hang a keybind-triggered run with no TTY.
+matugen --config "$HOME/.config/matugen/config.toml" image "$path" --source-color-index 0

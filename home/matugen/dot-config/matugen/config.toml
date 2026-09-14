@@ -1,11 +1,14 @@
 # Target: ~/.config/matugen/config.toml (linked by install/link-home)
 #
-# Phase 4: one placeholder palette (a seed color, no wallpaper-derived generation
-# yet), wired into the three components that phase themed. Phase 5 adds fuzzel and
-# waybar. The full theme system -- named themes, a switcher, every component -- is
-# Phase 6 (D-0025).
+# Phase 4 wired in a placeholder palette (a hardcoded seed color) to prove the
+# pipeline; Phase 5 added fuzzel and waybar. Phase 6 makes the palette real: the
+# wallpaper IS the palette source (no named-theme library -- D-0025's Phase 6
+# revision), re-derived live by `wallpaper-set`/`wallpaper-random`
+# (home/hyprpaper/dot-local/bin/) via `matugen image <path>` every time it changes.
 #
-# Run: matugen color hex "#1e1e2e"
+# Manual re-render (e.g. after editing a template): matugen image
+# ~/.local/share/backgrounds/current.png --source-color-index 0
+# `matugen color hex "#1e1e2e"` still works too (any seed color, not just an image).
 #
 # Output paths are absolute (~/...), not relative to this file: config.toml is a
 # stow symlink, and matugen resolves relative paths against the symlink's real
@@ -38,3 +41,11 @@ output_path = "~/.config/fuzzel/fuzzel.ini"
 input_path = "./templates/waybar.css"
 output_path = "~/.config/waybar/colors.css"
 post_hook = "pkill -SIGUSR2 waybar || true"
+
+[templates.gtk3]
+input_path = "./templates/gtk3.css"
+output_path = "~/.config/gtk-3.0/gtk.css"
+
+[templates.gtk4]
+input_path = "./templates/gtk4.css"
+output_path = "~/.config/gtk-4.0/gtk.css"

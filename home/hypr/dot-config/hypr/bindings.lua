@@ -33,6 +33,9 @@ hl.bind(mainMod .. " + PRINT", hl.dsp.exec_cmd("hyprpicker -a"))
 hl.bind("ALT + PRINT", hl.dsp.exec_cmd("screen-record"))
 hl.bind(mainMod .. " + CTRL + PRINT", hl.dsp.exec_cmd("qr-capture"))
 
+-- Wallpaper (Phase 6) -- SUPER+CTRL, same "panels/toggles" category as clipboard
+hl.bind(mainMod .. " + CTRL + W", hl.dsp.exec_cmd("wallpaper-random"))
+
 -- Workspace navigation (Phase 5)
 hl.bind(mainMod .. " + left", hl.dsp.focus({ direction = "left" }))
 hl.bind(mainMod .. " + right", hl.dsp.focus({ direction = "right" }))

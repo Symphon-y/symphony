@@ -35,6 +35,13 @@ intel-media-driver                # VAAPI for gpu-screen-recorder on this Intel 
 zbar                              # QR code decoding for capture
 libnotify                          # notify-send, for qr-capture's success/failure feedback
 
+# Visual system (Phase 6): fonts, icons, cursor, GTK/Qt theming -- see D-0037 onward.
+ttf-jetbrains-mono-nerd            # terminal/bar/UI font, matches the fontconfig override
+papirus-icon-theme                 # icon theme (Papirus-Dark)
+bibata-cursor-theme-bin            # cursor theme (Bibata-Modern-Classic); AUR, prebuilt
+                                    # (no native hyprcursor port shipped -- XCursor only,
+                                    # confirmed against the real GitHub release assets)
+
 # yay itself, plus its own build prerequisites: none of this belongs in packages/
 # tooling.txt, which CI installs with plain `pacman -S` in a container that never
 # touches the desktop stack -- an AUR-only name there breaks that command outright
