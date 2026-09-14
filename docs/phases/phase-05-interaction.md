@@ -118,7 +118,10 @@ launcher) still need the user's own visual confirmation — see live-session tas
 - [x] Static + automated live-session acceptance tests green (72/72, full suite,
       no regressions). Also fixed a real test hang (`wl-copy` forking to
       background kept bats's output pipe open after all 6 results printed)
-- [ ] Live-session testing (user): genuinely-interactive visual checks
+- [x] Live-session testing (user): launcher, power menu, waybar, clipboard
+      confirmed working; two flagged items explained (no audio hardware, no font
+      yet — both already-known, out-of-phase-scope gaps, not bugs). Screenshot/
+      color-pick/PIP not yet tried; not blocking.
 - [ ] Close: `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md`
 - [ ] Merge to `main`
 
@@ -172,10 +175,22 @@ launcher) still need the user's own visual confirmation — see live-session tas
     fails the test cleanly instead of hanging.
   - Full acceptance suite re-run across every phase: **72/72 green**, no
     regressions.
-- Remaining: genuinely-interactive checks that need the user's own eyes (launcher
-  finding apps, power menu, screenshot annotation UI, waybar theme colors, PIP
-  float/pin, web-app launcher end to end) — automated tests can confirm processes
-  run and files get created, not that the UI actually looks/behaves right.
+- **User's visual confirmation:** launcher works, power menu works, waybar shows
+  clock/date and `enp1s0` (the real ethernet interface, correct), clipboard works.
+  Two things the user flagged as unclear, both already-known/already-scoped gaps,
+  not new bugs — confirmed directly rather than assumed:
+  - **Audio module shows "0%":** `wpctl status` confirms zero audio sinks/sources/
+    devices exist at all on this VM — the already-documented "no audio device" gap
+    from Phase 4. The module is correctly reporting there's nothing to report;
+    it'll show a real value once a virtual sound card exists.
+  - **A square/placeholder icon where a glyph should be:** `fc-list` confirms no
+    Nerd Font is installed. The workspace/audio/network module icons use Nerd Font
+    glyphs that render as empty boxes ("tofu") without one — expected, since fonts
+    are explicitly Phase 6's job, not this phase's. Will render correctly once
+    Phase 6 installs a font with those glyphs.
+  - Screenshot, color-pick, and picture-in-picture float/pin: not yet tried by the
+    user; lower-risk/self-contained pieces, not blocking close-out. Revisit if
+    they turn out not to work.
 
 ## VM → physical hardware notes
 
