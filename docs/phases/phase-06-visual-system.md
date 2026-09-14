@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Status** | In progress |
+| **Status** | Complete |
 | **Driver** | Claude |
 | **Branch** | `phase/06-visual-system` |
 | **Started** | 2026-09-14 |
-| **Completed** | |
+| **Completed** | 2026-09-14 |
 
 ## Goal
 
@@ -98,9 +98,11 @@ Red confirmed: · Green confirmed:
       Phase 6, no regressions in any prior phase (the other failing tests are the
       known sudo-requires-a-tty and pre-Phase-4 "no AUR packages" gaps, unrelated to
       this phase)
-- [ ] User: live-session visual confirmation (font glyphs, icons, cursor,
-      `wallpaper-random`)
-- [ ] Close: `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md`
+- [x] User: live-session visual confirmation -- "everything looks great" (font
+      glyphs render in waybar, Bibata cursor visible, gradient wallpaper actually
+      renders for the first time, `wallpaper-random` bind works)
+- [x] Close: `DECISIONS.md` (D-0037–D-0042), `docs/omarchy-influences.md` (theme
+      system + fonts/GTK/Qt/icons/cursors entries filled in), `docs/roadmap.md`
 - [ ] Merge to `main`
 
 ## Implementation log
@@ -159,6 +161,19 @@ Red confirmed: · Green confirmed:
   regressions in any prior phase; Phase 6's own static tests 6/7 green (the font
   test needs `ttf-jetbrains-mono-nerd` actually installed -- expected, waiting on
   the user's package install).
+- User installed the three packages (`yay -S --needed $(scripts/pkglist
+  packages/*.txt)`). Full suite re-run: 73-79/79 green for Phase 6, no regressions
+  anywhere else (remaining failures are the pre-existing sudo-requires-a-tty and
+  pre-Phase-4 "no AUR packages" gaps, unrelated to this phase).
+- User's live-session visual confirmation: "everything looks great" -- font
+  glyphs, Bibata cursor, and (for the first time since Phase 4) an actually-visible
+  wallpaper all confirmed working.
+- Close: `DECISIONS.md` D-0037 (wallpaper-driven theme model, the biggest
+  architectural call this phase made -- no named-theme library), D-0038 (Papirus
+  icons), D-0039 (Bibata cursor), D-0040 (JetBrainsMono Nerd Font), D-0041 (live
+  matugen GTK/Qt theming), D-0042 (the hyprpaper config/IPC bug fix, amending
+  D-0028). `docs/omarchy-influences.md`'s two Phase 6 entries filled in.
+  `docs/roadmap.md` marked complete.
 
 ## VM → physical hardware notes
 
@@ -166,7 +181,7 @@ Red confirmed: · Green confirmed:
 
 ## Exit criteria
 
-- [ ] Static and live-session acceptance tests both pass
-- [ ] `scripts/check` green
-- [ ] `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md` updated
+- [x] Static and live-session acceptance tests both pass
+- [x] `scripts/check` green
+- [x] `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md` updated
 - [ ] Branch merged to `main`

@@ -12,7 +12,7 @@ outlines; their scope is finalized in their own plan mode.
 | 3 | [Omarchy research](phases/phase-03-omarchy-research.md) | all | Claude | `docs/omarchy-influences.md` classifies components | Complete (2026-09-14) |
 | 4 | [Minimal Hyprland session](phases/phase-04-minimal-hyprland-session.md) | 2 | Claude | Hyprland login; terminal, audio, portals, polkit agent, notifications, idle/lock, wallpaper | Complete (2026-09-14) |
 | 5 | [Interaction](phases/phase-05-interaction.md) | 3 | Claude | Launcher, keybinding scheme, clipboard, screenshots, workspaces/rules, status bar, power menu | Complete (2026-09-14) |
-| 6 | Visual system | 4 | Claude | Single palette source → component themes; fonts, GTK/Qt, icons, cursor, wallpapers | Not started |
+| 6 | [Visual system](phases/phase-06-visual-system.md) | 4 | Claude | Single palette source → component themes; fonts, GTK/Qt, icons, cursor, wallpapers | Complete (2026-09-14) |
 | 7 | Developer environment | 5 | Claude | Shell, prompt, Neovim, version manager, containers, git/gh config | Not started |
 | 8 | Packages, reproducibility, recovery | cross-cutting | Claude + user | Categorized package inventory; audit script; idempotent bootstrap; fresh-VM rebuild from repo succeeds; backups | Not started |
 | 9 | Personal automation | 6 | Claude | Scripts, systemd user services/timers, integrations | Not started |
@@ -30,6 +30,10 @@ outlines; their scope is finalized in their own plan mode.
   is still open — audio config landed and is statically verified, but not yet heard.
 - **Phase 5:** resolved; see D-0033 to D-0036. D-0036 also resolves D-0032's
   deferred Vulkan question directly: `gpu-screen-recorder` needs none.
+- **Phase 6:** resolved; see D-0037 to D-0042. The palette source turned out to be
+  simpler than planned -- the wallpaper itself, not a named-theme library (D-0037).
+  D-0042 also fixed a real, previously-silent bug: Phase 4's `hyprpaper.conf` never
+  actually rendered a wallpaper at all.
 
 ## Cross-cutting concerns (checked in every phase)
 

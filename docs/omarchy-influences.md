@@ -62,8 +62,8 @@ assumed.
 | Screenshots / screen recording | 3 | 5 | ADOPT (D-0036) |
 | Status bar | 3 | 5 | ADAPT (D-0025, D-0031) |
 | Web-app launchers | 3 | 5 | ADAPT (D-0034) |
-| Theme system and switching | 4 | 6 | ADAPT (matugen, D-0025) |
-| Fonts, GTK/Qt, icons, cursors | 4 | 6 | ADAPT |
+| Theme system and switching | 4 | 6 | ADAPT (matugen, wallpaper-driven, D-0025, D-0037) |
+| Fonts, GTK/Qt, icons, cursors | 4 | 6 | ADAPT (D-0038–D-0041) |
 | Shell and prompt | 5 | 7 | DEFER |
 | Neovim distribution | 5 | 7 | ADAPT idea; DEFER choice |
 | Language / tool version management | 5 | 7 | ADAPT |
@@ -697,11 +697,20 @@ below are current as of that branch unless a component explicitly discusses v3
   sed-based renderer, and a community template repository already covering mako,
   waybar, hyprlock, and more.
 - Our decision: **ADAPT**
-- Our implementation: matugen; a single palette file, templates per themed tool
-  (waybar, mako, hyprlock, the chosen terminal, GTK), each with a post-hook reload
-  command. See D-0025.
-- Reason: same idea, more mature standalone tool, no shell to push into.
-- Related decision: D-0025, Phase 6
+- Our implementation: matugen; but the source-of-truth is the current wallpaper
+  itself (`matugen image <path>`), not a saved palette file or a `themes/<name>/`
+  library the way Omarchy's `colors.toml`-per-theme is. `wallpaper-set`/
+  `wallpaper-random` (`home/hyprpaper/dot-local/bin/`) repoint hyprpaper live and
+  re-render every template (mako, hyprlock, ghostty, fuzzel, waybar, GTK3/GTK4) in
+  one step; GTK gets no post-hook since neither GTK3 nor libadwaita live-reload
+  their stylesheet (read once at process start). Omarchy's untrusted-theme
+  code-execution guard doesn't apply here at all -- there's no theme-directory
+  import path, just an image file.
+- Reason: Omarchy's own theme system needs a *library* of named themes because it
+  ships several and lets users install more from git; this system has exactly one
+  "theme" at a time -- whatever's on screen -- so the wallpaper itself is a simpler,
+  sufficient single source of truth. See D-0025, D-0037.
+- Related decision: D-0025, D-0037
 
 ### Fonts, GTK/Qt, icons, cursors
 - Omarchy approach: default font **JetBrainsMono Nerd Font** (switched to the lighter
@@ -723,11 +732,23 @@ below are current as of that branch unless a component explicitly discusses v3
   not shell-coupled.
 - Better modern alternatives: none needed — these are already standard mechanisms.
 - Our decision: **ADAPT**
-- Our implementation: the fontconfig-override pattern and `QT_QPA_PLATFORMTHEME=gtk3`
-  adopted as-is; actual font, icon theme, and cursor theme choices decided in Phase 6.
-- Reason: the mechanism is free to take; the specific visual choices are matters of
-  taste that belong to Phase 6.
-- Related decision: Phase 6
+- Our implementation: the fontconfig-override pattern (`home/fonts/.../fonts.conf`,
+  aliasing `monospace` to JetBrainsMono Nerd Font) and `QT_QPA_PLATFORMTHEME=gtk3`
+  adopted as-is. Font: JetBrainsMono Nerd Font (matches Omarchy's own default).
+  Icon theme: Papirus-Dark (diverges from Omarchy's Yaru, which is AUR-only on
+  Arch with narrower repo support). Cursor: Bibata-Modern-Classic, XCursor format
+  (no native hyprcursor port exists for the specific AUR package used, confirmed
+  against the real release assets -- `HYPRCURSOR_THEME` left unset, Hyprland falls
+  back to `XCURSOR_THEME` automatically). GTK/Qt colors: two new matugen templates
+  (`gtk3.css`, `gtk4.css`) rendering each toolkit's own named-color set live from
+  the wallpaper-derived palette, going further than Omarchy's own gsettings-based
+  theme-set step -- accepting libadwaita's narrower CSS override surface and
+  restart-to-reload limitation as a known tradeoff.
+- Reason: the mechanism was free to take in Phase 3; the specific visual choices
+  are matters of taste, made with the user in Phase 6. Going further than Omarchy's
+  gsettings-only approach for GTK/Qt colors keeps this system's "one palette drives
+  everything" promise consistent across every themed component, not just some.
+- Related decision: D-0038, D-0039, D-0040, D-0041
 
 ### Shell and prompt
 - Omarchy approach: **bash** as the login/interactive shell (`default/bashrc` sources
