@@ -33,6 +33,7 @@ gpu-screen-recorder              # screen recording; no Vulkan dependency (check
                                   # revisit) -- uses VAAPI via mesa + intel-media-driver on Intel
 intel-media-driver                # VAAPI for gpu-screen-recorder on this Intel iGPU (Broadwell+)
 zbar                              # QR code decoding for capture
+libnotify                          # notify-send, for qr-capture's success/failure feedback
 
 # yay itself, plus its own build prerequisites: none of this belongs in packages/
 # tooling.txt, which CI installs with plain `pacman -S` in a container that never
