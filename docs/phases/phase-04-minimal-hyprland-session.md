@@ -423,6 +423,18 @@ Investigation (over SSH, same live instance, PID unchanged throughout):
 - Session disconnected here to make the change; resume by re-checking `lspci` and
   `/dev/dri/` once the VM is back, and watching whether the DRM renderer loop is gone
   from a fresh `hyprland.log` before trusting the display is stable long-term.
+- **Resolved.** VM back up: `lspci` now shows "Red Hat, Inc. Virtio 1.0 GPU" (driver
+  `virtio_gpu`), and `/dev/dri/renderD128` exists with correct `render`-group
+  permissions — Virtio-GPU(3D) actually landed this time. A fresh Hyprland instance
+  (new PID, new instance signature) shows **zero** renderer errors in a 109-line log
+  (vs. 221,000+ before) and initializes `Renderer: virgl (Mesa Intel(R) Graphics
+  (RPL-S))` — real GPU-accelerated rendering, paravirtualized through the host's
+  actual Intel GPU, exactly as D-0032 intended. `1920x1080@60` at `scale 1` is
+  correct from a clean boot with no manual `hyprctl reload` needed, and the monitor
+  now reports real EDID data (`physical size (mm): 320x200`) instead of QXL's `0x0` —
+  `mode = "preferred"`/`scale = "auto"` would likely work correctly now too, though
+  the explicit pin from the earlier fix stays valid either way. Full acceptance
+  suite re-run on this fresh boot: **9/9 green**.
 
 ## Exit criteria
 
