@@ -79,14 +79,38 @@ as expected) · Green confirmed: _pending_
 - [x] `packages/desktop.txt` additions, verified against the live pacman database
       (also resolved D-0032's Vulkan question for real: gpu-screen-recorder has no
       Vulkan dependency, uses VAAPI via intel-media-driver instead)
-- [ ] `home/fuzzel/`
-- [ ] `home/waybar/` + matugen template, wired into `home/matugen/.../config.toml`
-- [ ] Power/system menu script
-- [ ] Clipboard wiring (cliphist + wl-clipboard)
-- [ ] Capture wiring (grim/slurp/hyprpicker/satty/gpu-screen-recorder), Vulkan
-      question checked for real
-- [ ] Web-app launcher scripts
-- [ ] `bindings.lua` additions; new `windows.lua`
+- [x] fuzzel — fully matugen-templated (like mako/hyprlock/ghostty in Phase 4),
+      not a static `home/fuzzel/` package. Fixed a contrast bug found in passing:
+      selection colors used `surface`/`on_surface`, which render nearly identical
+      to background/text for this palette -- switched to `surface_variant`/
+      `on_surface_variant`. Same bug, same fix, retroactively applied to Phase 4's
+      hyprlock template (its `inner_color`/`font_color` had the identical issue).
+- [x] `home/waybar/` + matugen template (hybrid pattern: static config.jsonc/
+      style.css, matugen-generated colors.css, `@import`-ed, reloaded via
+      `pkill -SIGUSR2 waybar`), wired into `home/matugen/.../config.toml`
+- [x] Power/system menu script (`power-menu`, fuzzel --dmenu)
+- [x] Clipboard wiring: `clipboard-menu` script (cliphist's own documented
+      fuzzel-dmenu pattern) + confirmed cliphist ships its own systemd --user
+      service (checked the real Arch PKGBUILD) for the wl-paste watcher --
+      enable it, don't hand-write an autostart line
+- [x] Capture wiring: `screenshot` (slurp+grim+satty pipeline), `screen-record`
+      (gpu-screen-recorder, SIGINT toggle), `qr-capture` (slurp+grim+zbarimg);
+      color-pick is a direct `hyprpicker -a` bind, no wrapper script needed.
+      Vulkan question checked for real: gpu-screen-recorder has no Vulkan
+      dependency at all, and its KMS root-access need is handled by a setuid
+      helper in the native package (no interactive sudo prompt) -- the
+      password-prompt caveat in its docs is flatpak-only.
+- [x] Web-app launcher scripts (`webapp-install`, `webapp-launch`)
+- [x] `bindings.lua` additions (launcher, menu, clipboard, capture, workspace
+      navigation); new `windows.lua` (smart gaps + PIP float/pin) -- both verified
+      against `Hyprland --verify-config`
+- [x] Found and fixed a real gap: `scripts/check` never linted scripts deployed via
+      `home/` (only `scripts/`, `install/`) -- extended it, and extended
+      `.editorconfig`'s `switch_case_indent` the same way Phase 2 did for
+      `scripts`/`install`
+- [ ] User: `yay -S --needed $(scripts/pkglist packages/*.txt)`, then
+      `systemctl --user enable cliphist.service` (the fifth shipped service, joining
+      Phase 4's four)
 - [ ] Static acceptance tests green
 - [ ] Live-session testing (user)
 - [ ] Close: `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md`
@@ -99,6 +123,33 @@ as expected) · Green confirmed: _pending_
   (wofi/fuzzel/rofi) and waybar module conventions + Hyprland workspace/window
   rules. User decisions: fuzzel, web-app launchers included, smart-gaps + PIP
   window rules adopted.
+- Branch, tracking doc, Red (6/6 failing, confirmed cleanly).
+- Package list verified against the live pacman database; resolved D-0032's
+  Vulkan question for real (`gpu-screen-recorder` has none) rather than assuming
+  either way.
+- Built fuzzel/waybar config, matugen-wired. Found and fixed a real contrast bug
+  along the way (`surface`/`on_surface` render nearly identical to
+  `background`/`text` for this palette) in both the new fuzzel template and,
+  retroactively, Phase 4's already-merged hyprlock template.
+- Found a real gap: `scripts/check` never linted `home/`-deployed scripts (only
+  `scripts/`/`install/`). Extended it and `.editorconfig`, the same fix shape as
+  Phase 2's for extensionless scripts.
+- Verified every CLI flag/syntax against real sources before writing scripts
+  (satty's `--filename`/`--output-filename`/`--copy-command`, gpu-screen-recorder's
+  actual flags and its KMS-root-access story, cliphist's actual PKGBUILD
+  confirming it ships its own systemd service) rather than assuming — same
+  discipline as Phase 4, which found several bugs exactly this way.
+- Hyprland's Lua API for `window_rule` action keys isn't fully typed in this
+  system's own installed stub (`/usr/share/hypr/stubs/hl.meta.lua`) — only
+  `enabled`/`match`/`name` are statically declared, though the official example
+  config clearly uses additional dynamic keys (`no_focus`) the same way.
+  `windows.lua` mirrors the pre-Lua `windowrulev2` keyword names for `float`/`pin`
+  on that basis; `--verify-config` accepts it (syntax), but whether it actually
+  floats+pins a real picture-in-picture window needs live-session confirmation.
+- All Lua config changes (`bindings.lua`, `windows.lua`, `hyprland.lua`'s new
+  `require`) verified against `Hyprland --verify-config`: config ok.
+- Waiting on the user: `yay -S --needed $(scripts/pkglist packages/*.txt)`, then
+  enabling `cliphist.service`.
 
 ## VM → physical hardware notes
 
