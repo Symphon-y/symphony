@@ -18,6 +18,12 @@ switch_case_indent = true
 indent_size = 2
 switch_case_indent = true
 
+# Scripts deployed via home/ (e.g. home/menu/dot-local/bin/power-menu) are also
+# extensionless.
+[home/**/dot-local/bin/*]
+indent_size = 2
+switch_case_indent = true
+
 [*.md]
 trim_trailing_whitespace = false
 

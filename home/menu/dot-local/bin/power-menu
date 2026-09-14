@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/power-menu (linked by install/link-home)
+#
+# fuzzel's dmenu mode as the menu engine (D-0025: ADAPT the menu idea, REJECT a
+# bespoke plugin engine -- Omarchy needs a whole shell process to host its menu
+# system; a small script over a dmenu-mode launcher does the same job).
+set -euo pipefail
+
+choice=$(printf '%s\n' Lock Logout Suspend Reboot Shutdown | fuzzel --dmenu --prompt "Power: ") || exit 0
+
+case "$choice" in
+  Lock) hyprlock ;;
+  Logout) hyprctl dispatch exit ;;
+  Suspend) systemctl suspend ;;
+  Reboot) systemctl reboot ;;
+  Shutdown) systemctl poweroff ;;
+esac

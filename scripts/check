@@ -9,6 +9,7 @@ while IFS= read -r file; do
   shell_files+=("$file")
 done < <(
   find scripts install -type f | sort
+  find home -path '*/dot-local/bin/*' -type f | sort
   printf '%s\n' system/*/*.sh tests/helpers/*.bash tests/unit/*.bats tests/acceptance/*.bats
 )
 

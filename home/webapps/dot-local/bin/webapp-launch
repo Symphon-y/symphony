@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/webapp-launch (linked by install/link-home)
+#
+# Usage: webapp-launch <url>
+#
+# Resolves the current default browser and launches <url> in its app mode
+# (Chromium-family --app= flag). Firefox-family browsers have no equivalent, so
+# this falls back to a plain window for those.
+set -euo pipefail
+
+if (($# < 1)); then
+  echo "usage: webapp-launch <url>" >&2
+  exit 2
+fi
+
+url=$1
+default=$(xdg-settings get default-web-browser)
+exec_line=$(grep -m1 '^Exec=' "/usr/share/applications/$default" 2>/dev/null | sed 's/^Exec=//; s/ %.*//')
+browser=${exec_line%% *}
+
+case "$browser" in
+  *chromium* | *chrome* | *brave* | *vivaldi* | *edge* | *helium*)
+    exec "$browser" --app="$url"
+    ;;
+  *)
+    exec "$browser" "$url"
+    ;;
+esac

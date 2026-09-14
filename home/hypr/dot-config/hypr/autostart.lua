@@ -12,3 +12,9 @@
 -- being on $PATH while duplicating what their own shipped services already do
 -- properly. Enable the four services instead:
 --   systemctl --user enable mako.service hypridle.service hyprpaper.service hyprpolkitagent.service
+--
+-- Phase 5 adds two more, both also shipped services (checked `pacman -Ql`/the
+-- actual PKGBUILD for each, not assumed -- waybar was missed at first and only
+-- caught because "waybar is running" failed in the live session):
+--   systemctl --user enable waybar.service
+--   systemctl --user enable cliphist.service   (runs `wl-paste --watch cliphist store`)

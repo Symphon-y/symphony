@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/clipboard-menu (linked by install/link-home)
+#
+# cliphist's own documented fuzzel/rofi/wofi integration pattern: list history
+# through fuzzel's dmenu mode, decode whichever entry was picked, copy it back to
+# the clipboard.
+set -euo pipefail
+
+selection=$(cliphist list | fuzzel --dmenu --prompt "Clipboard: ") || exit 0
+cliphist decode <<<"$selection" | wl-copy
