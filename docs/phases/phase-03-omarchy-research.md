@@ -71,7 +71,7 @@ Exit criteria).
 - [x] Record D-0025 in `DECISIONS.md`
 - [x] Update `docs/roadmap.md`
 - [x] Small CLAUDE.md wording fix (Hyprland config example: `source =` → Lua modules)
-- [ ] Close out: exit criteria, merge to `main`
+- [x] Close out: exit criteria, merge to `main`
 
 ## Implementation log
 
@@ -136,4 +136,4 @@ Exit criteria).
 - [x] `scripts/check` passes (71/71 unit tests; shellcheck/shfmt/identifier-scan clean)
 - [x] `DECISIONS.md` updated (D-0025)
 - [x] `docs/roadmap.md` status updated
-- [ ] Branch merged to `main`
+- [x] Branch merged to `main`
