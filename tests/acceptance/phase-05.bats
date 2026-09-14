@@ -54,7 +54,12 @@ setup() {
 
 @test "live-session: clipboard history captures a copied value" {
   local marker="phase-05-clipboard-test-$$"
-  printf '%s' "$marker" | wl-copy
+  # --paste-once: serve exactly one paste request (cliphist's watcher) then exit,
+  # so this doesn't leave a background wl-copy process holding the test's output
+  # pipe open (a real hang, found running this test for real). timeout bounds how
+  # long it waits for that one request, so a not-yet-running watcher fails the
+  # test cleanly instead of hanging the whole suite.
+  printf '%s' "$marker" | timeout 5s wl-copy --paste-once || true
   sleep 1
   run cliphist list
   assert_success
