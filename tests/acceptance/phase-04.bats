@@ -52,7 +52,7 @@ setup() {
 @test "terminal: xdg-terminal-exec resolves to ghostty" {
   run xdg-terminal-exec --print-id
   assert_success
-  assert_output "ghostty.desktop"
+  assert_output "com.mitchellh.ghostty.desktop"
 }
 
 # --- theming (matugen) --------------------------------------------------------------
