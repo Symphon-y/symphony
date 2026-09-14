@@ -116,7 +116,9 @@ File: `tests/acceptance/phase-04.bats`, split into two groups:
 | live-session | Hyprland actually starts through SDDM; a terminal opens (ghostty); a notification renders (mako); idle/lock behaves (hypridle/hyprlock); wallpaper shows (hyprpaper); a polkit prompt appears when needed (hyprpolkitagent) | User, from Unraid's console, after the Virtio-GPU(3D) switch |
 
 Red confirmed: yes (VM, 9/9 failing, no load/syntax errors — packages not installed,
-commands not found, sudo required, as expected) · Green confirmed: _pending_
+commands not found, sudo required, as expected) · Green confirmed: static group
+6/6 (packages, `Hyprland --verify-config`, SDDM config+enabled, `xdg-terminal-exec`,
+matugen rendering); live-session group 2/2 pending login through SDDM
 
 ## Tasks
 
@@ -135,19 +137,25 @@ commands not found, sudo required, as expected) · Green confirmed: _pending_
       errors
 - [x] `packages/desktop.txt` (new category), `packages/tooling.txt` (+yay, +go,
       +fakeroot, +make, +scdoc), `packages/external.md` (+yay, +xdg-terminal-exec)
-- [ ] User: `sudo pacman -S --needed go fakeroot` (yay's own build prerequisites),
-      then manually build+install yay (`git clone` + `makepkg -si`, needs `sudo` for
-      the final `pacman -U`), then `yay -S --needed $(scripts/pkglist
-      packages/*.txt)` for everything else (repo packages + `xdg-terminal-exec`, in
-      one command)
-- [ ] `system/sddm/` drop-ins, added to `system/files.txt`
-- [ ] `home/hypr/` (Lua-based, modular)
-- [ ] `home/ghostty/`, `home/mako/`, `home/hypridle/`, `home/hyprlock/`,
-      `home/hyprpaper/`
-- [ ] `home/wireplumber/` conf.d snippets
-- [ ] `home/matugen/` config + templates + placeholder palette
-- [ ] `xdg-terminals.list` defaulting to ghostty
-- [ ] Static acceptance tests green
+- [x] User: build-tool prerequisites (`go`, `fakeroot`, plus `make`/`gcc`/`debugedit`
+      found empirically along the way), manual yay build+install, then
+      `yay -S --needed $(scripts/pkglist packages/*.txt)` for everything else
+- [x] `system/sddm/` drop-in, added to `system/files.txt`; user applied it
+      (`sudo install/sync-system apply`) and enabled the service
+      (`sudo systemctl enable sddm`)
+- [x] `home/hypr/` (Lua-based, modular) — `Hyprland --verify-config` passes
+- [x] `home/hypridle/`, `home/hyprpaper/` (plain hyprlang `.conf`, unaffected by
+      Hyprland's own Lua move). No `home/ghostty/`, `home/mako/`, `home/hyprlock/` —
+      those three are entirely matugen-generated output, never stow-linked (same
+      reasoning as Claude Code's settings.json not being a repo symlink)
+- [x] `home/wireplumber/` conf.d snippets (found missing during this same pass;
+      written against WirePlumber 0.5's real conf.d rule syntax, verified by actually
+      starting the service — no parse errors, `wpctl status` responds)
+- [x] `home/matugen/` config + templates + placeholder palette — verified end to end,
+      real colors rendered into all three output files
+- [x] `home/terminal/` `xdg-terminals.list` — `xdg-terminal-exec --print-id` resolves
+      correctly
+- [x] Static acceptance tests green (6/6)
 
 **Live-session testing (user, from Unraid's console)**
 - [ ] Log in through SDDM; confirm Hyprland starts
@@ -213,6 +221,51 @@ commands not found, sudo required, as expected) · Green confirmed: _pending_
   file ownership while packaging) and `make`/`scdoc` (xdg-terminal-exec's own
   makedepends — its Makefile's default target renders a man page via `scdoc`) to
   `packages/tooling.txt`. All four confirmed against the live pacman database.
+- **Three more build-time gaps found empirically, one at a time, from the user's real
+  `makepkg -si` output** (not predicted in advance): `debugedit` (Arch's current
+  makepkg defaults build separate debug packages and abort without it), `make` (used
+  by yay's own build, not just xdg-terminal-exec's), `gcc` (yay's build uses cgo,
+  needing a real C compiler despite being a Go program). Each added to
+  `packages/tooling.txt` with the real error message as the reason, committed
+  individually as they came up.
+- **All 17 Phase 4 packages installed successfully.** `Hyprland --config
+  ~/.config/hypr/hyprland.lua --verify-config` passed cleanly on the first attempt —
+  the hand-written Lua config (checked against Hyprland's own real `hl.*` API, not
+  Omarchy's) was correct.
+- **Bug found running matugen for real:** `config.toml`'s `output_path`s were relative
+  (`../mako/config` etc.), which matugen resolved against the symlink's *real* target
+  inside the repo checkout, not `$HOME` — it started writing generated configs into
+  the git working tree (`home/matugen/dot-config/{mako,hypr,ghostty}/`, caught via
+  `git status` before committing anything). Confirmed empirically in an isolated
+  `/tmp` test that matugen does expand `~`; switched every `output_path` to an
+  absolute `~/.config/...` path. Re-ran: repo stayed clean, and all three templates
+  (mako/hyprlock/ghostty) rendered correct, well-formed color values.
+- **Bug found running `xdg-terminal-exec`:** ghostty's real installed `.desktop` file
+  is `com.mitchellh.ghostty.desktop` (reverse-DNS app ID), not `ghostty.desktop` as
+  assumed when writing `xdg-terminals.list` and the acceptance test. Confirmed via
+  `find /usr/share/applications`, fixed both, `xdg-terminal-exec --print-id` now
+  resolves correctly.
+- User ran `sudo install/sync-system apply` and `sudo systemctl enable sddm`.
+- **Bug found in my own test:** `session start: sddm is configured...` wrapped its
+  check in `as_root` unnecessarily, copying the sshd-config pattern from Phase 2 —
+  but `/etc/sddm.conf.d/10-wayland.conf` is plain `0644`, world-readable, unlike
+  `sshd_config`. Fixed to drop `as_root`; the test needed no privilege at all.
+- **Static group: 6/6 green.** The `hyprland` package turned out to already ship both
+  `hyprland.desktop` (direct) and `hyprland-uwsm.desktop` ("Hyprland (uwsm-managed)",
+  `Exec=uwsm start -e -D Hyprland hyprland.desktop`) — no custom `.desktop` file
+  needed, matching the plan's decision not to force a specific session name.
+- **Gap caught in self-review, before it was forgotten:** re-reading the plan against
+  what actually got built, `home/wireplumber/` — the two conf.d snippets from Phase
+  3's research (ALSA soft-mixer, Bluetooth A2DP autoconnect) — had never been
+  written. Researched WirePlumber 0.5's real current conf.d rule syntax (`monitor.
+  alsa.rules` / `monitor.bluez.rules` with `matches`/`actions.update-props`, not the
+  old 0.4 Lua scripts), wrote both files, and verified them by actually starting
+  `wireplumber.service` (`systemctl --user start pipewire wireplumber`) — no parse
+  errors in the journal, `wpctl status` responds cleanly. Stopped the services again
+  afterward.
+- Only the two genuine live-session checks (Hyprland actually running, the four
+  autostarted processes alive) remain, pending an actual login through SDDM from
+  Unraid's console.
 
 ## VM → physical hardware notes
 
