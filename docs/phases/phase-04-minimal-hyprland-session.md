@@ -130,13 +130,16 @@ commands not found, sudo required, as expected) · Green confirmed: _pending_
       virtio-gpu-3D would have been.
 
 **Implementation (Claude)**
-- [ ] Branch, tracking doc (this file)
+- [x] Branch, tracking doc (this file)
 - [x] Red: `tests/acceptance/phase-04.bats`; confirmed 9/9 failing, no load/syntax
       errors
-- [ ] `packages/desktop.txt` (new category), `packages/tooling.txt` (+yay),
-      `packages/external.md` (+yay, +xdg-terminal-exec)
-- [ ] User bootstraps `yay` (`git clone` + `makepkg -si`, needs `sudo`), then
-      `yay -S xdg-terminal-exec`
+- [x] `packages/desktop.txt` (new category), `packages/tooling.txt` (+yay, +go,
+      +fakeroot, +make, +scdoc), `packages/external.md` (+yay, +xdg-terminal-exec)
+- [ ] User: `sudo pacman -S --needed go fakeroot` (yay's own build prerequisites),
+      then manually build+install yay (`git clone` + `makepkg -si`, needs `sudo` for
+      the final `pacman -U`), then `yay -S --needed $(scripts/pkglist
+      packages/*.txt)` for everything else (repo packages + `xdg-terminal-exec`, in
+      one command)
 - [ ] `system/sddm/` drop-ins, added to `system/files.txt`
 - [ ] `home/hypr/` (Lua-based, modular)
 - [ ] `home/ghostty/`, `home/mako/`, `home/hypridle/`, `home/hyprlock/`,
@@ -194,6 +197,22 @@ commands not found, sudo required, as expected) · Green confirmed: _pending_
   **user decision: adopt yay after all**. `yay` and `xdg-terminal-exec` both recorded
   in `packages/external.md`; `yay` declared in `packages/tooling.txt`,
   `xdg-terminal-exec` in `packages/desktop.txt`.
+- **Caught before asking the user to run anything:** declaring `yay` and
+  `xdg-terminal-exec` in plain `packages/*.txt` files would have broken the
+  established bulk-install command (`sudo pacman -S --needed
+  $(scripts/pkglist packages/*.txt)`, from Phase 1/2's runbooks) — `pacman -S` can't
+  resolve an AUR package name at all, and errors out resolving *every* target before
+  installing anything, which would have blocked all of Phase 4's legitimate packages
+  in one command. Fix: **from Phase 4 onward, the bulk-install command is
+  `yay -S --needed $(scripts/pkglist packages/*.txt)`** — yay transparently handles
+  official-repo and AUR packages in one invocation, so every package can stay in the
+  same declared lists (one parser, one command, unchanged). The one remaining
+  chicken-and-egg step is bootstrapping yay itself, which needs its own prerequisites
+  installed the old way first. Added `go` and `fakeroot` (build yay itself; `go>=1.24`
+  is yay's only real makedepend, `fakeroot` is what `makepkg` always needs to fake
+  file ownership while packaging) and `make`/`scdoc` (xdg-terminal-exec's own
+  makedepends — its Makefile's default target renders a man page via `scdoc`) to
+  `packages/tooling.txt`. All four confirmed against the live pacman database.
 
 ## VM → physical hardware notes
 

@@ -12,3 +12,7 @@ tmux            # scrollback, a paste buffer, and windows on the text console
 jq              # JSON parsing: release manifests (install/claude-code), settings checks
 diffutils       # cmp: install/sync-system compares installed files with the repo (base doesn't pull it in)
 yay             # AUR helper; bootstrapped manually (packages/external.md), needed for AUR-only tools like xdg-terminal-exec
+go              # builds yay itself (makepkg makedepends); not in any repo pacman can resolve without it
+fakeroot        # makepkg needs it to fake file ownership when packaging, for any build (yay included)
+make            # runs xdg-terminal-exec's Makefile when yay builds it from AUR
+scdoc           # renders xdg-terminal-exec's man page (a makepkg makedepend of that AUR package)
