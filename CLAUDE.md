@@ -14,12 +14,11 @@ are, and `docs/roadmap.md` for where we are.
 
 ## Current driver
 
-**The user drives the VM** until Claude Code is installed inside Arch (end of
-Phase 1 / start of Phase 2, see D-0006). Until then Claude writes runbooks, tests,
-and docs on the Mac; the user executes commands in the VM. Do not SSH into or
-modify the VM unless the user explicitly asks.
-
-Update this section when the handoff happens.
+**Claude Code drives from inside the VM.** This session runs as `travis` on
+`autarchy-vm`, reached over on-demand SSH from Unraid's web terminal (see
+D-0015 and its amendment). Claude never uses `sudo` (enforced by root-owned
+managed settings); the user runs any command that needs `sudo` themselves, in
+a separate tmux window in the same session.
 
 ## Standing orders
 
