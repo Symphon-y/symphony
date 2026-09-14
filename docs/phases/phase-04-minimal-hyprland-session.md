@@ -17,11 +17,14 @@ portals, a polkit agent, notifications, idle/lock, and a wallpaper all working.
 
 **In scope**
 - Packages: `hyprland`, `uwsm`, `sddm`, `ghostty`, `mako`, `hypridle`, `hyprlock`,
-  `hyprpaper`, `hyprpolkitagent`, `pipewire`, `wireplumber`,
-  `xdg-desktop-portal-hyprland`, `xdg-desktop-portal-gtk`, `matugen`, `vulkan-intel`
-  — **all confirmed in Arch's official `extra` repo** directly against this VM's
-  pacman database (correcting the plan's original research, which wrongly claimed
-  matugen was AUR-only). No AUR helper needed for this phase.
+  `hyprpaper`, `hyprpolkitagent`, `pipewire`, `pipewire-pulse`, `pipewire-alsa`,
+  `wireplumber`, `xdg-desktop-portal-hyprland`, `xdg-desktop-portal-gtk`, `matugen`,
+  `vulkan-intel` — all confirmed in Arch's official `extra` repo directly against this
+  VM's pacman database (correcting the plan's original research, which wrongly claimed
+  matugen was AUR-only). Plus `xdg-terminal-exec` — genuinely AUR-only this time
+  (confirmed both against the live pacman database and the AUR PKGBUILD directly),
+  and it's the mechanism CLAUDE.md itself already names for the `$terminal` role, so
+  **yay is adopted after all** (see Decisions).
 - System config (root-owned, via `install/sync-system`): SDDM's `/etc/sddm.conf.d/*`
   drop-ins.
 - Home config (via `install/link-home`, one stow package per component): Hyprland
@@ -74,13 +77,19 @@ portals, a polkit agent, notifications, idle/lock, and a wallpaper all working.
   dependency, the idiomatic choice for a bare Hyprland session. Chosen over
   polkit-gnome (older, GTK2, what Omarchy v3 used), polkit-kde-agent, lxqt-policykit,
   and mate-polkit (all researched and compared).
-- **AUR helper: deferred, not adopted.** The plan's original research claimed
-  matugen (D-0025's theming tool) was AUR-only, which was wrong — checked directly
-  against this VM's live pacman database, matugen is in the official `extra` repo
-  (v4.2.0-1, packaged by an Arch Trusted User), same as every other Phase 4 package.
-  With the only justification for an AUR helper gone, the user chose to defer "AUR
-  helper or none" again rather than adopt yay/paru with no immediate job — revisit
-  whenever an actual AUR-only package is needed.
+- **AUR helper: yay, adopted — resolved twice in one session.** First pass: the
+  plan's original research claimed matugen (D-0025's theming tool) was AUR-only,
+  which was wrong — checked directly against this VM's live pacman database, matugen
+  is in the official `extra` repo (v4.2.0-1, packaged by an Arch Trusted User), same
+  as every other package researched so far. With that justification gone, the user
+  initially deferred "AUR helper or none" again. Second pass: implementation then hit
+  a genuine AUR-only need — `xdg-terminal-exec`, the exact mechanism CLAUDE.md already
+  names for the `$terminal` role, confirmed AUR-only both against the live pacman
+  database and its AUR PKGBUILD directly (no ambiguity this time). The user chose to
+  adopt yay after all rather than vendor the script by hand or one-off `makepkg`.
+  yay itself has to be bootstrapped manually (`git clone` + `makepkg -si`, needs
+  `sudo` for the final `pacman -U`) — a user-run step, like Phase 2's SSH/login
+  steps. Both packages tracked in `packages/external.md`.
 
 **Resolved (plan)**
 - Notifications (mako), idle/lock (hypridle + hyprlock), audio
@@ -123,7 +132,10 @@ Red confirmed: _pending_ · Green confirmed: _pending_
 - [ ] Branch, tracking doc (this file)
 - [ ] Red: `tests/acceptance/phase-04.bats` (static group) + any new script's unit
       tests; confirm red
-- [ ] `packages/desktop.txt` (new category)
+- [ ] `packages/desktop.txt` (new category), `packages/tooling.txt` (+yay),
+      `packages/external.md` (+yay, +xdg-terminal-exec)
+- [ ] User bootstraps `yay` (`git clone` + `makepkg -si`, needs `sudo`), then
+      `yay -S xdg-terminal-exec`
 - [ ] `system/sddm/` drop-ins, added to `system/files.txt`
 - [ ] `home/hypr/` (Lua-based, modular)
 - [ ] `home/ghostty/`, `home/mako/`, `home/hypridle/`, `home/hyprlock/`,
@@ -169,7 +181,18 @@ Red confirmed: _pending_ · Green confirmed: _pending_
   **user decision: defer the AUR-helper question again**, since nothing in this phase
   needs one. Added `vulkan-intel` to the package list (not in the original plan) once
   real Intel GPU passthrough was confirmed, for a proper Vulkan driver alongside
-  mesa's OpenGL/EGL support.
+  mesa's OpenGL/EGL support. Also added `pipewire-pulse`/`pipewire-alsa` (app
+  compatibility for anything not PipeWire-native), not called out individually in the
+  plan's audio bullet.
+- **Second AUR check, this one real:** `xdg-terminal-exec` — the exact tool CLAUDE.md
+  already names for the `$terminal` role — turned out to be genuinely AUR-only,
+  confirmed against both the live pacman database (`pacman -Ss` found nothing) and
+  its AUR PKGBUILD (`gitlab.freedesktop.org/Vladimir-csp/xdg-terminal-exec`, a
+  ~1500-line POSIX script, `make install`, no compiled deps). Presented the user three
+  options (vendor it like `install/claude-code`, adopt yay, one-off `makepkg`);
+  **user decision: adopt yay after all**. `yay` and `xdg-terminal-exec` both recorded
+  in `packages/external.md`; `yay` declared in `packages/tooling.txt`,
+  `xdg-terminal-exec` in `packages/desktop.txt`.
 
 ## VM → physical hardware notes
 

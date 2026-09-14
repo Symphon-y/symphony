@@ -11,3 +11,4 @@ stow            # links home/ config into the home directory (install/link-home)
 tmux            # scrollback, a paste buffer, and windows on the text console
 jq              # JSON parsing: release manifests (install/claude-code), settings checks
 diffutils       # cmp: install/sync-system compares installed files with the repo (base doesn't pull it in)
+yay             # AUR helper; bootstrapped manually (packages/external.md), needed for AUR-only tools like xdg-terminal-exec
