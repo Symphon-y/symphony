@@ -383,6 +383,47 @@ after fixing a real autostart bug found in the live session (see implementation 
 - Revisit the audio testing caveat once a virtual sound card exists in Unraid, and
   again once on physical hardware with real audio devices.
 
+### Post-close follow-up (2026-09-14) — the Virtio-GPU(3D) revert didn't actually land
+
+After the phase closed, the user reported Hyprland tripped "Emergency mode... a lua
+config error resulted in no binds being registered" right after confirming the
+`monitors.lua` fix (D-0032's `1920x1080@60` at `scale = 1`) looked correct — the
+*next* automatic config reload (Hyprland's own file-watcher, not the manual
+`hyprctl reload` that had just worked) hit an error and reverted the display back to
+its pre-fix state.
+
+Investigation (over SSH, same live instance, PID unchanged throughout):
+- `Hyprland --config ... --verify-config` still reports `config ok` — the Lua files
+  themselves are valid. A manual `hyprctl reload` immediately recovered the session
+  (confirmed back to `1920x1080`, and `hyprctl binds` showed our real four binds, not
+  emergency fallback ones) — so whatever the automatic reload hit wasn't a lasting
+  corruption, and didn't need a restart to fix.
+- Couldn't find the actual error text in the live instance's `hyprland.log` —
+  "emergency", "reload", and "Config parsing result" don't appear anywhere in it, so
+  that phrasing may be specific to a standalone `--verify-config` invocation's own
+  stdout, not something the long-running instance logs.
+- **Bigger, independently-confirmed problem found along the way:** `lspci` (full,
+  unfiltered) shows this VM's *only* display device is still **QXL** — not
+  Virtio-GPU(3D) as D-0032 called for, and not the earlier full-passthrough Intel
+  GPU either. `/dev/dri/` has no render node (`card1` only, no `renderD128`),
+  matching the original "QXL has no DRM render node" finding from planning. The
+  running Hyprland instance has been stuck retrying `CDRMRenderer(drm): Can't create
+  renderer, no matching devices found` in a tight loop since it started — confirmed
+  from line 147 of the log, not a recent change — and by the time this was
+  investigated the log had grown to **221,000+ lines** and was still growing fast.
+  This likely explains why an automatic reload could trip into a bad state: the
+  renderer was already in a persistent failure loop underneath everything that
+  otherwise looked like it was working (mode-setting/display-output apparently still
+  functions on QXL even without a working compositing renderer, which is presumably
+  how the session remained visually usable at all).
+- **User found the actual cause in Unraid's VM edit-config view** (not yet described
+  in detail) and is restarting the VM to fix it — this is a real gap between what
+  D-0032 intended (Virtio-GPU(3D)) and what's actually running (QXL), not a new
+  regression to chase in the repo's own config.
+- Session disconnected here to make the change; resume by re-checking `lspci` and
+  `/dev/dri/` once the VM is back, and watching whether the DRM renderer loop is gone
+  from a fresh `hyprland.log` before trusting the display is stable long-term.
+
 ## Exit criteria
 
 - [x] Static and live-session acceptance tests both pass (9/9)
