@@ -1,6 +1,7 @@
 # The graphical session: compositor, session start, and the components a minimal
-# Hyprland desktop needs (Phase 4). Standard, independently-replaceable tools, not a
-# unified shell (D-0025).
+# Hyprland desktop needs (Phase 4), plus interaction (Phase 5): launcher, clipboard,
+# screenshots/recording, status bar, power menu. Standard, independently-replaceable
+# tools, not a unified shell (D-0025).
 
 hyprland                     # the Wayland compositor
 uwsm                          # starts Hyprland in its own systemd scopes/slices
@@ -20,6 +21,18 @@ xdg-desktop-portal-gtk        # portal backend: file chooser fallback
 matugen                       # single palette -> per-tool templates (D-0025)
 vulkan-intel                  # Vulkan driver for the Intel iGPU
 xdg-terminal-exec             # resolves the $terminal role; AUR (yay), see packages/external.md
+fuzzel                         # launcher; also the --dmenu engine behind the power/system menu
+waybar                         # status bar, matugen-templated
+cliphist                       # clipboard history
+wl-clipboard                   # wl-copy/wl-paste, the primitive cliphist and capture scripts use
+grim                            # screenshot capture
+slurp                           # region/window selection for screenshots and recording
+hyprpicker                      # color picker; also the freeze overlay for screenshots
+satty                           # screenshot annotation
+gpu-screen-recorder              # screen recording; no Vulkan dependency (checked, D-0032's Phase 5
+                                  # revisit) -- uses VAAPI via mesa + intel-media-driver on Intel
+intel-media-driver                # VAAPI for gpu-screen-recorder on this Intel iGPU (Broadwell+)
+zbar                              # QR code decoding for capture
 
 # yay itself, plus its own build prerequisites: none of this belongs in packages/
 # tooling.txt, which CI installs with plain `pacman -S` in a container that never
