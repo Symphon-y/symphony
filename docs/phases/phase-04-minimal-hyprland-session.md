@@ -351,6 +351,15 @@ after fixing a real autostart bug found in the live session (see implementation 
   --verify-config`, SDDM config/enabled, `xdg-terminal-exec`, matugen rendering,
   Hyprland reachable via `hyprctl`, all four processes running (now systemd-managed),
   and the notification service reachable over D-Bus.
+- **Visual bug reported by the user: "very zoomed in and square."** `hyprctl
+  monitors` showed why: `mode = "preferred"` picked `1024x768@60` (4:3, not the
+  widescreen modes also available) at `scale: 2` — the virtual display reports no
+  EDID physical size at all (`physical size (mm): 0x0`), which `"preferred"`/`"auto"`
+  clearly handle badly with nothing real to reason from. Fixed `monitors.lua` to an
+  explicit `1920x1080@60` at `scale = 1` (confirmed available in `hyprctl monitors`'
+  own mode list). `Hyprland --verify-config` still passes; applied live with
+  `hyprctl reload` (no re-login needed) and confirmed via `hyprctl monitors` that
+  both the resolution and scale actually changed. **User confirmed the fix worked.**
 
 ## VM → physical hardware notes
 
