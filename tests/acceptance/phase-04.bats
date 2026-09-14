@@ -35,10 +35,11 @@ setup() {
 # --- session start (sddm + uwsm) --------------------------------------------------
 
 @test "session start: sddm is configured for a wayland uwsm-managed session" {
-  run as_root cat /etc/sddm.conf.d/10-wayland.conf
+  # World-readable (0644), unlike sshd_config -- no root needed to check this.
+  run cat /etc/sddm.conf.d/10-wayland.conf
   assert_success
   assert_line "DisplayServer=wayland"
-  run as_root grep -rl "uwsm start" /usr/share/wayland-sessions/ /etc/sddm.conf.d/
+  run grep -rl "uwsm start" /usr/share/wayland-sessions/ /etc/sddm.conf.d/
   assert_success
 }
 
