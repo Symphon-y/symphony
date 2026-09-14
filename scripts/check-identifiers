@@ -15,6 +15,12 @@ source scripts/lib/identifiers.bash
 
 files=("$@")
 if (($# == 0)); then
+  # Fail closed: without a git repository, "every tracked file" is silently nothing,
+  # and a guardrail that checks nothing must not report success.
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "check-identifiers: not a git repository; pass the files to check explicitly" >&2
+    exit 1
+  fi
   while IFS= read -r file; do
     if [[ -f $file ]]; then
       files+=("$file")
@@ -23,8 +29,8 @@ if (($# == 0)); then
 fi
 
 if ((${#files[@]} == 0)); then
-  echo "no files to check"
-  exit 0
+  echo "check-identifiers: nothing to check" >&2
+  exit 1
 fi
 
 findings=$(find_identifiers "${files[@]}")

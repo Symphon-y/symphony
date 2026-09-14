@@ -47,6 +47,14 @@ setup() {
   assert_output ""
 }
 
+@test "allows SSH algorithm names, which look like email addresses but name nobody" {
+  printf '%s\n' \
+    "Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com" \
+    "KexAlgorithms curve25519-sha256@libssh.org,sntrup761x25519-sha512@openssh.com" >"$FIXTURE"
+  run find_identifiers "$FIXTURE"
+  assert_output ""
+}
+
 @test "does not mistake times, dates, or version numbers for identifiers" {
   printf '%s\n' "Local time: 04:00:13" "released 2026-09-13" "Claude Code 2.1.236" \
     "OpenSSH 10.5p1" "Summer 2024: notes" "sha256 3a624a5a7cd79bbad4d32bd7" >"$FIXTURE"
@@ -69,6 +77,17 @@ setup() {
   assert_failure 1
   assert_line "$FIXTURE:2: ipv4"
   refute_output --partial "$LAN_IP"
+}
+
+@test "check-identifiers fails closed when there is no git repository to scan" {
+  # A guardrail that finds nothing to check must not report success.
+  local copy="$BATS_TEST_TMPDIR/not-a-repo"
+  mkdir -p "$copy/scripts/lib"
+  cp "$SCANNER" "$copy/scripts/"
+  cp "$REPO_ROOT/scripts/lib/identifiers.bash" "$copy/scripts/lib/"
+  run "$copy/scripts/check-identifiers"
+  assert_failure
+  assert_output --partial "git"
 }
 
 @test "check-identifiers passes on clean files" {

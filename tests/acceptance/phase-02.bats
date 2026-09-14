@@ -47,13 +47,19 @@ readonly MANAGED_SETTINGS=/etc/claude-code/managed-settings.json
 
 # --- ssh (on demand, from a trusted jump host) ---------------------------------
 
+# sshd's effective configuration in lowercase: OpenSSH versions differ in whether
+# `sshd -T` prints keywords as "passwordauthentication" or "PasswordAuthentication".
+sshd_effective_config() {
+  as_root sshd -T | tr '[:upper:]' '[:lower:]'
+}
+
 # Firewall rules that open SSH without restricting the source address.
 unrestricted_ssh_rules() {
   as_root nft list chain inet filter input | grep -E 'dport (22|ssh)\b' | grep -v 'saddr' || true
 }
 
 @test "ssh: the server accepts keys only, never root, and forwards nothing" {
-  run as_root sshd -T
+  run sshd_effective_config
   assert_success
   assert_line "passwordauthentication no"
   assert_line "kbdinteractiveauthentication no"
@@ -66,7 +72,7 @@ unrestricted_ssh_rules() {
 }
 
 @test "ssh: authorized keys are root-owned system config, not user-editable files" {
-  run as_root sshd -T
+  run sshd_effective_config
   assert_line "authorizedkeysfile /etc/ssh/authorized_keys/%u"
   local keys
   keys="/etc/ssh/authorized_keys/$(id -un)"
