@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "autoUpdatesChannel": "stable",
+  "env": {
+    "DISABLE_TELEMETRY": "1",
+    "DISABLE_ERROR_REPORTING": "1"
+  },
+  "permissions": {
+    "deny": [
+      "Bash(sudo *)",
+      "Read(~/.claude/.credentials.json)",
+      "Read(~/.config/gh/**)"
+    ]
+  }
+}

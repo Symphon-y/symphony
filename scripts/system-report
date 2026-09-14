@@ -6,11 +6,14 @@
 # It never changes system state.
 #
 # Exit status: 0 if every install gate passes, 1 otherwise. The full report is
-# printed either way.
+# printed either way, with IP, MAC, and email addresses masked so it can be committed.
 
 # No `set -e`: a missing tool should blank one section, not abort the report.
 set -uo pipefail
 shopt -s nullglob
+
+# shellcheck source-path=SCRIPTDIR source=lib/identifiers.bash
+source "$(dirname "${BASH_SOURCE[0]}")/lib/identifiers.bash"
 
 has() {
   command -v "$1" >/dev/null 2>&1
@@ -184,4 +187,5 @@ main() {
   report_gates
 }
 
-main "$@"
+# pipefail keeps main's exit status (the gates) through the masking filter.
+main "$@" | redact_identifiers

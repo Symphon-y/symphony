@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# link-home: link the stow packages under home/ into the home directory.
+#
+# Usage: install/link-home apply|check
+#   apply  stow every package (each directory directly under home/)
+#   check  verify every file is linked and no directory is folded; exit 1 otherwise
+#
+# Packages use stow's --dotfiles naming: home/tmux/dot-tmux.conf becomes ~/.tmux.conf.
+# --no-folding makes stow link individual files, never whole directories, so a
+# directory like ~/.claude, which also holds credentials, can never become a link into
+# this repository.
+set -euo pipefail
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+readonly REPO_ROOT
+readonly PACKAGES_DIR="$REPO_ROOT/home"
+
+usage() {
+  echo "usage: link-home apply|check" >&2
+  exit 2
+}
+
+apply() {
+  local dir names=()
+  for dir in "$PACKAGES_DIR"/*/; do
+    dir=${dir%/}
+    names+=("${dir##*/}")
+  done
+  stow --dir="$PACKAGES_DIR" --target="$HOME" --dotfiles --no-folding --restow "${names[@]}"
+  echo "linked: ${names[*]}"
+}
+
+# Where stow places a package file: every dot-x path component becomes .x.
+home_path() {
+  sed -E 's#(^|/)dot-#\1.#g' <<<"$1"
+}
+
+check() {
+  local file path dir problems=0 total=0 folded=" "
+  while IFS= read -r file; do
+    total=$((total + 1))
+    path=$(home_path "${file#"$PACKAGES_DIR/"*/}")
+
+    # A linked directory on the way to the file means stow folded it into the repo.
+    dir=$(dirname "$path")
+    while [[ $dir != . ]]; do
+      if [[ -L $HOME/$dir && $folded != *" $dir "* ]]; then
+        echo "folded: $dir"
+        folded+="$dir "
+        problems=$((problems + 1))
+      fi
+      dir=$(dirname "$dir")
+    done
+
+    if [[ ! -L $HOME/$path || $(realpath "$HOME/$path") != "$(realpath "$file")" ]]; then
+      echo "not linked: $path"
+      problems=$((problems + 1))
+    fi
+  done < <(find "$PACKAGES_DIR" -type f | sort)
+
+  if ((problems > 0)); then
+    return 1
+  fi
+  echo "linked: $total files"
+}
+
+main() {
+  case ${1:-} in
+    apply | check) "$1" ;;
+    *) usage ;;
+  esac
+}
+
+main "$@"

@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+# ssh-jump-host: admit SSH to this machine only from one jump host.
+#
+# Usage: install/ssh-jump-host [--root DIR] ADDRESS
+#   ADDRESS     the jump host's IPv4 address (for the lab VM: Unraid's LAN address)
+#   --root DIR  work on DIR instead of /
+#
+# Writes machine-local, root-owned state. The address never enters git:
+#   /etc/nftables.d/ssh-jump-host.nft  admits tcp/22 from ADDRESS only
+#   /etc/ssh/authorized_keys/<user>    each public key from
+#                                      system/hosts/<hostname>/ssh/authorized_keys.<user>,
+#                                      restricted with from="ADDRESS",restrict,pty
+# Then load the rule with: systemctl restart nftables
+set -euo pipefail
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+readonly REPO_ROOT
+# shellcheck source-path=SCRIPTDIR source=../scripts/lib/host.bash
+source "$REPO_ROOT/scripts/lib/host.bash"
+
+die() {
+  printf 'ssh-jump-host: %s\n' "$*" >&2
+  exit 1
+}
+
+usage() {
+  echo "usage: ssh-jump-host [--root DIR] ADDRESS" >&2
+  exit 2
+}
+
+is_ipv4() {
+  local IFS=. octet
+  local -a octets
+  [[ $1 =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]] || return 1
+  read -ra octets <<<"$1"
+  for octet in "${octets[@]}"; do
+    if ((10#$octet > 255)); then
+      return 1
+    fi
+  done
+}
+
+# Public key files for a host, one per user: system/hosts/<host>/ssh/authorized_keys.<user>.
+key_files() {
+  local file
+  for file in "$REPO_ROOT/system/hosts/$1/ssh"/authorized_keys.*; do
+    if [[ -f $file ]]; then
+      echo "$file"
+    fi
+  done
+}
+
+# Refuse anything but plain public keys. Options such as from= would put an address
+# into git, which this script exists to prevent.
+validate_key_file() {
+  local file=$1 line user=${1##*/authorized_keys.}
+  [[ $user =~ ^[a-z_][a-z0-9_-]*$ ]] || die "not a valid user name in $file"
+  while IFS= read -r line || [[ -n $line ]]; do
+    if [[ $line =~ ^[[:space:]]*(#|$) ]]; then
+      continue
+    fi
+    [[ $line =~ ^(ssh-|ecdsa-|sk-) ]] ||
+      die "${file#"$REPO_ROOT/"}: keys must not carry options; addresses stay out of git"
+  done <"$file"
+}
+
+# Write CONTENT (stdin) to PATH with mode 0644, replacing any previous version at once.
+write_file() {
+  local path=$1
+  mkdir -p "$(dirname "$path")"
+  cat >"$path.tmp"
+  chmod 0644 "$path.tmp"
+  mv "$path.tmp" "$path"
+}
+
+write_firewall_rule() {
+  local address=$1
+  {
+    echo "# Written by install/ssh-jump-host. Machine-local state: never commit this."
+    echo "add rule inet filter input ip saddr $address tcp dport 22 accept"
+  } | write_file "$ROOT/etc/nftables.d/ssh-jump-host.nft"
+  echo "firewall: SSH admitted only from $address"
+}
+
+write_authorized_keys() {
+  local address=$1 host=$2 file user line
+  while IFS= read -r file; do
+    user=${file##*/authorized_keys.}
+    {
+      echo "# Written by install/ssh-jump-host from system/hosts/$host/ssh/authorized_keys.$user."
+      while IFS= read -r line || [[ -n $line ]]; do
+        if [[ ! $line =~ ^[[:space:]]*(#|$) ]]; then
+          echo "from=\"$address\",restrict,pty $line"
+        fi
+      done <"$file"
+    } | write_file "$ROOT/etc/ssh/authorized_keys/$user"
+    echo "authorized keys: $user, restricted to $address"
+  done < <(key_files "$host")
+}
+
+main() {
+  ROOT=""
+  local address="" host files file
+  while (($#)); do
+    case $1 in
+      --root)
+        (($# >= 2)) || usage
+        ROOT=${2%/}
+        shift 2
+        ;;
+      -*) usage ;;
+      *)
+        [[ -z $address ]] || usage
+        address=$1
+        shift
+        ;;
+    esac
+  done
+  [[ -n $address ]] || usage
+
+  is_ipv4 "$address" || die "not an IPv4 address: $address"
+  if [[ -z $ROOT ]] && (($(id -u) != 0)); then
+    die "writing to the live system must run as root (use sudo)"
+  fi
+
+  host=$(target_hostname "$ROOT")
+  [[ -n $host ]] || die "cannot read this machine's hostname from $ROOT/etc/hostname"
+  files=$(key_files "$host")
+  [[ -n $files ]] || die "no public keys for $host in system/hosts/$host/ssh/"
+
+  # Validate everything before writing anything.
+  while IFS= read -r file; do
+    validate_key_file "$file"
+  done <<<"$files"
+
+  write_firewall_rule "$address"
+  write_authorized_keys "$address" "$host"
+  echo "next: systemctl restart nftables"
+}
+
+main "$@"

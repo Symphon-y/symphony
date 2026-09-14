@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# check: static analysis and unit tests. The single entry point used locally and by CI.
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+shell_files=()
+while IFS= read -r file; do
+  shell_files+=("$file")
+done < <(
+  find scripts install -type f | sort
+  printf '%s\n' system/*/*.sh tests/helpers/*.bash tests/unit/*.bats tests/acceptance/*.bats
+)
+
+echo "==> shellcheck"
+shellcheck -x "${shell_files[@]}"
+
+echo "==> shfmt"
+shfmt -d "${shell_files[@]}"
+
+echo "==> JSON syntax"
+while IFS= read -r json; do
+  jq empty "$json"
+done < <(find home system -name '*.json')
+
+echo "==> identifiers"
+scripts/check-identifiers
+
+echo "==> unit tests"
+bats tests/unit

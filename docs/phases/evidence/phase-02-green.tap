@@ -1,0 +1,264 @@
+1..57
+ok 1 boot: firmware is 64-bit UEFI
+ok 2 boot: systemd-boot is installed on the ESP
+ok 3 boot: unified kernel images exist for linux and linux-lts
+ok 4 boot: the boot menu does not allow editing the kernel command line
+ok 5 boot: the kernel command line unlocks root through sd-encrypt
+ok 6 storage: / is btrfs on the LUKS mapping
+ok 7 storage: the root mapping is LUKS2 with discards allowed
+ok 8 storage: every subvolume in the layout is mounted where declared
+ok 9 storage: fstab declares each mountpoint exactly once
+ok 10 storage: the ESP is vfat at the ESP mountpoint and not world-readable
+ok 11 storage: periodic TRIM is enabled
+ok 12 swap: zram swap is active
+ok 13 snapshots: snapper root config exists with timeline snapshots off
+ok 14 snapshots: old snapshots are cleaned up on a timer
+ok 15 snapshots: pacman transactions are snapshotted by snap-pac
+ok 16 identity: hostname is set and is not the installer's
+ok 17 identity: a UTF-8 locale is configured
+ok 18 identity: a console keymap is configured
+ok 19 identity: timezone is set and the clock is NTP-synchronized
+ok 20 network: NetworkManager and systemd-resolved are active
+ok 21 network: resolv.conf points at the systemd-resolved stub
+ok 22 network: public DNS names resolve
+ok 23 network: HTTPS to archlinux.org works
+ok 24 packages: the pacman database is consistent
+ok 25 packages: no foreign (AUR or hand-built) packages are installed
+ok 26 packages: every explicitly installed package is declared in packages/
+ok 27 security: tests run as a non-root member of wheel
+ok 28 security: the root account is locked
+ok 29 security: sudo never skips the password
+ok 30 security: the sudoers configuration is valid
+ok 31 security: the firewall drops unsolicited inbound traffic
+ok 32 security: nothing listens beyond loopback except DHCP clients and on-demand sshd
+ok 33 security: the SSH server is not started at boot
+ok 34 health: no systemd units have failed
+ok 35 health: the system reports itself fully running
+ok 36 vm: the QEMU guest agent is active
+ok 37 tooling: development tools are installed
+ok 38 tooling: static checks and unit tests pass on this machine
+ok 39 system config: installed files match system/files.txt
+ok 40 home config: every file under home/ is linked into the home directory
+ok 41 home config: ~/.claude is a real directory, so credentials never land in the repo
+not ok 42 ssh: the server accepts keys only, never root, and forwards nothing
+# (in test file tests/acceptance/phase-02.bats, line 58)
+#   `assert_line "passwordauthentication no"' failed
+#
+# -- output does not contain line --
+# line : passwordauthentication no
+# output (95 lines):
+#   Port 22
+#   AddressFamily any
+#   ListenAddress [::]:22
+#   ListenAddress 0.0.0.0:22
+#   UsePAM yes
+#   PAMServiceName sshd
+#   LoginGraceTime 120
+#   X11DisplayOffset 10
+#   MaxAuthTries 6
+#   MaxSessions 10
+#   ClientAliveInterval 0
+#   ClientAliveCountMax 3
+#   RequiredRSASize 1024
+#   StreamLocalBindMask 0177
+#   UnusedConnectionTimeout none
+#   PermitRootLogin no
+#   IgnoreRhosts yes
+#   IgnoreUserKnownHosts no
+#   HostbasedAuthentication no
+#   HostbasedUsesNameFromPacketOnly no
+#   PubkeyAuthentication yes
+#   KerberosAuthentication no
+#   KerberosOrLocalPasswd yes
+#   KerberosTicketCleanup yes
+#   GSSAPIAuthentication no
+#   GSSAPICleanupCredentials yes
+#   GSSAPIDelegateCredentials yes
+#   GSSAPIStrictAcceptorCheck yes
+#   PasswordAuthentication no
+#   KbdInteractiveAuthentication no
+#   PrintMotd no
+#   X11Forwarding no
+#   X11UseLocalhost yes
+#   PermitTTY yes
+#   PermitUserRC yes
+#   StrictModes yes
+#   TCPKeepAlive yes
+#   PermitEmptyPasswords no
+#   Compression yes
+#   GatewayPorts no
+#   UseDNS no
+#   AllowTcpForwarding no
+#   AllowAgentForwarding no
+#   DisableForwarding no
+#   AllowStreamLocalForwarding yes
+#   StreamLocalBindUnlink no
+#   FingerprintHash SHA256
+#   ExposeAuthInfo no
+#   RefuseConnection no
+#   PidFile /run/sshd.pid
+#   ModuliFile /etc/ssh/moduli
+#   XAuthLocation /usr/bin/xauth
+#   Ciphers chacha20-poly1305@openssh.com,aes128-gcm@openssh.com,aes256-gcm@openssh.com,aes128-ctr,aes192-ctr,aes256-ctr
+#   Macs umac-64-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha1-etm@openssh.com,umac-64@openssh.com,umac-128@openssh.com,hmac-sha2-256,hmac-sha2-512,hmac-sha1
+#   Banner none
+#   ForceCommand none
+#   ChrootDirectory none
+#   TrustedUserCAKeys none
+#   SecurityKeyProvider internal
+#   AuthorizedPrincipalsFile none
+#   VersionAddendum none
+#   AuthorizedKeysCommand /usr/bin/userdbctl ssh-authorized-keys %u
+#   AuthorizedKeysCommandUser root
+#   AuthorizedPrincipalsCommand none
+#   AuthorizedPrincipalsCommandUser none
+#   HostKeyAgent none
+#   KexAlgorithms mlkem768x25519-sha256,sntrup761x25519-sha512,sntrup761x25519-sha512@openssh.com,curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521
+#   CASignatureAlgorithms ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,webauthn-sk-ecdsa-sha2-nistp256@openssh.com,rsa-sha2-512,rsa-sha2-256
+#   HostbasedAcceptedAlgorithms ssh-ed25519-cert-v01@openssh.com,ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,webauthn-sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,webauthn-sk-ecdsa-sha2-nistp256@openssh.com,rsa-sha2-512,rsa-sha2-256
+#   HostKeyAlgorithms ssh-ed25519-cert-v01@openssh.com,ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,webauthn-sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,webauthn-sk-ecdsa-sha2-nistp256@openssh.com,rsa-sha2-512,rsa-sha2-256
+#   PubkeyAcceptedAlgorithms ssh-ed25519-cert-v01@openssh.com,ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,webauthn-sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,webauthn-sk-ecdsa-sha2-nistp256@openssh.com,rsa-sha2-512,rsa-sha2-256
+#   SshdSessionPath /usr/lib/ssh/sshd-session
+#   SshdAuthPath /usr/lib/ssh/sshd-auth
+#   PerSourcePenaltyExemptList none
+#   LogLevel INFO
+#   SyslogFacility AUTH
+#   AuthorizedKeysFile /etc/ssh/authorized_keys/%u
+#   HostKey /etc/ssh/ssh_host_rsa_key
+#   HostKey /etc/ssh/ssh_host_ecdsa_key
+#   HostKey /etc/ssh/ssh_host_ed25519_key
+#   HostKey /etc/ssh/ssh_host_mldsa44_ed25519_key
+#   AuthenticationMethods publickey
+#   ChannelTimeout none
+#   Subsystem sftp /usr/lib/ssh/sftp-server
+#   MaxStartups 10:30:100
+#   PerSourceMaxStartups none
+#   PerSourceNetBlockSize 32:128
+#   PermitTunnel no
+#   IPQoS ef cs0
+#   RekeyLimit 0 0
+#   PermitOpen any
+#   PermitListen any
+#   PermitUserEnvironment no
+#   PubkeyAuthOptions none
+#   PerSourcePenalties crash:90.000000 authfail:5.000000 noauth:1.000000 invaliduser:5.000000 grace-exceeded:10.000000 refuseconnection:10.000000 max:600.000000 min:15.000000 max-sources4:65536 max-sources6:65536 overflow:permissive overflow6:permissive
+# --
+#
+not ok 43 ssh: authorized keys are root-owned system config, not user-editable files
+# (in test file tests/acceptance/phase-02.bats, line 70)
+#   `assert_line "authorizedkeysfile /etc/ssh/authorized_keys/%u"' failed
+#
+# -- output does not contain line --
+# line : authorizedkeysfile /etc/ssh/authorized_keys/%u
+# output (95 lines):
+#   Port 22
+#   AddressFamily any
+#   ListenAddress [::]:22
+#   ListenAddress 0.0.0.0:22
+#   UsePAM yes
+#   PAMServiceName sshd
+#   LoginGraceTime 120
+#   X11DisplayOffset 10
+#   MaxAuthTries 6
+#   MaxSessions 10
+#   ClientAliveInterval 0
+#   ClientAliveCountMax 3
+#   RequiredRSASize 1024
+#   StreamLocalBindMask 0177
+#   UnusedConnectionTimeout none
+#   PermitRootLogin no
+#   IgnoreRhosts yes
+#   IgnoreUserKnownHosts no
+#   HostbasedAuthentication no
+#   HostbasedUsesNameFromPacketOnly no
+#   PubkeyAuthentication yes
+#   KerberosAuthentication no
+#   KerberosOrLocalPasswd yes
+#   KerberosTicketCleanup yes
+#   GSSAPIAuthentication no
+#   GSSAPICleanupCredentials yes
+#   GSSAPIDelegateCredentials yes
+#   GSSAPIStrictAcceptorCheck yes
+#   PasswordAuthentication no
+#   KbdInteractiveAuthentication no
+#   PrintMotd no
+#   X11Forwarding no
+#   X11UseLocalhost yes
+#   PermitTTY yes
+#   PermitUserRC yes
+#   StrictModes yes
+#   TCPKeepAlive yes
+#   PermitEmptyPasswords no
+#   Compression yes
+#   GatewayPorts no
+#   UseDNS no
+#   AllowTcpForwarding no
+#   AllowAgentForwarding no
+#   DisableForwarding no
+#   AllowStreamLocalForwarding yes
+#   StreamLocalBindUnlink no
+#   FingerprintHash SHA256
+#   ExposeAuthInfo no
+#   RefuseConnection no
+#   PidFile /run/sshd.pid
+#   ModuliFile /etc/ssh/moduli
+#   XAuthLocation /usr/bin/xauth
+#   Ciphers chacha20-poly1305@openssh.com,aes128-gcm@openssh.com,aes256-gcm@openssh.com,aes128-ctr,aes192-ctr,aes256-ctr
+#   Macs umac-64-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha1-etm@openssh.com,umac-64@openssh.com,umac-128@openssh.com,hmac-sha2-256,hmac-sha2-512,hmac-sha1
+#   Banner none
+#   ForceCommand none
+#   ChrootDirectory none
+#   TrustedUserCAKeys none
+#   SecurityKeyProvider internal
+#   AuthorizedPrincipalsFile none
+#   VersionAddendum none
+#   AuthorizedKeysCommand /usr/bin/userdbctl ssh-authorized-keys %u
+#   AuthorizedKeysCommandUser root
+#   AuthorizedPrincipalsCommand none
+#   AuthorizedPrincipalsCommandUser none
+#   HostKeyAgent none
+#   KexAlgorithms mlkem768x25519-sha256,sntrup761x25519-sha512,sntrup761x25519-sha512@openssh.com,curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521
+#   CASignatureAlgorithms ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,webauthn-sk-ecdsa-sha2-nistp256@openssh.com,rsa-sha2-512,rsa-sha2-256
+#   HostbasedAcceptedAlgorithms ssh-ed25519-cert-v01@openssh.com,ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,webauthn-sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,webauthn-sk-ecdsa-sha2-nistp256@openssh.com,rsa-sha2-512,rsa-sha2-256
+#   HostKeyAlgorithms ssh-ed25519-cert-v01@openssh.com,ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,webauthn-sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,webauthn-sk-ecdsa-sha2-nistp256@openssh.com,rsa-sha2-512,rsa-sha2-256
+#   PubkeyAcceptedAlgorithms ssh-ed25519-cert-v01@openssh.com,ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,webauthn-sk-ecdsa-sha2-nistp256-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,sk-ssh-ed25519@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,webauthn-sk-ecdsa-sha2-nistp256@openssh.com,rsa-sha2-512,rsa-sha2-256
+#   SshdSessionPath /usr/lib/ssh/sshd-session
+#   SshdAuthPath /usr/lib/ssh/sshd-auth
+#   PerSourcePenaltyExemptList none
+#   LogLevel INFO
+#   SyslogFacility AUTH
+#   AuthorizedKeysFile /etc/ssh/authorized_keys/%u
+#   HostKey /etc/ssh/ssh_host_rsa_key
+#   HostKey /etc/ssh/ssh_host_ecdsa_key
+#   HostKey /etc/ssh/ssh_host_ed25519_key
+#   HostKey /etc/ssh/ssh_host_mldsa44_ed25519_key
+#   AuthenticationMethods publickey
+#   ChannelTimeout none
+#   Subsystem sftp /usr/lib/ssh/sftp-server
+#   MaxStartups 10:30:100
+#   PerSourceMaxStartups none
+#   PerSourceNetBlockSize 32:128
+#   PermitTunnel no
+#   IPQoS ef cs0
+#   RekeyLimit 0 0
+#   PermitOpen any
+#   PermitListen any
+#   PermitUserEnvironment no
+#   PubkeyAuthOptions none
+#   PerSourcePenalties crash:90.000000 authfail:5.000000 noauth:1.000000 invaliduser:5.000000 grace-exceeded:10.000000 refuseconnection:10.000000 max:600.000000 min:15.000000 max-sources4:65536 max-sources6:65536 overflow:permissive overflow6:permissive
+# --
+#
+ok 44 ssh: every authorized key is restricted to a source address
+ok 45 ssh: the server is not started at boot
+ok 46 ssh: the firewall opens port 22 only to specific source addresses
+ok 47 shell: login shells put ~/.local/bin on PATH, after the system directories
+ok 48 claude code: the claude command runs
+ok 49 claude code: the installed binary matches its GPG-signed release manifest
+ok 50 claude code: diagnostics pass with auto-updates enabled
+ok 51 claude code: managed settings pin the stable channel and turn off telemetry
+ok 52 claude code: managed settings deny sudo and reading credential files
+ok 53 claude code: managed settings are root-owned, so Claude can't loosen its own rules
+ok 54 claude code: personal settings are Claude's own file, not a link into the repo
+ok 55 claude code: logged in and able to answer
+ok 56 github: gh is authenticated and the remote is reachable
+ok 57 github: the latest CI run for this branch succeeded

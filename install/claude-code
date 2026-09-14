@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+# claude-code: install or verify Claude Code from Anthropic's signed releases.
+#
+# Usage: install/claude-code install|verify
+#   install  download the current stable release, check it, then run `claude install stable`
+#   verify   check the installed version's binary against its signed release manifest
+#
+# Two checks, both required: the release manifest's GPG signature must come from
+# Anthropic's release key (pinned fingerprint below), and the binary's SHA256 must match
+# that manifest. Anthropic's own install.sh checks only the checksum. Run as your user:
+# Claude Code installs into ~/.local and never needs root.
+set -euo pipefail
+
+readonly RELEASES=https://downloads.claude.ai/claude-code-releases
+readonly SIGNING_KEY_URL=https://downloads.claude.ai/keys/claude-code.asc
+# "Anthropic Claude Code Release Signing <security@anthropic.com>", as published in
+# https://code.claude.com/docs/en/setup (binary integrity and code signing).
+readonly SIGNING_FINGERPRINT=31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE
+
+die() {
+  printf 'claude-code: %s\n' "$*" >&2
+  exit 1
+}
+
+usage() {
+  echo "usage: claude-code install|verify" >&2
+  exit 2
+}
+
+# HTTPS only, redirects included.
+fetch() {
+  curl --proto '=https' --tlsv1.2 -fsSL "$@"
+}
+
+platform() {
+  case $(uname -m) in
+    x86_64) echo linux-x64 ;;
+    aarch64) echo linux-arm64 ;;
+    *) die "unsupported architecture: $(uname -m)" ;;
+  esac
+}
+
+# Download the release manifest for a version into WORKDIR and prove it was signed by
+# the pinned release key.
+fetch_verified_manifest() {
+  local version=$1 gnupg="$WORKDIR/gnupg" status
+  fetch -o "$WORKDIR/manifest.json" "$RELEASES/$version/manifest.json"
+  fetch -o "$WORKDIR/manifest.json.sig" "$RELEASES/$version/manifest.json.sig"
+  fetch -o "$WORKDIR/signing-key.asc" "$SIGNING_KEY_URL"
+
+  # A throwaway keyring, so nothing is added to the user's own GnuPG trust.
+  mkdir -m 700 "$gnupg"
+  gpg --batch --quiet --homedir "$gnupg" --import "$WORKDIR/signing-key.asc" 2>/dev/null
+
+  status=$(gpg --batch --homedir "$gnupg" --status-fd 1 \
+    --verify "$WORKDIR/manifest.json.sig" "$WORKDIR/manifest.json" 2>/dev/null) ||
+    die "the manifest signature for Claude Code $version does not verify"
+
+  # A downloaded key file could hold any key, so require the pinned fingerprint.
+  # VALIDSIG fields: 3 = signing key fingerprint, 12 = primary key fingerprint.
+  awk -v fpr="$SIGNING_FINGERPRINT" \
+    '$2 == "VALIDSIG" && ($3 == fpr || $12 == fpr) { ok = 1 } END { exit !ok }' <<<"$status" ||
+    die "the manifest signature is not from the pinned release key $SIGNING_FINGERPRINT"
+}
+
+manifest_checksum() {
+  local platform=$1 checksum
+  checksum=$(jq -r --arg platform "$platform" '.platforms[$platform].checksum // empty' "$WORKDIR/manifest.json")
+  [[ $checksum =~ ^[0-9a-f]{64}$ ]] || die "the manifest has no valid checksum for $platform"
+  echo "$checksum"
+}
+
+sha256_of() {
+  sha256sum "$1" | cut -d' ' -f1
+}
+
+install_stable() {
+  local version platform expected binary="$WORKDIR/claude"
+
+  version=$(fetch "$RELEASES/stable")
+  [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
+    die "unexpected stable version pointer: ${version:0:40}"
+
+  platform=$(platform)
+  fetch_verified_manifest "$version"
+  expected=$(manifest_checksum "$platform")
+
+  fetch -o "$binary" "$RELEASES/$version/$platform/claude"
+  [[ $(sha256_of "$binary") == "$expected" ]] ||
+    die "checksum mismatch for the downloaded Claude Code $version binary"
+
+  # The verified binary installs itself: the launcher goes to ~/.local/bin/claude and
+  # versions to ~/.local/share/claude/versions/.
+  chmod +x "$binary"
+  "$binary" install stable
+  echo "Claude Code $version installed (signature and checksum verified)"
+}
+
+verify_installed() {
+  local version platform expected installed
+
+  version=$(claude --version | awk '{ print $1 }')
+  [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "could not read the installed Claude Code version"
+  installed="$HOME/.local/share/claude/versions/$version"
+  [[ -f $installed ]] || die "no installed binary for Claude Code $version at $installed"
+
+  platform=$(platform)
+  fetch_verified_manifest "$version"
+  expected=$(manifest_checksum "$platform")
+  [[ $(sha256_of "$installed") == "$expected" ]] ||
+    die "checksum mismatch: the installed Claude Code $version binary differs from its signed manifest"
+
+  echo "Claude Code $version verified against its signed release manifest"
+}
+
+main() {
+  case ${1:-} in
+    install | verify) ;;
+    *) usage ;;
+  esac
+  (($(id -u) != 0)) || die "run as your user, not root: Claude Code lives in your home directory"
+  command -v jq >/dev/null || die "jq is required (declared in packages/tooling.txt)"
+
+  WORKDIR=$(mktemp -d)
+  trap 'rm -rf "$WORKDIR"' EXIT
+
+  case $1 in
+    install) install_stable ;;
+    verify) verify_installed ;;
+  esac
+}
+
+main "$@"

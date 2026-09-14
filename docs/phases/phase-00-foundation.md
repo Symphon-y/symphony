@@ -73,7 +73,7 @@ Phase 1 (acceptance) and Phase 2 (unit tests, CI). Verification is manual:
   visibility change. The API then reported `disabled: false`, which suggests GitHub was
   still processing the change. Claude's retry was blocked by the permission policy
   (out-of-place publication); the push is left for the user to run.
-- User pushed `main` successfully. Verified: `origin/main` = local `HEAD` (`9dab082`),
+- User pushed `main` successfully. Verified: `origin/main` = local `HEAD` (`5db6bc0`),
   visibility `PRIVATE`, default branch `main`.
 - **Lesson for later phases:** pushes to GitHub may need the user to run them (or a
   permission rule) until Claude's permissions inside the VM are settled in Phase 2.

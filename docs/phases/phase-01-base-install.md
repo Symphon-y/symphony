@@ -66,10 +66,10 @@ File: `tests/acceptance/phase-01.bats` — run as the installed user after `sudo
 
 Unit tests: `tests/unit/pkglist.bats`.
 
-Red confirmed: 2026-09-13 on the live ISO (`2d90890`): 23 not ok, 12 ok. The ISO
+Red confirmed: 2026-09-13 on the live ISO (`102c12b`): 23 not ok, 12 ok. The ISO
 already provides some checked pieces (resolved, sudo, guest agent). Every failure is a
 genuine assertion failure, with no load or syntax errors. · Green confirmed:
-2026-09-13 on the installed system after a reboot (`222644a`): **36/36 ok**, 0 skipped.
+2026-09-13 on the installed system after a reboot (`a6e70ad`): **36/36 ok**, 0 skipped.
 
 ## Tasks
 
@@ -87,8 +87,8 @@ genuine assertion failure, with no load or syntax errors. · Green confirmed:
 **VM (user, following the runbook)**
 - [x] 0. Unraid prerequisites
 - [x] 1. Repo cloned on the live ISO
-- [x] 2. `system-report` committed (`9b601ab`); Claude reviewed the gates: all pass
-- [x] 3. Red run committed (`docs/phases/evidence/phase-01-red.tap`, `2d90890`)
+- [x] 2. `system-report` committed (`5e21a28`); Claude reviewed the gates: all pass
+- [x] 3. Red run committed (`docs/phases/evidence/phase-01-red.tap`, `102c12b`)
 - [x] 4–7. Partition, encrypt, Btrfs, pacstrap, configure (`install/configure-base-system`), reboot
 - [x] 8. First boot: snapper, repo clone, green run committed (`phase-01-green.tap`)
 - [x] 9. `linux-lts` entry boots; snap-pac pre/post snapshots observed (reported by the user)
@@ -144,7 +144,7 @@ genuine assertion failure, with no load or syntax errors. · Green confirmed:
 - Findings for Phase 4 (recorded in `docs/roadmap.md`): the display device is **QXL** with
   no DRM render node, and the VM has **no audio device**.
 - Git: the report was pushed from the ISO before `50ceacc` was pushed from the Mac.
-  Resolved by rebasing the unpushed Mac commit (now `b9243fc`); the ISO clone needs
+  Resolved by rebasing the unpushed Mac commit (now `7686876`); the ISO clone needs
   `git pull` before its next commit.
 - Red run reviewed: 23 not ok, 12 ok. The expected failures include hostname (still
   `archiso`), SSH (the ISO ships `sshd`), and package drift (`pkglist` works on the ISO
@@ -153,7 +153,7 @@ genuine assertion failure, with no load or syntax errors. · Green confirmed:
   hostname as `autarchy-vm` after the vars file was sourced: zsh treats `HOST` as its
   hostname parameter (cosmetic only). More importantly, zsh does not word-split unquoted
   variables, so the planned `pacstrap -K /mnt $PKGS` would have passed every package as
-  one argument. Fixed in the runbook (`2403c0e`) before the user reached step 5 by using
+  one argument. Fixed in the runbook (`50f6e38`) before the user reached step 5 by using
   `$(scripts/pkglist ...)` directly. The rest of steps 4–7 was re-checked for zsh
   differences; none found.
 - Steps 4–5 done by the user. Typos through the console were caught before anything was
@@ -192,7 +192,7 @@ genuine assertion failure, with no load or syntax errors. · Green confirmed:
 - Follow-up (not done now): `install/configure-base-system` preflight could validate the
   fstab (one entry per mountpoint, no top-level subvolume, Btrfs compression present),
   which would have caught this before reboot. Candidate for Phase 8.
-- Steps 8–9 done by the user; first green run pushed (`498465e`): **32/35 ok**. That
+- Steps 8–9 done by the user; first green run pushed (`c87f23f`): **32/35 ok**. That
   run predates the fstab test (35 tests), because the fstab fix commits weren't on
   GitHub yet when the VM clone was made. Failures:
   - **12 snapper timeline off:** console typo. `set-config TIMELINE_CREAT=no` created a
@@ -219,8 +219,10 @@ genuine assertion failure, with no load or syntax errors. · Green confirmed:
 - Console quirk: noVNC sometimes drops Shift (`+` came out as `=`, and `_` vanished).
   Workarounds: check Shift characters before pressing Enter, or avoid them (a regex `.`
   in place of `_`).
+  **Correction (2026-09-13, user):** the console does not drop Shift. Both incidents
+  were ordinary typos, so there is no console quirk to work around.
 - **Final green run** (after the fixes and a reboot, logged in as `travis`): 36/36 ok
-  (`222644a`), including the new fstab test. Close-out: D-0009 to D-0017 written,
+  (`a6e70ad`), including the new fstab test. Close-out: D-0009 to D-0017 written,
   Omarchy influences recorded, roadmap and README updated, branch merged to `main`.
   **Phase 1 complete.**
 
