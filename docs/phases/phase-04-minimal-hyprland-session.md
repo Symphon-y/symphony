@@ -158,7 +158,12 @@ matugen rendering); live-session group 2/2 pending login through SDDM
 - [x] Static acceptance tests green (6/6)
 
 **Live-session testing (user, from Unraid's console)**
-- [ ] Log in through SDDM; confirm Hyprland starts
+- [ ] **Blocked, in progress:** user is reverting the VM's display device from full
+      PCI GPU passthrough back to Virtio-GPU(3D) in Unraid (see the implementation
+      log entry below for why) — this disconnects the VM again. Once it's back up
+      on Virtio-GPU(3D), resume here.
+- [ ] Log in through SDDM (should now show directly in Unraid's noVNC console, no
+      extra tooling); confirm Hyprland starts
 - [ ] Confirm terminal, notification, idle/lock, wallpaper, polkit prompt all work;
       report back
 
@@ -281,18 +286,66 @@ matugen rendering); live-session group 2/2 pending login through SDDM
   the thing they exist to support (`xdg-terminal-exec`). The VM's own bulk-install
   convention (`yay -S --needed $(scripts/pkglist packages/*.txt)`) is unaffected,
   since it processes every list either way.
+- **Blocker found trying to actually log in: noVNC is gone.** When the user
+  restarted the VM for the display-device change (see the earlier "VM back up" entry
+  above), they did **full PCI GPU passthrough** of the physical Intel GPU, not the
+  planned Virtio-GPU(3D). Full passthrough hands the display output straight to the
+  guest, bypassing Unraid's own display pipeline entirely — Unraid can no longer
+  render a console, so noVNC disappeared. Unraid's only remaining remote-access
+  option is RDP, which needs a GUI session already running inside the guest to serve
+  it — useless for a first login. The user has been getting past the LUKS prompt on
+  reboot via Unraid's terminal (`virsh`-style exec into the running VM), not a real
+  graphical console.
+- Considered `wayvnc` (a Wayland-native VNC server; `hyprctl output create headless`
+  + `wayvnc -o <output>` is the standard, well-documented pattern for exactly this
+  "wlroots compositor, no physical display" scenario) as a workaround that keeps
+  passthrough. Surfaced a real complication before going further: our own sshd
+  config (D-0021) sets `AllowTcpForwarding no` deliberately, so a plain SSH tunnel to
+  reach a VNC port wouldn't work without a scoped exception.
+- **User's own question reframed the problem correctly:** shouldn't we already be
+  able to just see a GUI, without adding remote-access tooling? Yes — that's exactly
+  what Virtio-GPU(3D) (the original recommendation) gives, since Unraid keeps owning
+  the framebuffer. Full passthrough was chosen during troubleshooting for terminal
+  GPU acceleration (ghostty) and "another dep" the user suspected needed it.
+- **Checked whether that's actually true, against real package dependencies**
+  (`pacman -Si`, not assumption): nothing installed for Phase 4 hard-requires Vulkan.
+  Hyprland, hyprlock, and hyprpaper all depend on OpenGL/EGL (`libEGL`, `libGLESv2`,
+  mesa), not Vulkan. Ghostty renders via OpenGL on Linux. `vulkan-intel` was added
+  speculatively ("proper Vulkan support alongside mesa's OpenGL"), not because
+  anything currently in scope demanded it. Virtio-GPU(3D)'s `virgl` mode provides
+  OpenGL acceleration via host-side translation, which covers everything Phase 4
+  needs. Vulkan-over-virtio (`Venus`) is a separate, newer capability Unraid's simple
+  GUI toggle likely doesn't even expose (per the original research: needs manual
+  libvirt XML edits). The one place Vulkan plausibly matters is Phase 5's
+  `gpu-screen-recorder` (screenshots/recording), which typically wants it for
+  GPU-accelerated capture — a real future consideration, not a Phase 4 blocker.
+- **User decision: revert to Virtio-GPU(3D).** Should restore the direct
+  "just look at Unraid's noVNC console" experience with no extra tooling, at the cost
+  of leaving the Vulkan/passthrough question for Phase 5 (or later) if capture
+  quality actually suffers without it. `vulkan-intel` stays declared either way —
+  harmless to have installed even if not strictly required yet.
+- **User is disconnecting again to make the change.** Resume live-session testing
+  once the VM is back up on Virtio-GPU(3D).
 
 ## VM → physical hardware notes
 
-- Superseded by events: the user did real GPU passthrough (Intel UHD Graphics 770,
-  `i915`/`xe`) instead of the planned virtio-gpu-3D fallback, so this VM now runs
-  against real Intel graphics rather than a virtualized display device. Workarounds
-  that exist specifically for virtualized GPUs without hardware cursor scanout
-  (`cursor:no_hardware_cursors`) likely aren't needed here — confirm during
-  implementation rather than assuming either way, and note whether Hyprland needs it
-  regardless once tested. If the eventual physical workstation uses different (e.g.
-  discrete NVIDIA/AMD) graphics, driver packages will need revisiting then; if it's
-  also Intel, this VM's config should carry over close to as-is.
+- Twice-superseded, worth keeping the full story: the VM went QXL (Phase 4 planning)
+  → full PCI passthrough of the physical Intel UHD Graphics 770 (`i915`/`xe`, chosen
+  during troubleshooting for terminal GPU acceleration) → back to Virtio-GPU(3D)
+  (reverted once full passthrough turned out to disconnect Unraid's own console —
+  see the implementation log). Real hardware won't have this problem at all: a
+  physical workstation's display goes to an actual monitor, with no host display
+  pipeline to disconnect from. Whether `cursor:no_hardware_cursors` or any other
+  VM-only Hyprland workaround is needed should get confirmed once live-session
+  testing actually happens, not assumed either way. If the eventual physical
+  workstation uses different (e.g. discrete NVIDIA/AMD) graphics, driver packages
+  need revisiting; if it's also Intel, this VM's config should carry over closely.
+- If Phase 5's `gpu-screen-recorder` turns out to need Vulkan for good capture
+  quality and Virtio-GPU(3D)'s `virgl` (OpenGL-only) mode isn't enough, revisit
+  either enabling Venus (Vulkan-over-virtio, needs manual libvirt XML edits beyond
+  Unraid's simple toggle) or accepting full passthrough's console tradeoff
+  deliberately at that point (e.g. paired with `wayvnc` for visibility, which was
+  considered and set aside this time).
 - Revisit the audio testing caveat once a virtual sound card exists in Unraid, and
   again once on physical hardware with real audio devices.
 
