@@ -1,0 +1,22 @@
+# The graphical session: compositor, session start, and the components a minimal
+# Hyprland desktop needs (Phase 4). Standard, independently-replaceable tools, not a
+# unified shell (D-0025).
+
+hyprland                     # the Wayland compositor
+uwsm                          # starts Hyprland in its own systemd scopes/slices
+sddm                          # graphical greeter; autologin into the uwsm-managed session
+ghostty                       # terminal, behind the $terminal role (xdg-terminal-exec)
+mako                          # notification daemon
+hypridle                      # idle detection, dispatches to hyprlock
+hyprlock                      # lock screen
+hyprpaper                     # wallpaper, IPC-controlled
+hyprpolkitagent               # polkit authentication agent, native to Hyprland
+pipewire                      # audio/video routing
+pipewire-pulse                # PulseAudio-compatible server, for apps that expect one
+pipewire-alsa                 # ALSA-compatible plugin, for apps that use ALSA directly
+wireplumber                   # session/policy manager for PipeWire
+xdg-desktop-portal-hyprland   # portal backend: screenshare, screenshot
+xdg-desktop-portal-gtk        # portal backend: file chooser fallback
+matugen                       # single palette -> per-tool templates (D-0025)
+vulkan-intel                  # Vulkan driver for the Intel iGPU
+xdg-terminal-exec             # resolves the $terminal role; AUR (yay), see packages/external.md
