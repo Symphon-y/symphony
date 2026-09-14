@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/webapp-install (linked by install/link-home)
+#
+# Usage: webapp-install <url> <name>
+#
+# Generates a .desktop file that launches <url> via webapp-launch, so the actual
+# browser used stays whatever the current default is, not baked in at install
+# time. Favicon comes from Google's public favicon endpoint (the same source
+# Omarchy's version uses) -- best-effort, a missing icon isn't fatal.
+set -euo pipefail
+
+if (($# < 2)); then
+  echo "usage: webapp-install <url> <name>" >&2
+  exit 2
+fi
+
+url=$1
+name=$2
+slug=$(tr -c 'a-zA-Z0-9' '-' <<<"$name" | tr -s '-')
+apps_dir="$HOME/.local/share/applications"
+icons_dir="$apps_dir/icons"
+mkdir -p "$apps_dir" "$icons_dir"
+
+icon="$icons_dir/$slug.png"
+domain=$(sed -E 's#^[a-z]+://##; s#/.*##' <<<"$url")
+curl -fsSL "https://www.google.com/s2/favicons?domain=$domain&sz=128" -o "$icon" || true
+
+cat >"$apps_dir/$slug.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=$name
+Exec=webapp-launch $url
+Icon=$icon
+Terminal=false
+Categories=Network;
+EOF
+
+echo "installed: $apps_dir/$slug.desktop"
