@@ -15,6 +15,11 @@ jobs:
     timeout-minutes: 15
     container: archlinux:latest
     steps:
+      # Without git in the container, actions/checkout downloads a tarball with no .git,
+      # and every check that asks git which files are tracked silently sees none.
+      - name: Install git before checkout
+        run: pacman -Sy --noconfirm --needed git
+
       # Pinned by commit: a tag can be moved to different code, a commit cannot.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -256,6 +256,32 @@ Red confirmed: _pending (VM, before the runbook)_ · Green confirmed: _pending_
   - `scripts/check` also validates JSON under `system/`.
   - Runbook step 4 removes the old link before `link-home apply`. Otherwise Claude would
     write through the dangling link and recreate a file inside the repo.
+- VM, runbook steps 5b–5c: the VM repo was reset to the rewritten history. The stale
+  local `main` and `phase/01-base-install` still pointed at old commits; they were
+  force-deleted and pruned, and a scan of the VM's full history is clean. One expected
+  `content:` drift appeared on `/etc/nftables.conf`: the diff showed only the new
+  include block, so it was applied. The jump-host rule loaded, sshd was started on
+  demand, and the host key fingerprint was verified. **The user is working over SSH
+  from Unraid's web terminal, with copy/paste.**
+- **First green run on the VM (`faf8ee9`): 55/57.** Three findings:
+  - **Test bug:** Arch's OpenSSH 10.5 prints `sshd -T` keywords in CamelCase, where the
+    Mac's 10.3 printed lowercase. Both SSH config tests now compare lowercased output.
+    The effective values in the TAP were all correct.
+  - **Scanner false positives:** that TAP includes SSH algorithm names such as
+    `…@openssh.com` and `…@libssh.org`. They are now allowed, test-first.
+  - **Guardrail hole (serious): the identifier scan never ran in CI.** Without git in
+    the container, `actions/checkout` downloads a tarball with no `.git`, so
+    `git ls-files` failed and the scanner printed `no files to check` and exited 0. That
+    is why CI passed on `faf8ee9`. Fixes, test-first: the scanner fails closed (no git
+    repository, or nothing to scan, is an error), and CI installs git before checkout.
+    The earlier "identifier scan passed in CI" claims (runs 34768526860 and
+    34769184182) were therefore wrong; the local scans on the Mac and VM were real.
+  - `faf8ee9` was authored with the personal email: the VM's repo-local `user.email`
+    was not set. **User decision: leave that commit as is**, and set the VM's email so
+    future commits use the noreply address.
+  - Fixes verified on the Mac: 71/71 unit tests (the two new tests failed first),
+    shellcheck and shfmt clean, the identifier scan passes on all 66 tracked files
+    including the green TAP, and the workflow is valid YAML.
 
 ## VM → physical hardware notes
 
