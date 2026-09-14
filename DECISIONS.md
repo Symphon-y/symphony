@@ -751,3 +751,138 @@ and the old entry is marked `Superseded by D-XXXX`.
   remains harmlessly unused by this — nothing currently in the repo's package list
   actually depends on it. Left declared rather than removed, since removing an
   installed package the user might still want is a bigger, unrelated decision.
+
+## D-0037 — Theme model: wallpaper-driven, no named-theme library
+
+- **Status:** Accepted (2026-09-14, Phase 6)
+- **Decision:** the palette is always derived live from whatever the current
+  wallpaper is (`matugen image <path>`), not from a library of pre-defined named
+  themes. Changing the wallpaper *is* changing the theme — `wallpaper-set <path>` /
+  `wallpaper-random [dir]` (`home/hyprpaper/dot-local/bin/`) repoint hyprpaper live
+  and re-render every matugen template in one step.
+- **Alternatives considered:** curated named themes, a `themes/<name>/` directory
+  per theme (seed/wallpaper pair) with a switcher script — the pattern every real
+  matugen-based dotfiles repo converges on (researched directly: `ethanlaeltan/
+  dotfiles-theming`, `AnanyTanwar/hyprland-dotfiles`, `Javatrix/hyprtheme`). Rejected
+  by the user in favor of the simpler model.
+- **Reasoning:** matugen itself has no concept of a saved theme library — every
+  example found bolts a wrapper on top. A named-theme library adds a real piece of
+  state management (which theme is "current," a directory-per-theme convention, a
+  switcher script) for a single-user system that doesn't need to switch between
+  curated looks; deriving the palette from the wallpaper directly satisfies the
+  roadmap's "single palette source → component themes" framing without that extra
+  layer.
+- **Consequences:** no way to name/save/recall a specific look independent of a
+  wallpaper file; reverting to an old palette means keeping the old wallpaper image
+  around. If a named-theme library is ever wanted, it layers on top of this
+  mechanism cleanly (a `themes/<name>/wallpaper.png` convention feeding the same
+  `wallpaper-set` script) rather than replacing it.
+
+## D-0038 — Icon theme: Papirus / Papirus-Dark
+
+- **Status:** Accepted (2026-09-14, Phase 6)
+- **Decision:** Papirus-Dark, set in `home/gtk/.../settings.ini`
+  (`gtk-icon-theme-name`).
+- **Alternatives considered:** Yaru (Omarchy's own pick — AUR-only on Arch, no
+  official-repo package); Adwaita (zero extra package, ships with GTK, but a
+  narrower icon set than Papirus).
+- **Reasoning:** official `extra` repo, actively maintained, widest icon coverage of
+  the three, ships a dark variant natively. A deliberate divergence from Omarchy's
+  Yaru — better Arch-repo support, not an oversight.
+- **Consequences:** none of note; a static settings.ini key, swappable without
+  touching the theming pipeline.
+
+## D-0039 — Cursor theme: Bibata-Modern-Classic
+
+- **Status:** Accepted (2026-09-14, Phase 6)
+- **Decision:** `bibata-cursor-theme-bin` (AUR, prebuilt), theme name
+  `Bibata-Modern-Classic`, set via `XCURSOR_THEME`/`XCURSOR_SIZE` env vars in
+  `looknfeel.lua` and `gtk-cursor-theme-name`/`-size` in `home/gtk/.../settings.ini`.
+- **Alternatives considered:** Adwaita (the no-package fallback); Capitaine Cursors
+  (official `extra` repo, but no hyprcursor-native port and less community traction
+  in the Hyprland ecosystem than Bibata).
+- **Reasoning:** most popular cursor theme in the Hyprland community. No native
+  hyprcursor-format port exists for this specific AUR package (confirmed against the
+  real GitHub release asset list before declaring it — only XCursor-format tarballs
+  are published), so `HYPRCURSOR_THEME` is deliberately left unset; Hyprland falls
+  back to XCursor via `XCURSOR_THEME` automatically.
+- **Consequences:** slightly larger on-disk footprint and slower cursor loading than
+  a native hyprcursor theme would give (unquantified, not measured — XCursor is the
+  universally-compatible baseline every Wayland/X11 app already supports, which
+  matters more here than shaving hyprcursor's load time). A native hyprcursor Bibata
+  port exists via separate community projects, not the official/AUR-official
+  package; revisit only if cursor load time is ever an observed problem, not
+  preemptively.
+
+## D-0040 — Font: JetBrainsMono Nerd Font, fontconfig canonical alias
+
+- **Status:** Accepted (2026-09-14, Phase 6)
+- **Decision:** `ttf-jetbrains-mono-nerd` (official `extra`), aliased as the
+  `monospace` generic family via `home/fonts/.../fontconfig/fonts.conf`; Ghostty's
+  matugen template sets `font-family`/`font-size` explicitly rather than relying on
+  the generic alias, since it's a native app with its own font resolution, not a GTK
+  app.
+- **Alternatives considered:** FiraCode Nerd Font (ligatures, popular for code), 
+  CascadiaCode Nerd Font (Microsoft's terminal font) — both also official-repo,
+  equally viable; JetBrainsMono chosen on preference, matching Omarchy's own default.
+- **Reasoning:** fixes waybar's workspace/audio/network module icons, which
+  rendered as empty "tofu" boxes with no Nerd Font installed at all (flagged during
+  Phase 5's live-session check). The fontconfig-override pattern was already
+  recorded as adopted in Phase 3 (`docs/omarchy-influences.md`); this phase makes
+  the actual font choice.
+- **Consequences:** any app that reads the generic `monospace` family automatically
+  gets Nerd Font glyph coverage; apps with their own font-resolution logic (Ghostty)
+  need it set explicitly per-app, as done here.
+
+## D-0041 — GTK/Qt theming: live matugen-rendered `gtk.css`, `QT_QPA_PLATFORMTHEME=gtk3`
+
+- **Status:** Accepted (2026-09-14, Phase 6)
+- **Decision:** two new matugen templates, `gtk3.css` → `~/.config/gtk-3.0/gtk.css`
+  and `gtk4.css` → `~/.config/gtk-4.0/gtk.css`, each rendering the two toolkits'
+  different named-color sets (GTK3's `theme_*_color` variables vs. libadwaita's
+  `accent_color`/`window_bg_color`/etc.) from the same palette roles used
+  everywhere else (`surface_variant`/`on_surface_variant` for base/text colors, the
+  same Phase 5 contrast-bug fix applied proactively here). `QT_QPA_PLATFORMTHEME=gtk3`
+  set in `looknfeel.lua` so Qt apps read the GTK3 theme, per Phase 3's
+  already-adopted mechanism.
+- **Alternatives considered:** a static pre-built GTK theme (e.g. a
+  Catppuccin/Nord GTK theme package) — simpler, more visually polished out of the
+  box, but breaks the "one palette drives everything" premise for GTK apps
+  specifically. Rejected by the user in favor of staying consistent with every other
+  themed component.
+- **Reasoning:** matches D-0025's single cross-cutting theming mechanism; the
+  tradeoff (libadwaita's CSS overrides are narrower/more fragile than GTK3's, and
+  neither toolkit live-reloads — both read their stylesheet once at process start,
+  confirmed by research before writing the templates) is accepted as known, not
+  discovered later as a surprise.
+- **Consequences:** GTK apps need restarting after a `wallpaper-set`/
+  `wallpaper-random` call to pick up new colors — unlike mako/hyprlock/ghostty/
+  fuzzel/waybar, which all reload live via their post_hooks. No post_hook is
+  attached to either GTK template for this reason.
+
+## D-0042 — hyprpaper's config and IPC syntax corrected (amends D-0028)
+
+- **Status:** Accepted (2026-09-14, Phase 6)
+- **Decision:** `hyprpaper.conf` rewritten to the current block-based config syntax
+  (`wallpaper { monitor = *; path = ...; fit_mode = cover; }`); `wallpaper-set` uses
+  `hyprctl hyprpaper wallpaper ",<path>,cover"` (empty monitor field) for the live
+  IPC push.
+- **Alternatives considered:** none — this is a factual bug fix, not a choice
+  between options.
+- **Reasoning:** Phase 4's original `hyprpaper.conf` used the *old* flat
+  `preload = ...` / `wallpaper = ,path` syntax. hyprpaper 0.8.4 (installed) parses
+  `wallpaper` as a block special-category and silently ignores unrecognized flat
+  keys — no parse error, but also no wallpaper was ever actually rendered
+  (confirmed live: `Monitor Virtual-1 has no target: no wp will be created` in the
+  journal, `hyprctl hyprpaper listactive` empty). This had been silently broken
+  since Phase 4. Found by reading hyprpaper's actual source
+  (`src/config/ConfigManager.cpp`, `WallpaperMatcher.cpp`) rather than trusting
+  docs/community posts, which disagreed with each other on the current syntax. The
+  live IPC path turned out to be a separate custom wire protocol in this version
+  (confirmed against Hyprland's own `hyprctl/src/hyprpaper/Hyprpaper.cpp` client
+  source) with its own quirk: the config file's wildcard spelling (`monitor = *`)
+  is rejected by the IPC path specifically ("Invalid monitor"), which only accepts
+  an empty monitor field for "all monitors" — found by actually running it.
+- **Consequences:** the wallpaper now actually renders for the first time since
+  Phase 4 introduced hyprpaper. `tests/acceptance/phase-06.bats` includes a
+  regression guard against reintroducing the old flat syntax.
