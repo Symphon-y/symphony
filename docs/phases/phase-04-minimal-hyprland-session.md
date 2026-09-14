@@ -115,7 +115,8 @@ File: `tests/acceptance/phase-04.bats`, split into two groups:
 | static | Packages declared+installed; config files linked with correct content; `Hyprland --verify-config` passes; SDDM enabled; `xdg-terminals.list` defaults to ghostty; matugen renders its templates from the placeholder palette correctly | Claude, no live session needed |
 | live-session | Hyprland actually starts through SDDM; a terminal opens (ghostty); a notification renders (mako); idle/lock behaves (hypridle/hyprlock); wallpaper shows (hyprpaper); a polkit prompt appears when needed (hyprpolkitagent) | User, from Unraid's console, after the Virtio-GPU(3D) switch |
 
-Red confirmed: _pending_ · Green confirmed: _pending_
+Red confirmed: yes (VM, 9/9 failing, no load/syntax errors — packages not installed,
+commands not found, sudo required, as expected) · Green confirmed: _pending_
 
 ## Tasks
 
@@ -130,8 +131,8 @@ Red confirmed: _pending_ · Green confirmed: _pending_
 
 **Implementation (Claude)**
 - [ ] Branch, tracking doc (this file)
-- [ ] Red: `tests/acceptance/phase-04.bats` (static group) + any new script's unit
-      tests; confirm red
+- [x] Red: `tests/acceptance/phase-04.bats`; confirmed 9/9 failing, no load/syntax
+      errors
 - [ ] `packages/desktop.txt` (new category), `packages/tooling.txt` (+yay),
       `packages/external.md` (+yay, +xdg-terminal-exec)
 - [ ] User bootstraps `yay` (`git clone` + `makepkg -si`, needs `sudo`), then
