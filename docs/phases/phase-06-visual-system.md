@@ -93,7 +93,13 @@ Red confirmed: · Green confirmed:
 - [x] Static acceptance tests green (6/7 -- the font test needs the package
       installed); `scripts/check` green; full suite re-run, no regressions in any
       prior phase
-- [ ] User: install packages, live-session testing
+- [x] User: installed packages (`ttf-jetbrains-mono-nerd`, `papirus-icon-theme`,
+      `bibata-cursor-theme-bin`); full acceptance suite re-run: 73-79/79 green for
+      Phase 6, no regressions in any prior phase (the other failing tests are the
+      known sudo-requires-a-tty and pre-Phase-4 "no AUR packages" gaps, unrelated to
+      this phase)
+- [ ] User: live-session visual confirmation (font glyphs, icons, cursor,
+      `wallpaper-random`)
 - [ ] Close: `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md`
 - [ ] Merge to `main`
 
