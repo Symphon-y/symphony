@@ -309,4 +309,4 @@ scanner allowlist, and CI checkout fixes)
 - [x] `scripts/check` green on the Mac, on the VM, and in CI
 - [x] Claude Code in the VM has committed and pushed the `CLAUDE.md` handoff
 - [x] `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md` updated
-- [ ] Branch merged to `main`
+- [x] Branch merged to `main`
