@@ -27,4 +27,5 @@
 # every user setting, and root ownership means Claude, running as the user, can't
 # loosen its own rules. Must stay world-readable: Claude Code exits if it can't read it.
 0644  claude/managed-settings.json  /etc/claude-code/managed-settings.json
+0644  sddm/10-wayland.conf          /etc/sddm.conf.d/10-wayland.conf
 -     boot/loader.conf             /efi/loader/loader.conf

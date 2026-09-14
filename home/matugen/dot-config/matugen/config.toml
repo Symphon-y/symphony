@@ -1,0 +1,23 @@
+# Target: ~/.config/matugen/config.toml (linked by install/link-home)
+#
+# Phase 4: one placeholder palette (a seed color, no wallpaper-derived generation
+# yet), wired into the three components this phase themes. The full theme system --
+# named themes, a switcher, every component -- is Phase 6 (D-0025).
+#
+# Run: matugen color hex "#1e1e2e"
+
+[config]
+fallback_color = "#1e1e2e"
+
+[templates.mako]
+input_path = "./templates/mako.ini"
+output_path = "../mako/config"
+post_hook = "makoctl reload || true"
+
+[templates.hyprlock]
+input_path = "./templates/hyprlock.conf"
+output_path = "../hypr/hyprlock.conf"
+
+[templates.ghostty]
+input_path = "./templates/ghostty.conf"
+output_path = "../ghostty/config"
