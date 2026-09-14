@@ -11,7 +11,7 @@ outlines; their scope is finalized in their own plan mode.
 | 2 | [Agent handoff + developer bootstrap](phases/phase-02-agent-handoff.md) | 1/5 | User → Claude | Claude Code runs as user in VM; repo cloned; bats/shellcheck/shfmt; deploy mechanism chosen; CI (static + unit) | Complete (2026-09-14) |
 | 3 | [Omarchy research](phases/phase-03-omarchy-research.md) | all | Claude | `docs/omarchy-influences.md` classifies components | Complete (2026-09-14) |
 | 4 | [Minimal Hyprland session](phases/phase-04-minimal-hyprland-session.md) | 2 | Claude | Hyprland login; terminal, audio, portals, polkit agent, notifications, idle/lock, wallpaper | Complete (2026-09-14) |
-| 5 | Interaction | 3 | Claude | Launcher, keybinding scheme, clipboard, screenshots, workspaces/rules, status bar, power menu | Not started |
+| 5 | [Interaction](phases/phase-05-interaction.md) | 3 | Claude | Launcher, keybinding scheme, clipboard, screenshots, workspaces/rules, status bar, power menu | Complete (2026-09-14) |
 | 6 | Visual system | 4 | Claude | Single palette source → component themes; fonts, GTK/Qt, icons, cursor, wallpapers | Not started |
 | 7 | Developer environment | 5 | Claude | Shell, prompt, Neovim, version manager, containers, git/gh config | Not started |
 | 8 | Packages, reproducibility, recovery | cross-cutting | Claude + user | Categorized package inventory; audit script; idempotent bootstrap; fresh-VM rebuild from repo succeeds; backups | Not started |
@@ -26,9 +26,10 @@ outlines; their scope is finalized in their own plan mode.
 - **Phase 4:** resolved; see D-0026 to D-0032. Software rendering was never actually
   needed — the VM ended up on Virtio-GPU(3D) (D-0032) after a detour through full
   PCI passthrough broke Unraid's console. GPU passthrough as its own side phase
-  wasn't needed either; revisit only if Phase 5's `gpu-screen-recorder` needs Vulkan.
-  The VM's audio-device gap (no virtual sound card in Unraid) is still open — audio
-  config landed and is statically verified, but not yet heard.
+  wasn't needed either. The VM's audio-device gap (no virtual sound card in Unraid)
+  is still open — audio config landed and is statically verified, but not yet heard.
+- **Phase 5:** resolved; see D-0033 to D-0036. D-0036 also resolves D-0032's
+  deferred Vulkan question directly: `gpu-screen-recorder` needs none.
 
 ## Cross-cutting concerns (checked in every phase)
 
