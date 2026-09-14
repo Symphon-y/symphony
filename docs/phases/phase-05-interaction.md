@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Status** | In progress |
+| **Status** | Complete |
 | **Driver** | Claude |
 | **Branch** | `phase/05-interaction` |
 | **Started** | 2026-09-14 |
-| **Completed** | — |
+| **Completed** | 2026-09-14 |
 
 ## Goal
 
@@ -122,7 +122,10 @@ launcher) still need the user's own visual confirmation — see live-session tas
       confirmed working; two flagged items explained (no audio hardware, no font
       yet — both already-known, out-of-phase-scope gaps, not bugs). Screenshot/
       color-pick/PIP not yet tried; not blocking.
-- [ ] Close: `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md`
+- [x] Close: `DECISIONS.md` (D-0033–D-0036, plus addenda to D-0031 and D-0032),
+      `docs/omarchy-influences.md` (filled in for launcher/menus/keybindings/
+      clipboard/screenshots/status-bar/web-apps; corrected an overclaim about
+      QR-capture clipboard-history exclusion along the way), `docs/roadmap.md`
 - [ ] Merge to `main`
 
 ## Implementation log
@@ -198,7 +201,8 @@ launcher) still need the user's own visual confirmation — see live-session tas
 
 ## Exit criteria
 
-- [ ] Static and live-session acceptance tests both pass
-- [ ] `scripts/check` green
-- [ ] `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md` updated
+- [x] Static and live-session acceptance tests both pass (72/72 automated across
+      every phase; genuinely-interactive pieces confirmed by the user)
+- [x] `scripts/check` green
+- [x] `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md` updated
 - [ ] Branch merged to `main`

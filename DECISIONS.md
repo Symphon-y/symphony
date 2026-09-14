@@ -625,6 +625,10 @@ and the old entry is marked `Superseded by D-XXXX`.
   run. Any future Hyprland-ecosystem component should be checked for a shipped
   `systemd/user/*.service` file (`pacman -Ql <pkg> | grep systemd/user`) before
   writing a manual autostart line for it.
+  _(The lesson didn't fully stick: Phase 5 added waybar and cliphist without
+  checking either, and waybar's own shipped service was missed entirely until
+  "waybar is running" failed in the live session — cliphist's was at least checked
+  against its real PKGBUILD first. Both are now enabled the same way.)_
 
 ## D-0032 — VM display device: Virtio-GPU(3D), not full PCI GPU passthrough
 
@@ -655,3 +659,95 @@ and the old entry is marked `Superseded by D-XXXX`.
   passthrough's console tradeoff deliberately, paired with `wayvnc` this time. Real
   hardware won't have this problem at all — a physical display has no host display
   pipeline to disconnect from.
+  _(Resolved: checked directly in Phase 5 — `gpu-screen-recorder` has no Vulkan
+  dependency at all; see D-0036.)_
+
+## D-0033 — Launcher: fuzzel
+
+- **Status:** Accepted (2026-09-14, Phase 5)
+- **Decision:** fuzzel behind the launcher role, also used as the `--dmenu` engine
+  behind the power/system menu (D-0025's plan: ADAPT the menu idea, REJECT a
+  bespoke plugin engine).
+- **Alternatives considered:** rofi (most mature dmenu/scripting ecosystem and
+  `.rasi` theming language, but native Wayland support only merged into mainline in
+  2025 — the community relied on a fork, `lbonn/rofi`, before that); wofi (GTK3 +
+  CSS theming, the most visually flexible of the three, but upstream explicitly
+  says it's "not actively maintained"). All three have working community matugen
+  templates (`InioX/matugen-themes`).
+- **Reasoning:** smallest dependency footprint (no GTK/Qt, a custom C renderer),
+  widely cited as the fastest of the three to open, a plain ini config (no CSS to
+  maintain), actively maintained, and a dedicated dmenu-safety flag
+  (`--only-match`) the others don't have. Fits this project's stated minimalism
+  better than the alternatives, without giving up dmenu scriptability.
+- **Consequences:** `home/matugen/.../templates/fuzzel.ini` themes it (fully
+  templated, like mako/hyprlock/ghostty in Phase 4 — every visible color needs the
+  palette). If rofi's theming ecosystem or wofi's CSS flexibility is ever
+  genuinely needed, swapping the launcher is a contained change (one template,
+  one binding target, one `power-menu` script's `fuzzel --dmenu` calls).
+
+## D-0034 — Web-app launchers: included
+
+- **Status:** Accepted (2026-09-14, Phase 5)
+- **Decision:** Omarchy's web-app mechanism (generate a `.desktop` file, launch via
+  the default browser's `--app=` flag) is adopted — `webapp-install`/
+  `webapp-launch` scripts, resolving the browser at launch time rather than baking
+  it in at install time.
+- **Alternatives considered:** skip the feature entirely (deferred as the default
+  in Phase 3's classification, pending this phase's own decision) — it's small and
+  fully self-contained, so deferring it further would only have delayed a feature
+  with no coupling cost either way.
+- **Reasoning:** the mechanism is genuinely simple (a generated `.desktop` file
+  plus a browser flag, no PWA manifest or service-worker machinery) and useful
+  whenever a website is better used as its own launcher entry/window (chat,
+  webmail, etc.).
+- **Consequences:** true app-mode needs a Chromium-family default browser
+  (`webapp-launch` falls back to a plain window for Firefox-family browsers, which
+  have no equivalent flag). Favicon fetching depends on a third-party endpoint
+  (Google's public favicon service, the same source Omarchy's own version uses) —
+  best-effort, a missing icon isn't fatal.
+
+## D-0035 — Workspace/window rules: smart gaps + picture-in-picture float/pin
+
+- **Status:** Accepted (2026-09-14, Phase 5)
+- **Decision:** two idiomatic Hyprland-community defaults, written in Lua and
+  verified against `Hyprland --verify-config`: smart gaps (no border/gap clutter
+  when a workspace has only one window) and auto-float+pin for windows matching
+  `Picture-in-Picture` in their title.
+- **Alternatives considered:** skip window/workspace rules entirely for this phase,
+  revisit once actual daily use surfaces real friction — rejected by the user as
+  the phase's plan was reviewed, in favor of adopting both now since they're
+  low-stakes and easy to remove.
+- **Reasoning:** both patterns are common across Hyprland dotfiles independent of
+  Omarchy, cheap to adopt, and directly address a real annoyance (gap clutter with
+  one window; picture-in-picture windows needing to float and stay on top to be
+  useful at all).
+- **Consequences:** `windows.lua`'s `window_rule` action keys (`float`, `pin`)
+  aren't statically typed in this system's own installed Lua API stub
+  (`/usr/share/hypr/stubs/hl.meta.lua` — only `enabled`/`match`/`name` are) and
+  were written by mirroring the pre-Lua `windowrulev2` keyword pattern from
+  Hyprland's own official example config, which uses the same kind of untyped
+  dynamic key (`no_focus`) the same way. `--verify-config` confirms the syntax is
+  accepted; whether the PIP rule actually floats+pins a real picture-in-picture
+  window still needs a live confirmation with an actual PIP window, not yet done.
+
+## D-0036 — `gpu-screen-recorder` needs no Vulkan; resolves D-0032's Phase 5 revisit
+
+- **Status:** Accepted (2026-09-14, Phase 5)
+- **Decision:** no Vulkan driver is required for screen recording. `intel-media-
+  driver` (VAAPI) is declared instead, alongside `gpu-screen-recorder` itself.
+- **Alternatives considered:** none — this is a factual resolution of an open
+  question D-0032 explicitly deferred, not a choice between options.
+- **Reasoning:** checked `gpu-screen-recorder`'s actual `Depends On` list
+  (`pacman -Si`) directly rather than assuming either way: no `vulkan-*` package
+  anywhere in it. Its optional deps for Intel point to `intel-media-driver`
+  ("Required to record your screen on Intel Broadwell or later iGPUs") and
+  `linux-firmware-intel` — VAAPI, not Vulkan. Also checked the often-cited "needs
+  root to record a monitor" caveat: reading the project's own README, that root
+  requirement is handled by a small setuid helper baked into the native package
+  build (confirmed via the actual PKGBUILD's `package()` step), and the
+  interactive password-prompt caveat mentioned in its docs is specific to the
+  flatpak distribution — the Arch package needs no `sudo` and no prompt.
+- **Consequences:** `vulkan-intel` (installed speculatively in Phase 4, D-0032)
+  remains harmlessly unused by this — nothing currently in the repo's package list
+  actually depends on it. Left declared rather than removed, since removing an
+  installed package the user might still want is a bigger, unrelated decision.

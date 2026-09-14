@@ -54,14 +54,14 @@ assumed.
 | Notifications | 2 | 4 | ADAPT (D-0025, D-0031) |
 | Idle management and locking | 2 | 4 | ADAPT (D-0025, D-0031) |
 | Wallpaper | 2 | 4, 6 | ADAPT (D-0025, D-0028) |
-| Application launcher | 3 | 5 | ADAPT (D-0025) |
-| Menus (system / power / utility) | 3 | 5 | ADAPT idea; REJECT plugin engine (D-0025) |
-| Keybinding scheme | 3 | 5 | ADAPT |
+| Application launcher | 3 | 5 | ADAPT (D-0025, D-0033) |
+| Menus (system / power / utility) | 3 | 5 | ADAPT idea; REJECT plugin engine (D-0025, D-0033) |
+| Keybinding scheme | 3 | 5 | ADAPT (D-0033, D-0034, D-0035) |
 | Terminal | 3 | 4, 5 | ADAPT (D-0027, D-0030) |
-| Clipboard | 3 | 5 | ADAPT (D-0025) |
-| Screenshots / screen recording | 3 | 5 | ADOPT |
-| Status bar | 3 | 5 | ADAPT (D-0025) |
-| Web-app launchers | 3 | 5 | ADAPT |
+| Clipboard | 3 | 5 | ADAPT (D-0025, D-0031) |
+| Screenshots / screen recording | 3 | 5 | ADOPT (D-0036) |
+| Status bar | 3 | 5 | ADAPT (D-0025, D-0031) |
+| Web-app launchers | 3 | 5 | ADAPT (D-0034) |
 | Theme system and switching | 4 | 6 | ADAPT (matugen, D-0025) |
 | Fonts, GTK/Qt, icons, cursors | 4 | 6 | ADAPT |
 | Shell and prompt | 5 | 7 | DEFER |
@@ -429,10 +429,11 @@ below are current as of that branch unless a component explicitly discusses v3
 - Better modern alternatives: a standard standalone launcher (**wofi**, **fuzzel**, or
   **rofi**) — mature, well-documented, no daemon required, config-file based.
 - Our decision: **ADAPT**
-- Our implementation: decided in Phase 5 (specific launcher pick).
+- Our implementation: **fuzzel** (D-0033) — matugen-templated, bound to
+  `SUPER+SPACE`.
 - Reason: fuzzy app search doesn't need a daemon or a shell process; a standard
   launcher does the job with far less to own.
-- Related decision: D-0025, Phase 5
+- Related decision: D-0025, D-0033
 
 ### Menus (system / power / utility)
 - Omarchy approach (v4): `bin/omarchy-menu` is now a thin IPC wrapper
@@ -460,11 +461,12 @@ below are current as of that branch unless a component explicitly discusses v3
   selected line.
 - Our decision: **ADAPT** the idea (one small scriptable menu mechanism); **REJECT**
   the JSONC+QML plugin engine (only makes sense inside a shell process).
-- Our implementation: decided in Phase 5, once the launcher (above) is picked — the
-  same tool's dmenu mode is the natural menu mechanism.
+- Our implementation: `power-menu` — a ~10-line bash script piping a fixed option
+  list through `fuzzel --dmenu` and `case`-matching the result (Lock, Logout,
+  Suspend, Reboot, Shutdown). Bound to `SUPER+ESCAPE`.
 - Reason: the nested-menu *need* is real and worth solving simply; the general-purpose
   plugin *engine* Omarchy built for it is sized for a shell we're not building.
-- Related decision: D-0025, Phase 5
+- Related decision: D-0025, D-0033
 
 ### Keybinding scheme
 - Omarchy approach: modular Lua bindings under `default/hypr/bindings/*.lua`
@@ -491,11 +493,16 @@ below are current as of that branch unless a component explicitly discusses v3
   (`bindd`, or the Lua equivalent per the Hyprland config decision above) already
   provides this.
 - Our decision: **ADAPT**
-- Our implementation: decided in Phase 5 alongside the specific tools each binding
-  dispatches to; the modifier convention and labeling habit carry over regardless.
+- Our implementation: the modifier convention carried through exactly as recorded
+  here — `home/hypr/.../bindings.lua` uses SUPER for launcher/terminal/lock/focus,
+  SUPER+SHIFT for window-move, SUPER+CTRL for clipboard/QR-capture, and the PRINT
+  family for capture. Every bind still lacks Hyprland's optional description
+  string (the "label every bind" habit) — not carried over yet, since nothing
+  currently renders a keybindings-search surface to show it in; worth adding once
+  something does.
 - Reason: a naming convention and a labeling habit are free to adopt; the actual
   dispatch targets depend on tool choices this phase doesn't make.
-- Related decision: Phase 5
+- Related decision: D-0033, D-0034, D-0035
 
 ### Terminal
 - Omarchy approach: four terminals supported in parallel with matching config —
@@ -548,10 +555,19 @@ below are current as of that branch unless a component explicitly discusses v3
   history daemon built directly on wl-clipboard, with its own dmenu-style picker
   integration (pairs naturally with whichever launcher is chosen for menus above).
 - Our decision: **ADAPT**
-- Our implementation: cliphist + wl-clipboard; specific integration decided in Phase 5.
+- Our implementation: cliphist + wl-clipboard, started via cliphist's own shipped
+  systemd `--user` service (confirmed against its real Arch PKGBUILD, D-0031) —
+  `clipboard-menu` script (cliphist's own documented fuzzel-dmenu pattern) bound to
+  `SUPER+CTRL+V`. Omarchy's sensitive-content-exclusion idea (QR capture skips
+  clipboard history) was **not** carried over: `qr-capture` uses plain `wl-copy`,
+  and cliphist's watcher picks up everything that goes through the clipboard the
+  same as anything else, so a decoded QR value does end up in history. Worth
+  fixing later if it matters in practice (cliphist has no built-in
+  sensitivity-marking mechanism to hook, unlike Omarchy's own history store) —
+  flagged honestly rather than claimed as done.
 - Reason: wl-clipboard was never part of the shell rewrite either way; cliphist gives
   the history feature as an independent, standard program.
-- Related decision: D-0025, Phase 5
+- Related decision: D-0025, D-0031
 
 ### Screenshots / screen recording
 - Omarchy approach: the tool chain is standard and largely unchanged by the v4
@@ -577,12 +593,19 @@ below are current as of that branch unless a component explicitly discusses v3
   optionally, notification actions for post-capture editing.
 - Better modern alternatives: none — this already is the standard toolchain.
 - Our decision: **ADOPT**
-- Our implementation: grim + slurp + hyprpicker + satty + gpu-screen-recorder,
-  including the QR-capture idea; keybindings and exact save-path env vars decided in
-  Phase 5.
+- Our implementation: `screenshot` (slurp region into `satty --filename - --output-
+  filename ... --copy-command wl-copy` piped straight from grim, one pipeline, no
+  intermediate file); `screen-record` (gpu-screen-recorder, toggled via `SIGINT` —
+  its own documented stop mechanism); `qr-capture` (slurp+grim+zbarimg, decoded
+  value never touches disk); color-pick is a direct `hyprpicker -a` bind, no
+  wrapper script. Bound to the PRINT family as already recorded here.
+  `gpu-screen-recorder` needs no Vulkan (D-0036, resolving D-0032's deferred
+  question) and no interactive `sudo` on the native package (a setuid helper
+  handles KMS access; the docs' password-prompt caveat is flatpak-only). OCR
+  (tesseract) stayed out of scope, as already decided in Phase 3.
 - Reason: unlike the other interaction components, this chain was barely touched by
   the shell rewrite — it's already standard, standalone tools doing one job each.
-- Related decision: Phase 5
+- Related decision: D-0036
 
 ### Status bar
 - Omarchy approach (v4): waybar is gone (confirmed retired; `config/waybar` 404s on
@@ -605,10 +628,17 @@ below are current as of that branch unless a component explicitly discusses v3
 - Better modern alternatives: **waybar** — the standard, actively-maintained,
   JSON+CSS-configured status bar, themed via a matugen template instead of shell IPC.
 - Our decision: **ADAPT**
-- Our implementation: waybar, matugen-templated; module selection decided in Phase 5.
+- Our implementation: waybar, hybrid-themed (the community-standard
+  `InioX/matugen-themes` pattern: static `config.jsonc`/`style.css`, a
+  matugen-generated `colors.css` `@import`-ed at the top, reloaded live via
+  `pkill -SIGUSR2 waybar`) — not fully templated like mako/hyprlock/ghostty/fuzzel,
+  since CSS's own `@import` does the color/structure split naturally. Minimal
+  module set: `hyprland/workspaces`, `clock`, `wireplumber`, `network`, `tray` — no
+  cpu/memory/battery on a desktop VM. Started via its own shipped systemd `--user`
+  service, found only after being missed entirely at first (D-0031's addendum).
 - Reason: matches D-0025; waybar remains popular and well-documented enough that even
   Omarchy's replacement kept a compatibility bridge for it.
-- Related decision: D-0025, Phase 5
+- Related decision: D-0025, D-0031
 
 ### Web-app launchers
 - Omarchy approach: `bin/omarchy-webapp-install` generates a `~/.local/share/
@@ -630,11 +660,13 @@ below are current as of that branch unless a component explicitly discusses v3
 - Better modern alternatives: none needed — this is already about as simple as the
   mechanism gets.
 - Our decision: **ADAPT**
-- Our implementation: decided in Phase 5 — whether this feature is wanted at all, and
-  if so, a small script following the same `.desktop`-generation + `--app=` pattern.
+- Our implementation: `webapp-install <url> <name>` (generates the `.desktop` file
+  and best-effort favicon) + `webapp-launch <url>` (resolves the current default
+  browser at launch time, not baked in at install time — so it stays correct if
+  the default browser ever changes) (D-0034).
 - Reason: small, self-contained, and unaffected by every other decision in this
-  document; the only open question is whether it's a feature we actually want.
-- Related decision: Phase 5
+  document; the only open question was whether it's a feature we actually want.
+- Related decision: D-0034
 
 ### Theme system and switching
 - Omarchy approach: each theme is a directory (`themes/<name>/`) with `colors.toml` as
