@@ -20,8 +20,10 @@ setup() {
 
 # --- status bar (waybar) ------------------------------------------------------
 
-@test "status bar: waybar's config is valid JSON" {
-  run jq empty "$HOME/.config/waybar/config.jsonc"
+@test "status bar: waybar's config is valid JSON once // comments are stripped" {
+  # waybar's config is JSONC (comments, matching this repo's header-comment
+  # convention); jq only accepts strict JSON, so strip // line comments first.
+  run bash -c "sed -E 's#//.*$##' '$HOME/.config/waybar/config.jsonc' | jq empty"
   assert_success
 }
 

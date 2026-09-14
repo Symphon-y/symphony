@@ -1,0 +1,46 @@
+// Target: ~/.config/waybar/config.jsonc (linked by install/link-home)
+//
+// A minimal, non-cluttered bar: no cpu/memory/battery modules on a desktop VM.
+// Colors come from ~/.config/waybar/colors.css (matugen-generated, imported by
+// style.css) -- this file only defines structure.
+{
+  "layer": "top",
+  "position": "top",
+  "height": 30,
+  "spacing": 4,
+
+  "modules-left": ["hyprland/workspaces"],
+  "modules-center": ["clock"],
+  "modules-right": ["wireplumber", "network", "tray"],
+
+  "hyprland/workspaces": {
+    "format": "{icon}",
+    "format-icons": {
+      "active": "",
+      "default": ""
+    }
+  },
+
+  "clock": {
+    "format": "{:%H:%M  %Y-%m-%d}",
+    "tooltip-format": "{:%A, %d %B %Y}"
+  },
+
+  "wireplumber": {
+    "format": "{icon} {volume}%",
+    "format-muted": "muted",
+    "format-icons": ["", "", ""],
+    "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
+  },
+
+  "network": {
+    "format-wifi": "  {essid}",
+    "format-ethernet": "󰈀 {ifname}",
+    "format-disconnected": "disconnected",
+    "tooltip-format": "{ifname}: {ipaddr}/{cidr}"
+  },
+
+  "tray": {
+    "spacing": 8
+  }
+}

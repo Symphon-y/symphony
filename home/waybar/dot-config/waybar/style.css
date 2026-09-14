@@ -1,0 +1,40 @@
+/* Target: ~/.config/waybar/style.css (linked by install/link-home)
+ *
+ * Structure only -- colors.css is matugen-generated (never stow-linked; matugen
+ * owns it, same reasoning as mako/hyprlock/ghostty's configs in Phase 4) and
+ * reloaded live via `pkill -SIGUSR2 waybar` whenever the palette changes.
+ */
+
+@import "colors.css";
+
+* {
+  font-family: monospace;
+  font-size: 13px;
+  min-height: 0;
+}
+
+window#waybar {
+  background-color: @background;
+  color: @on_background;
+}
+
+#workspaces button {
+  padding: 0 8px;
+  color: @on_background;
+}
+
+#workspaces button.active {
+  color: @primary;
+}
+
+#clock,
+#wireplumber,
+#network,
+#tray {
+  padding: 0 10px;
+}
+
+#wireplumber.muted {
+  color: @on_background;
+  opacity: 0.6;
+}
