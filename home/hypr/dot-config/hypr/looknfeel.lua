@@ -1,8 +1,15 @@
 -- Target: ~/.config/hypr/looknfeel.lua
 --
--- Static defaults for now: the full theme system (single palette source -> every
--- component, D-0025) is Phase 6. Phase 4 only wires matugen into mako/hyprlock/ghostty
--- to prove the pipeline works.
+-- Phase 6 adds the env vars that make GTK/Qt/cursor theming actually consistent:
+-- XCURSOR_THEME/XCURSOR_SIZE (Bibata, verified against the real release asset list --
+-- no native hyprcursor port for this package, so HYPRCURSOR_THEME is left unset and
+-- Hyprland falls back to XCursor) and QT_QPA_PLATFORMTHEME=gtk3 (Qt apps read the GTK3
+-- theme -- home/gtk/, Phase 3's already-adopted mechanism). Syntax confirmed against
+-- Hyprland's own example config (hl.env("VAR", "VALUE")).
+
+hl.env("XCURSOR_THEME", "Bibata-Modern-Classic")
+hl.env("XCURSOR_SIZE", "24")
+hl.env("QT_QPA_PLATFORMTHEME", "gtk3")
 
 hl.config({
   general = {
