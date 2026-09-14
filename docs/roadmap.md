@@ -9,7 +9,7 @@ outlines; their scope is finalized in their own plan mode.
 | 0 | [Foundation](phases/phase-00-foundation.md) — repo, docs, standing orders, roadmap | — | Claude (Mac, docs only) | Private GitHub repo with core docs | Complete (2026-09-12) |
 | 1 | Environment inspection + base Arch install | 1 | **User** (runbook) | Boots to TTY; user login; network + pacman work; `tests/acceptance/phase-01.bats` passes | Complete (2026-09-13) |
 | 2 | [Agent handoff + developer bootstrap](phases/phase-02-agent-handoff.md) | 1/5 | User → Claude | Claude Code runs as user in VM; repo cloned; bats/shellcheck/shfmt; deploy mechanism chosen; CI (static + unit) | Complete (2026-09-14) |
-| 3 | Omarchy research | all | Claude | `docs/omarchy-influences.md` classifies components | Not started |
+| 3 | [Omarchy research](phases/phase-03-omarchy-research.md) | all | Claude | `docs/omarchy-influences.md` classifies components | Complete (2026-09-14) |
 | 4 | Minimal Hyprland session | 2 | Claude | Hyprland login; terminal, audio, portals, polkit agent, notifications, idle/lock, wallpaper | Not started |
 | 5 | Interaction | 3 | Claude | Launcher, keybinding scheme, clipboard, screenshots, workspaces/rules, status bar, power menu | Not started |
 | 6 | Visual system | 4 | Claude | Single palette source → component themes; fonts, GTK/Qt, icons, cursor, wallpapers | Not started |
@@ -22,6 +22,7 @@ outlines; their scope is finalized in their own plan mode.
 
 - **Phase 1:** resolved; see D-0008 to D-0017.
 - **Phase 2:** resolved; see D-0018 to D-0024.
+- **Phase 3:** resolved; see D-0025.
 - **Phase 4:** session start (uwsm / greeter / TTY), acceptability of software
   rendering, whether GPU passthrough becomes its own side phase.
   Findings from the Phase 1 VM report: the display device is QXL with no DRM render

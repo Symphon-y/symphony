@@ -450,3 +450,50 @@ and the old entry is marked `Superseded by D-XXXX`.
 - **Consequences:** revisit bubblewrap once Claude's tool surface is better understood;
   revisit Remote Control if telemetry is ever turned back on; leave the console font
   alone unless legibility becomes a real problem.
+
+## D-0025 — Desktop shell: standard decoupled tools + matugen, not a unified shell
+
+- **Status:** Accepted (2026-09-14, Phase 3)
+- **Decision:** autarchy's desktop layer (status bar, notifications, idle/lock,
+  wallpaper, launcher, menus, clipboard, polkit agent) is built from standard,
+  independently-replaceable Linux desktop tools, each behind its own role — not a single
+  unified shell process. The one real problem a unified shell solves for a personal
+  system — keeping one visual identity across every component instead of hand-editing N
+  configs — is solved instead by **matugen**: a single palette is the source of truth,
+  rendered per-tool through matugen templates, with a post-hook reload command per tool.
+  Specific tool picks (which bar, which launcher, etc.) stay each implementing phase's
+  (4/5) own decision.
+- **Alternatives considered:**
+  - A unified custom shell built from scratch, matching Omarchy v4's own architecture
+    (one Quickshell/QML process owning the bar, notifications, launcher, menus,
+    idle/lock, wallpaper, clipboard, and polkit agent, IPC-scriptable, with a plugin
+    system). Omarchy's own stated reasons for building it: one theming surface instead
+    of eight independent configs; event-driven updates instead of polling; notification
+    state surviving a shell restart (which happens on every Omarchy update); and a
+    plugin ecosystem. All real engineering wins, but sized for a multi-user open-source
+    project with a team of contributors and its own plugin marketplace, not a one-person
+    workstation — and it cuts directly against this project's own stated
+    interface-segregation and "no custom abstraction over a standard primitive"
+    principles.
+  - Adopting **Noctalia**, an independent (non-Omarchy) Quickshell-based shell project —
+    gets most of the same consolidation without writing it ourselves, at the cost of a
+    younger, more opinionated dependency than mature standalone tools, and still a
+    monolith relative to the rest of this repo's component-by-component design.
+  - No propagation layer at all, hand-editing each tool's theme file — reintroduces
+    exactly the "N configs to keep in sync" complaint that motivated Omarchy's rewrite
+    in the first place.
+- **Reasoning:** of Omarchy's stated motivations, only the consistency problem actually
+  bites a single-user system — the performance win (avoiding waybar-style polling) and
+  the plugin ecosystem matter far more at Omarchy's scale, and the persistence-across-
+  restart problem doesn't exist here in the first place, since nothing forces every
+  desktop component to restart together the way a monolithic shell does on every update.
+  matugen is a mature, actively-maintained, single-binary, no-daemon tool that already
+  displaced the same fragmentation problem community-wide for exactly this "one palette,
+  many configs" need, at a far smaller lift than building or adopting a shell, while
+  preserving full swap-one-component-without-touching-the-others flexibility.
+- **Consequences:** every themed component needs a matugen template and a reload
+  post-hook, decided alongside that component's own tool pick in Phase 4/5/6. No native
+  video wallpaper support the way Omarchy's shell has, unless deliberately added later
+  (DEFER, not REJECT). This can be revisited if the decoupled-tools experience proves
+  disjointed in practice — Noctalia or a from-scratch shell stay on the table then, not
+  ruled out permanently.
