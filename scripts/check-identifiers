@@ -17,8 +17,8 @@ files=("$@")
 if (($# == 0)); then
   # Fail closed: without a git repository, "every tracked file" is silently nothing,
   # and a guardrail that checks nothing must not report success.
-  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    echo "check-identifiers: not a git repository; pass the files to check explicitly" >&2
+  if ! git_error=$(git rev-parse --is-inside-work-tree 2>&1 >/dev/null); then
+    echo "check-identifiers: not a usable git repository (${git_error:-unknown error}); pass the files to check explicitly" >&2
     exit 1
   fi
   while IFS= read -r file; do

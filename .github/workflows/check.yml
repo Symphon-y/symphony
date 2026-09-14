@@ -25,6 +25,11 @@ jobs:
         with:
           persist-credentials: false
 
+      # The container runs as root but the checkout belongs to the runner's user, so git
+      # refuses to treat it as a repository ("dubious ownership") until it is marked safe.
+      - name: Trust the checked-out repository
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - name: Install the tooling declared in packages/tooling.txt
         run: pacman -Syu --noconfirm --needed $(scripts/pkglist packages/tooling.txt)
 
