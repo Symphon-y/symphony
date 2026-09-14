@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/screenshot (linked by install/link-home)
+#
+# Region capture (slurp) piped straight into satty for annotation, which also
+# saves the file and copies it to the clipboard -- one pipeline, no intermediate
+# file to manage. Cancelling the region selection (Escape) exits quietly.
+set -euo pipefail
+
+dir="${XDG_PICTURES_DIR:-$HOME/Pictures}"
+mkdir -p "$dir"
+file="$dir/screenshot-$(date +%Y%m%d-%H%M%S).png"
+
+region=$(slurp) || exit 0
+grim -g "$region" -t ppm - | satty --filename - --output-filename "$file" --copy-command wl-copy

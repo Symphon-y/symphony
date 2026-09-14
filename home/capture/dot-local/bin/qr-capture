@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/qr-capture (linked by install/link-home)
+#
+# Select a region, decode any QR code in it, copy the result to the clipboard.
+# The decoded value never touches disk and never appears in the notification body
+# -- only a fixed, trusted string does, so there's no argv-injection surface even
+# though the decoded content itself is untrusted (it came from whatever was shown
+# on screen).
+set -euo pipefail
+
+region=$(slurp) || exit 0
+result=$(grim -g "$region" -t png - | zbarimg --raw -q -) || {
+  notify-send "QR code" "No code found"
+  exit 0
+}
+printf '%s' "$result" | wl-copy
+notify-send "QR code" "Copied to clipboard"

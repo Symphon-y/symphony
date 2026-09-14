@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/screen-record (linked by install/link-home)
+#
+# Toggle: not running -> start recording the whole screen in the background;
+# running -> SIGINT it, which gpu-screen-recorder handles by saving and exiting
+# cleanly (its own documented stop mechanism, not something this script invents).
+set -euo pipefail
+
+if pgrep -x gpu-screen-recorder >/dev/null; then
+  pkill -SIGINT -x gpu-screen-recorder
+  exit 0
+fi
+
+dir="${XDG_VIDEOS_DIR:-$HOME/Videos}"
+mkdir -p "$dir"
+file="$dir/screenrecording-$(date +%Y%m%d-%H%M%S).mp4"
+
+gpu-screen-recorder -w screen -f 60 -a default_output -o "$file" &
+disown
