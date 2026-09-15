@@ -14,7 +14,7 @@ outlines; their scope is finalized in their own plan mode.
 | 5 | [Interaction](phases/phase-05-interaction.md) | 3 | Claude | Launcher, keybinding scheme, clipboard, screenshots, workspaces/rules, status bar, power menu | Complete (2026-09-14) |
 | 6 | [Visual system](phases/phase-06-visual-system.md) | 4 | Claude | Single palette source → component themes; fonts, GTK/Qt, icons, cursor, wallpapers | Complete (2026-09-14) |
 | 7 | [Developer environment](phases/phase-07-developer-environment.md) | 5 | Claude | Shell, prompt, Neovim, version manager, containers, git/gh config | Complete (2026-09-14) |
-| 8 | Packages, reproducibility, recovery | cross-cutting | Claude + user | Categorized package inventory; audit script; idempotent bootstrap; fresh-VM rebuild from repo succeeds; backups | Not started |
+| 8 | [Packages, reproducibility, recovery](phases/phase-08-packages-reproducibility-recovery.md) | cross-cutting | Claude + user | Categorized package inventory; audit script; idempotent bootstrap; fresh-VM rebuild from repo succeeds; backups | Complete (2026-09-15) |
 | 9 | Personal automation | 6 | Claude | Scripts, systemd user services/timers, integrations | Not started |
 | 10 | Physical hardware migration | 1–4 | Both | Microcode, GPU drivers, power management, Secure Boot/TPM, hardware package list | Not started |
 
@@ -43,6 +43,14 @@ outlines; their scope is finalized in their own plan mode.
   an untracked local-identity include. D-0049 fixed a latent bug from Phase 6
   (`install/link-home` silently refusing to link *any* package once
   `wallpaper-set` had ever run).
+- **Phase 8:** resolved; see D-0050 to D-0053. `scripts/pkg-audit` found three
+  real drift items on its first real run (D-0050); `scripts/migrate` shipped
+  with one real first migration rather than an empty mechanism (D-0051); the
+  LUKS header -- the one genuinely unmitigated single point of failure -- now
+  has a real backup on the Unraid host (D-0052); `docs/runbooks/rebuild.md`
+  consolidates every manual step Phases 2-7 scattered across their own
+  tracking docs, validated by an idempotent re-run against the live VM rather
+  than a real from-scratch rebuild (D-0053).
 
 ## Cross-cutting concerns (checked in every phase)
 

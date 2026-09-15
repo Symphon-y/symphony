@@ -1062,3 +1062,113 @@ and the old entry is marked `Superseded by D-XXXX`.
   (by design, not an oversight) -- `wallpaper-set`/`wallpaper-random` own its
   entire lifecycle after the initial bootstrap. The one unit test asserting the
   exact `stow` command line was updated to match.
+
+## D-0050 — Package drift audit: `scripts/pkg-audit`
+
+- **Status:** Accepted (2026-09-15, Phase 8)
+- **Decision:** a standalone, unit-tested script checking package drift in both
+  directions -- explicitly-installed-but-undeclared (`pacman -Qqe` vs.
+  `packages/*.txt`), declared-but-not-present-at-all (checked against `pacman
+  -Qq`, any install reason, not just explicit -- a declared package satisfied
+  by someone else's dependency isn't drift), and every foreign/AUR package
+  (`pacman -Qqm`) declared specifically in `packages/desktop.txt`.
+- **Alternatives considered:** leaving package drift as two bats functions
+  embedded in `phase-01.bats` (the prior state) -- no standalone script,
+  no CI-independent way to run it, and one of the two checks ("no foreign
+  packages at all") was already stale by Phase 4.
+- **Reasoning:** running the very first version of this script against the
+  live system immediately found three real, previously-invisible issues: an
+  undeclared optional dependency (`linux-firmware-intel`, present since Phase
+  5), an over-strict check design of my own making (flagging `diffutils` as
+  "not installed" when it was present only as `mkinitcpio`'s dependency --
+  fixed by checking presence, not install reason), and an unintended build
+  artifact (`yay-debug`, resolved via D-0051's migration mechanism). A tool
+  that finds real problems on its first real run is exactly the point.
+- **Consequences:** `phase-01.bats`'s two original package tests were merged
+  into one delegate call to this script, and its now-redundant
+  `undeclared_packages()` helper removed (D-0053 amends this further).
+
+## D-0051 — Idempotent migrations: `migrations/` + `scripts/migrate`
+
+- **Status:** Accepted (2026-09-15, Phase 8)
+- **Decision:** `migrations/<unix-timestamp>-<slug>.sh` scripts, run in
+  filename order by `scripts/migrate check|apply`, each marked complete (an
+  empty file under `~/.local/state/autarchy/migrations/`) only after it exits
+  `0`. A migration needing root calls `sudo` itself; the user runs `scripts/
+  migrate apply`, never Claude. Shipped with one real first migration
+  (removing the `yay-debug` package D-0050 found), not a synthetic
+  placeholder.
+- **Alternatives considered:** Omarchy's full mechanism (timestamped scripts +
+  completion markers, ADAPTed here) plus its channel/mirror/pacman-guard
+  infrastructure (REJECTed already in Phase 3's research, not revisited).
+- **Reasoning:** this exact pattern was already the recorded plan for Phase 8
+  (`docs/omarchy-influences.md`, "Update and migration mechanism") before this
+  phase started -- Phase 3's research had already concluded it was "a strong
+  candidate for 'idempotent bootstrap.'" Giving it one real migration instead
+  of an empty directory proves the mechanism end-to-end rather than leaving it
+  untested infrastructure.
+- **Consequences:** future one-time changes to an already-configured system
+  (as opposed to ordinary `home/`/`system/` config edits, which apply the
+  normal way) get a migration script instead of an ad hoc runbook note. A
+  migration is never renumbered or edited once shipped, matching database
+  migration conventions, since it may have already run somewhere.
+
+## D-0052 — Backups: LUKS header only, on the Unraid host
+
+- **Status:** Accepted (2026-09-15, Phase 8)
+- **Decision:** `cryptsetup luksHeaderBackup` to a file, moved off the VM
+  entirely to the Unraid host (via the existing on-demand SSH jump host,
+  D-0021) and deleted from the VM once confirmed there. Nothing else gets a
+  backup mechanism this phase.
+- **Alternatives considered:** a broader personal-data backup strategy --
+  rejected as premature; there's no real personal data on this machine yet
+  (Phase 9, personal automation, hasn't happened), so designing for it now
+  would be speculative.
+- **Reasoning:** the LUKS header was the one genuinely unmitigated single
+  point of failure found during this phase's survey -- if it's corrupted, the
+  passphrase alone can't recover the disk, and nothing about D-0008's existing
+  recovery chain (snapper → LTS/fallback kernel → ISO chroot → rebuild from
+  repo) touches it at all. Everything else out-of-repo
+  (`~/.gitconfig.local`, D-0048; the nvim config clone, D-0045; `gh`/Claude
+  Code's own auth) is either trivially re-creatable by hand or already
+  durable in its own separate store, so none of it needed a backup
+  mechanism, just documentation (`docs/runbooks/rebuild.md`'s inventory
+  table).
+- **Consequences:** found and fixed two real snags taking the backup for
+  real, not hypothetically: `sshd` needed starting on-demand first (D-0021),
+  and the backup file's `root:root` mode-`400` ownership (an artifact of
+  running the backup command via `sudo`) blocked the `travis`-authenticated
+  jump-host session from reading it for the `scp` pull -- fixed with `sudo
+  chown travis:travis` before retrying. If the LUKS key is ever rotated, the
+  header backup needs retaking -- not automated, a manual reminder for
+  whoever does that.
+
+## D-0053 — Consolidated rebuild runbook and user-services list
+
+- **Status:** Accepted (2026-09-15, Phase 8)
+- **Decision:** `docs/runbooks/rebuild.md`, picking up exactly where
+  `base-install.md` ends, consolidating every manual command Phases 2-7
+  scattered across their own tracking docs into one repeatable sequence, plus
+  an out-of-repo state inventory table. `system/services-user.txt` +
+  `install/enable-user-services check|apply` replaces the scattered
+  `systemctl --user enable --now X Y Z` commands from Phases 4-5 specifically.
+- **Alternatives considered:** a real second fresh VM to validate this end to
+  end -- the user chose an idempotent re-run against the already-configured
+  VM instead (see the phase's own tracking doc), deferring a true
+  from-scratch test to whenever Phase 10's hardware migration or a real
+  disaster actually needs one.
+- **Reasoning:** every phase from 2 onward required retyping install/enable
+  commands by hand from a tracking doc -- fine once, but each phase since has
+  made that list longer and more error-prone to reconstruct from memory or by
+  re-reading seven separate docs. One authoritative runbook, backed by real
+  idempotent scripts rather than prose alone, is what "idempotent bootstrap"
+  in the roadmap's exit signal actually meant.
+- **Consequences:** validated for real, not just read and trusted: every
+  no-sudo piece (`install/link-home apply`, `install/enable-user-services
+  apply`, `scripts/migrate apply`) was re-run against the live, already-
+  configured VM and reported zero changes; the one sudo-gated piece
+  (`install/sync-system check`/`apply`) was re-run by the user directly,
+  reporting "in sync[,] applied 0 updated 12 unchanged." A real
+  from-scratch rebuild has never been exercised end-to-end -- if one is ever
+  needed for real and finds a gap this runbook missed, that's the moment to
+  fix it, not a hypothetical to solve preemptively now.
