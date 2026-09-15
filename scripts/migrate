@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# migrate: run every migrations/*.sh script exactly once, in filename order.
+#
+# Usage: scripts/migrate check|apply
+#   check  list pending migrations without running them
+#   apply  run every pending migration in order, marking each complete as it
+#          succeeds; stops at the first failure so nothing after it silently
+#          runs ahead of a broken step
+#
+# Migration scripts live in migrations/<unix-timestamp>-<slug>.sh, one per
+# one-time change, and must be idempotent/safe to interrupt: this runner marks a
+# migration complete only after it exits 0, as an empty file under
+# $AUTARCHY_STATE/migrations/<filename> (default ~/.local/state/autarchy), so a
+# later re-run picks up exactly where an interrupted one left off. Modeled on
+# Omarchy's own migrations/<timestamp>.sh + completion-marker pattern
+# (docs/omarchy-influences.md, "Update and migration mechanism") -- its
+# channel/mirror/pacman-guard infrastructure is deliberately not part of this.
+set -euo pipefail
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+readonly REPO_ROOT
+readonly MIGRATIONS_DIR="${AUTARCHY_MIGRATIONS_DIR:-$REPO_ROOT/migrations}"
+readonly STATE_DIR="${AUTARCHY_STATE:-$HOME/.local/state/autarchy}/migrations"
+
+usage() {
+  echo "usage: migrate check|apply" >&2
+  exit 2
+}
+
+# Every migration script not yet marked complete, oldest first (the leading
+# unix-timestamp in each filename sorts correctly as plain text).
+pending() {
+  local file name
+  for file in "$MIGRATIONS_DIR"/*.sh; do
+    [[ -e $file ]] || continue
+    name=$(basename "$file")
+    [[ -e "$STATE_DIR/$name" ]] && continue
+    echo "$file"
+  done
+}
+
+check() {
+  local file found=0
+  while IFS= read -r file; do
+    echo "pending: $(basename "$file")"
+    found=1
+  done < <(pending)
+  ((found)) || echo "migrate: nothing pending"
+}
+
+apply() {
+  local file name
+  mkdir -p "$STATE_DIR"
+  while IFS= read -r file; do
+    name=$(basename "$file")
+    echo "running: $name"
+    "$file"
+    touch "$STATE_DIR/$name"
+  done < <(pending)
+  echo "migrate: up to date"
+}
+
+main() {
+  case ${1:-} in
+    check | apply) "$1" ;;
+    *) usage ;;
+  esac
+}
+
+main "$@"

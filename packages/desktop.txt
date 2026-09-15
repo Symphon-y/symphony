@@ -32,6 +32,8 @@ satty                           # screenshot annotation
 gpu-screen-recorder              # screen recording; no Vulkan dependency (checked, D-0032's Phase 5
                                   # revisit) -- uses VAAPI via mesa + intel-media-driver on Intel
 intel-media-driver                # VAAPI for gpu-screen-recorder on this Intel iGPU (Broadwell+)
+linux-firmware-intel               # optional dep of gpu-screen-recorder (D-0036); installed since
+                                    # Phase 5 but never declared -- found by Phase 8's pkg-audit
 zbar                              # QR code decoding for capture
 libnotify                          # notify-send, for qr-capture's success/failure feedback
 
