@@ -886,3 +886,179 @@ and the old entry is marked `Superseded by D-XXXX`.
 - **Consequences:** the wallpaper now actually renders for the first time since
   Phase 4 introduced hyprpaper. `tests/acceptance/phase-06.bats` includes a
   regression guard against reintroducing the old flat syntax.
+
+## D-0043 — Shell: bash
+
+- **Status:** Accepted (2026-09-14, Phase 7)
+- **Decision:** bash as the interactive shell, configured via `home/bash/dot-bashrc`.
+- **Alternatives considered:** zsh (largest plugin/theme ecosystem, most commonly
+  customized shell); fish (modern out-of-the-box ergonomics -- autosuggestions,
+  syntax highlighting, no plugins needed -- but not POSIX-compatible).
+- **Reasoning:** already Arch's default, zero extra package, matches every script
+  convention already used throughout this repo. Omarchy's own research (Phase 3)
+  called this a taste choice, not a technical one, and the user's taste was bash.
+- **Consequences:** none of note; a straightforward pick with no coupling to
+  anything else in the repo.
+
+## D-0044 — Prompt: Starship
+
+- **Status:** Accepted (2026-09-14, Phase 7)
+- **Decision:** Starship, `home/starship/dot-config/starship.toml`, adapted from
+  Omarchy's own deliberately minimal format (directory + git branch + git status,
+  nothing else -- no time, no username/hostname, no language-runtime version
+  clutter).
+- **Alternatives considered:** none seriously -- Starship is the de facto
+  cross-shell standard for exactly this, and Omarchy's own minimal-format
+  philosophy (recorded in Phase 3's research) was worth keeping rather than
+  building a more decorated prompt from scratch.
+- **Reasoning:** low-stakes, reversible, no real controversy -- resolved without a
+  question to the user, per the plan's own "resolved by research" framing.
+- **Consequences:** none of note.
+
+## D-0045 — Neovim: not packaged by autarchy; personal config used directly
+
+- **Status:** Accepted (2026-09-14, Phase 7)
+- **Decision:** no `home/nvim/` stow package, no curated distribution of any kind.
+  The user's own long-maintained personal config
+  (`github.com/Symphon-y/config.nvim`, public, default branch `master`) is cloned
+  directly to `~/.config/nvim` via plain HTTPS `git clone` and tracked in
+  `packages/external.md` as an out-of-repo dependency -- the same way Claude Code
+  itself is tracked there, not vendored.
+- **Alternatives considered:** a thin LazyVim-starter-based config of our own
+  (mirroring `omarchy-nvim`'s actual shape -- confirmed via source read to be
+  genuinely thin, ~400 lines over stock `LazyVim/starter`); kickstart.nvim (a
+  single-file, fully transparent config, no plugin-manager magic); building fully
+  custom from scratch. All rejected once the user clarified they already have their
+  own config and specifically didn't want it coupled to this distro's repo.
+- **Reasoning:** the user's existing config is genuinely personal content, not
+  "system design" -- coupling it to autarchy's own repo would mean either forking
+  it (drifting from the source they actually maintain) or making this repo own
+  something it has no business owning. This also sidesteps a real, confirmed
+  Omarchy pitfall for free: `omarchy-nvim`'s theme hot-reload structurally requires
+  LazyVim's plugin-spec shape (`omacom/omarchy#1803`, raised and never fixed
+  upstream) -- not this project's problem, since it never adopts that mechanism at
+  all.
+- **Consequences:** `~/.config/nvim` is genuinely outside this repo's
+  reproducibility story -- Phase 8's fresh-rebuild needs the clone command
+  documented in `packages/external.md`, not a `home/` package. If the user's config
+  itself changes, that happens in its own repo, untouched by anything here. The
+  `neovim` package itself is unaffected (already installed, `packages/base.txt`,
+  Phase 1).
+
+## D-0046 — Version manager: mise
+
+- **Status:** Accepted (2026-09-14, Phase 7)
+- **Decision:** mise, installed and activated in `home/bash/dot-bashrc`
+  (`eval "$(mise activate bash)"`). Omarchy's lazy-install-wrapper pattern
+  (`omarchy-mise-install`, generating a `~/.local/bin/<command>` shim per tool) is
+  noted as a genuinely good, reusable idea but **not implemented** -- its actual
+  tool roster is almost entirely Omarchy/Basecamp-specific (AI-CLI wrappers,
+  `hey`/`basecamp`) and there's no concrete tool to wrap yet on this machine.
+- **Alternatives considered:** none seriously -- mise already consolidates what
+  used to be N language-specific version managers (asdf/rbenv/nvm/pyenv) into one
+  tool, and Phase 3's research had already flagged it as the likely pick.
+- **Reasoning:** the tool itself is a strong, low-risk pick independent of Omarchy;
+  building the lazy-install wrapper infrastructure now, with nothing concrete to
+  wrap, would be unused machinery -- add it the day a real tool needs it, not
+  speculatively.
+- **Consequences:** no per-project language runtimes are pinned yet -- that happens
+  organically as real projects need it. The wrapper pattern is documented here for
+  whenever it's actually needed.
+
+## D-0047 — Containers: rootless Podman, not Docker
+
+- **Status:** Accepted (2026-09-14, Phase 7)
+- **Decision:** `podman` + `podman-compose` + `podman-docker` (CLI-compat shim), no
+  Docker at all. Confirmed on this VM before deciding: `travis` already has
+  subuid/subgid ranges allocated (`/etc/subuid`/`/etc/subgid`:
+  `travis:100000:65536`, from Arch's default `useradd`/`login.defs` behavior), so
+  rootless containers work with zero extra privilege setup -- no group-or-sudo
+  dance to build at all.
+- **Alternatives considered:** Docker Engine + Omarchy's own no-docker-group
+  guardrail pattern (`install/config/docker.sh`: install+enable Docker, but never
+  add the install user to the `docker` group, since that's "equivalent to
+  passwordless root"; explicit opt-in script if ever wanted, polkit-gated GUI
+  access). This matches this project's own D-0016 privilege-escalation stance and
+  was a real contender. Deferring the whole container question to Phase 8 (Phase
+  3's original research note) was also considered and rejected -- resolved now
+  instead, since the roadmap already scoped it to Phase 7.
+- **Reasoning:** rootless Podman solves the "docker-group = passwordless root"
+  problem structurally (no daemon, no privileged group, ever) rather than gating
+  it behind sudo/polkit after the fact -- a strictly stronger version of D-0016's
+  own no-silent-escalation stance than Omarchy's current guardrail achieves.
+  Omarchy's own maintainers are independently reaching the same conclusion: an
+  open, unmerged PR found during research (`omacom/omarchy` PR #11032, "Make
+  Podman native with optional Docker compatibility") is actively migrating their
+  default from Docker to rootless Podman, with Docker Compose retained as a
+  frontend and `podman-docker` CLI-compat made optional -- not yet shipped as of
+  this research, but a strong signal in the same direction.
+- **Consequences:** `docker`-branded muscle memory and Compose files work via
+  `podman-docker`'s shim and `podman-compose`, but anything that specifically
+  assumes a root-owned Docker daemon socket (rare, but real for some GUI tools)
+  won't work unmodified. Resolves the roadmap-vs-Phase-3-research scope conflict
+  (roadmap listed containers under Phase 7; Phase 3's research note said the tool
+  choice belonged to Phase 8) in favor of Phase 7 owning it, since a concrete,
+  well-researched answer was already in hand.
+
+## D-0048 — Git identity: split into tracked defaults + untracked local identity
+
+- **Status:** Accepted (2026-09-14, Phase 7)
+- **Decision:** `home/git/dot-gitconfig` (tracked, portable: Omarchy's own shipped
+  git defaults adopted near-verbatim -- histogram diff, `rerere`, `autoSetupRemote`,
+  verbose commit, branch/tag sort by recency, `co`/`br`/`ci`/`st` aliases -- plus
+  `init.defaultBranch = main`, not Omarchy's `master`, matching this repo's own
+  convention; and the `gh auth git-credential` helper blocks, mechanical and
+  reproducible) includes `~/.gitconfig.local` (untracked, machine-local, holding
+  only the real `[user]` block) via `[include] path = ~/.gitconfig.local`.
+- **Alternatives considered:** baking `user.name`/`user.email` directly into the
+  tracked `dot-gitconfig` -- tried first, immediately caught by CI's
+  `check-identifiers` (D-0022) exactly as designed, since it's a real email address
+  in a tracked file. Not a hypothetical to weigh; a real mistake, fixed once found.
+- **Reasoning:** D-0022's no-personal-identifiers policy applies to file *content*,
+  not just commit authorship metadata -- a stowed gitconfig with a real email baked
+  in is exactly the kind of leak that policy exists to catch, private repo or not.
+  `[include]` is the standard git mechanism for exactly this split (portable
+  defaults vs. machine-local identity), already anticipated in the roadmap's own
+  cross-cutting concern ("machine-specific config separate from portable config")
+  but not applied here on the first attempt.
+- **Consequences:** a fresh rebuild (Phase 8) needs `~/.gitconfig.local` created by
+  hand (or a small documented step) with the real identity -- it's genuinely
+  outside this repo's reproducibility story, same as any other personal secret.
+  `git config --global` alone doesn't resolve included values (needs
+  `--includes`, or no scope flag at all) -- relevant for anyone querying config by
+  hand, not for git's own normal operation, which follows includes automatically.
+  Also found and fixed in passing: the VM already had a real, undocumented global
+  git config (this same identity, plus `gh auth login`'s own credential-helper
+  setup) that an earlier repo survey had missed by only checking for a *tracked*
+  `~/.gitconfig`, not the live untracked file -- confirmed with the user which
+  email to keep rather than silently overwriting it.
+- **Incident:** the first version of this commit, pushed to the phase branch,
+  had the real email baked into the tracked file (caught by CI). Since the branch
+  was brand new, unmerged, and single-developer, it was squashed to one clean
+  commit and force-pushed (`--force-with-lease`, guarded to the known prior remote
+  head) rather than leaving the leak sitting in history for a `--no-ff` merge to
+  make permanent in `main` -- consistent with D-0022's own precedent that a
+  private repo doesn't excuse an identifier leak.
+
+## D-0049 — `install/link-home` no longer aborts entirely on one package's conflict
+
+- **Status:** Accepted (2026-09-14, Phase 7)
+- **Decision:** `install/link-home apply` passes `--ignore='current\.png$'` to its
+  single combined `stow` call, and separately seeds
+  `~/.local/share/backgrounds/current.png` by hand if absent (since stow will no
+  longer create it).
+- **Alternatives considered:** a `.stow-local-ignore` file in `home/hyprpaper/` --
+  tried first, didn't take effect for reasons not fully run down; the documented
+  `--ignore` CLI flag worked immediately and was used instead.
+- **Reasoning:** Phase 6's `wallpaper-set` script deliberately repoints
+  `current.png` to an arbitrary absolute path outside the repo (by design -- the
+  palette source can be any image anywhere). Stow correctly refuses to restow a
+  package over a target it no longer owns, but because `apply()` stows every
+  package in one combined invocation, that single conflict aborted *every*
+  package's linking, not just hyprpaper's -- a real bug that had been silently
+  waiting since Phase 6's own `wallpaper-set` test run, only discovered now because
+  Phase 7 was the first phase since to re-run `install/link-home apply`.
+- **Consequences:** `current.png` is now permanently outside stow's management
+  (by design, not an oversight) -- `wallpaper-set`/`wallpaper-random` own its
+  entire lifecycle after the initial bootstrap. The one unit test asserting the
+  exact `stow` command line was updated to match.

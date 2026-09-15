@@ -11,3 +11,14 @@ stow            # links home/ config into the home directory (install/link-home)
 tmux            # scrollback, a paste buffer, and windows on the text console
 jq              # JSON parsing: release manifests (install/claude-code), settings checks
 diffutils       # cmp: install/sync-system compares installed files with the repo (base doesn't pull it in)
+
+# Developer environment (Phase 7) -- see D-0043 onward.
+starship        # prompt
+mise            # version manager (per-project language runtimes)
+eza             # ls replacement, used by home/bash/dot-bashrc's aliases
+zoxide          # frecency-based `z`/`zi`, used by home/bash/dot-bashrc
+fzf             # fuzzy finder, completion/keybindings sourced by home/bash/dot-bashrc
+bat             # syntax-highlighted cat, also the colorized MANPAGER
+podman          # rootless containers -- no docker-group-equivalent privilege needed
+podman-compose  # docker-compose-style multi-container files, via podman
+podman-docker   # `docker` CLI-compat shim over podman, for muscle memory/compose tooling

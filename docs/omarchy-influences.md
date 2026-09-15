@@ -64,10 +64,10 @@ assumed.
 | Web-app launchers | 3 | 5 | ADAPT (D-0034) |
 | Theme system and switching | 4 | 6 | ADAPT (matugen, wallpaper-driven, D-0025, D-0037) |
 | Fonts, GTK/Qt, icons, cursors | 4 | 6 | ADAPT (D-0038–D-0041) |
-| Shell and prompt | 5 | 7 | DEFER |
-| Neovim distribution | 5 | 7 | ADAPT idea; DEFER choice |
-| Language / tool version management | 5 | 7 | ADAPT |
-| Containers | 5 | 7 | ADOPT (docker-group stance); DEFER (tool choice) |
+| Shell and prompt | 5 | 7 | ADAPT (bash, Starship; D-0043, D-0044) |
+| Neovim distribution | 5 | 7 | REJECT packaging; personal config used (D-0045) |
+| Language / tool version management | 5 | 7 | ADAPT (mise; D-0046) |
+| Containers | 5 | 7 | REJECT Docker; rootless Podman (D-0047) |
 | Package selection | all | 8 | ADAPT idea; REJECT custom repo/mirror |
 | Update and migration mechanism | cross-cutting | 8 | ADAPT (migrations); REJECT (channels/mirror) |
 
@@ -762,12 +762,21 @@ below are current as of that branch unless a component explicitly discusses v3
   worth weighing against fish's or zsh's usability wins.
 - Coupling to other Omarchy components: none significant.
 - Better modern alternatives: n/a — this is a taste decision, not a technical one.
-- Our decision: **DEFER**
-- Our implementation: n/a — decided in Phase 7.
-- Reason: shell and prompt choice is exactly the kind of subjective, user-owned
-  decision the roadmap already reserves for Phase 7's own plan mode; Omarchy's
-  minimal-bash-plus-Starship default is worth weighing then, not committing to now.
-- Related decision: Phase 7
+- Our decision: **ADAPT**
+- Our implementation: bash (D-0043) + Starship (D-0044), Omarchy's own deliberately
+  minimal prompt format adapted near-verbatim (directory + git branch + git status,
+  nothing else). None of Omarchy's `bash/{envs,aliases,functions,init}` structure
+  was carried over wholesale -- `home/bash/dot-bashrc` is a single small file with
+  history settings, `eza`/`zoxide`/`fzf`/`bat` aliases, and the starship/mise/zoxide
+  activation lines, deliberately without Omarchy's `herdr`-specific functions,
+  AI-tool single-letter aliases, or worktree/ssh-reconnect helpers -- none of which
+  apply here, though the ssh-reconnect wrapper and worktree functions are worth
+  remembering as reference material if a concrete need for either ever comes up.
+- Reason: bash won the subjective shell question on zero-friction/already-the-
+  default grounds; Starship's minimalism was worth keeping as-is since it's a
+  taste choice already well-suited to a single-user machine, not something to
+  re-litigate from scratch.
+- Related decision: D-0043, D-0044
 
 ### Neovim distribution
 - Omarchy approach: a separate pacman package, `omarchy-nvim`, built on **LazyVim**.
@@ -783,13 +792,22 @@ below are current as of that branch unless a component explicitly discusses v3
   otherwise self-contained.
 - Better modern alternatives: n/a — LazyVim itself is already a reasonable modern
   choice; repackaging it as our own pacman package is the unnecessary part.
-- Our decision: **ADAPT** the curated-starting-point idea; **REJECT** repackaging as
-  our own pacman package; **DEFER** the actual distribution/config choice.
-- Our implementation: n/a — decided in Phase 7.
-- Reason: a starting Neovim config is worth having, but doesn't need to be a
-  redistributable package for a single machine; the theme-coupling pitfall is worth
-  remembering whenever Phase 7 (or a later theming pass) touches Neovim's colorscheme.
-- Related decision: Phase 7
+- Our decision: **REJECT** building or packaging any curated Neovim distribution at
+  all, LazyVim-based or otherwise.
+- Our implementation: the user's own long-maintained personal config
+  (`github.com/Symphon-y/config.nvim`) is cloned directly to `~/.config/nvim` (plain
+  HTTPS `git clone`, no auth needed for this public repo) and tracked only in
+  `packages/external.md` -- not a `home/nvim/` stow package, not vendored,
+  independently updatable from its own repo (D-0045).
+- Reason: confirmed via source read that `omarchy-nvim` is genuinely thin (~400
+  lines of custom Lua over stock `LazyVim/starter`) -- so the "curate a small
+  layer over a solid starting point" idea was sound, but moot once the user
+  clarified they already have their own such layer and specifically didn't want it
+  coupled to this repo. This also sidesteps Omarchy's own confirmed pitfall for
+  free: its theme hot-reload structurally requires LazyVim's plugin-spec shape
+  (`omacom/omarchy#1803`, raised, never fixed upstream) -- not a risk here at all,
+  since this project never adopts that mechanism.
+- Related decision: D-0045
 
 ### Language / tool version management
 - Omarchy approach: **mise** (`mise-bin` package) as the single tool for per-project
@@ -810,12 +828,18 @@ below are current as of that branch unless a component explicitly discusses v3
   Code, gh) are Omarchy's own choices, not mise's.
 - Better modern alternatives: none needed — mise is already the modern consolidated
   choice here.
-- Our decision: **ADAPT**
-- Our implementation: mise as the likely pick, with the lazy-install-wrapper idea
-  worth reusing for our own occasionally-used tools; final call in Phase 7.
-- Reason: the tool itself is a strong, low-risk pick; which specific runtimes and
-  wrapper targets we need is a Phase 7 question.
-- Related decision: Phase 7
+- Our decision: **ADAPT** the tool; **DEFER** the lazy-install-wrapper mechanism.
+- Our implementation: mise, installed and activated in `home/bash/dot-bashrc`
+  (D-0046). Omarchy's `omarchy-mise-install` wrapper-generator pattern is a
+  genuinely good, reusable idea, but its actual tool roster (Claude Code, gh,
+  codex, crush, `hey`/`basecamp`, and a dozen other AI-CLI/Basecamp-specific tools)
+  isn't transferable, and there's no concrete tool on this machine to wrap yet --
+  building the wrapper infrastructure now would be unused machinery.
+- Reason: the tool itself is a strong, low-risk pick, confirmed still current in
+  Omarchy's own `quattro` branch; the wrapper pattern is worth remembering and easy
+  to add the day a real occasionally-used tool needs it, not worth building
+  speculatively.
+- Related decision: D-0046
 
 ### Containers
 - Omarchy approach: Docker installed and enabled by default, but **the install user is
@@ -832,12 +856,23 @@ below are current as of that branch unless a component explicitly discusses v3
 - Coupling to other Omarchy components: none significant.
 - Better modern alternatives: **Podman** is a rootless-by-default alternative worth
   weighing in Phase 8 against Docker-without-the-group; not resolved here.
-- Our decision: **ADOPT** the docker-group stance; **DEFER** the tool choice
-- Our implementation: whichever container tool Phase 8 picks, the install user does
-  not get an automatic root-equivalent group membership, matching D-0016.
-- Reason: the privilege-model reasoning is already our own standing policy; which
-  specific container runtime to use is unrelated and belongs to Phase 8.
-- Related decision: D-0016, Phase 8
+- Our decision: **ADOPT** the underlying privilege-model goal; **REJECT** Docker
+  and its docker-group-guardrail mechanism; resolved with **rootless Podman**
+  instead, in this phase rather than deferred to Phase 8.
+- Our implementation: `podman` + `podman-compose` + `podman-docker` (D-0047).
+  Confirmed on this VM that `travis` already has subuid/subgid ranges allocated
+  from Arch's default `useradd` behavior, so rootless containers need zero extra
+  privilege setup at all -- no group to gate, no guardrail script needed.
+- Reason: Omarchy's own no-docker-group stance already matches this project's
+  D-0016 privilege-escalation policy, but it's still gating a root-equivalent
+  daemon after the fact via sudo/polkit. Rootless Podman solves the same problem
+  structurally instead -- and Omarchy's own maintainers are independently reaching
+  the same conclusion (an open, unmerged PR, `omacom/omarchy#11032`, found during
+  research, is actively migrating their own default from Docker to rootless
+  Podman). Given a concrete, well-researched answer was already in hand, resolving
+  it in Phase 7 rather than deferring to Phase 8 made more sense than leaving a
+  known-answer question open.
+- Related decision: D-0016, D-0047
 
 ### Package selection
 - Omarchy approach: two static, flat, uncommented manifests

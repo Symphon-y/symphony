@@ -1,0 +1,61 @@
+# Target: ~/.gitconfig (linked by install/link-home)
+#
+# No [user] block here: identity is machine-specific personal data, so it lives in
+# ~/.gitconfig.local instead -- a real, untracked file, not stow-managed -- and is
+# pulled in via [include] below. D-0022 (scripts/check-identifiers) fails the build
+# on any email address in a tracked file; baking a real one into this file directly
+# was tried first and caught by CI exactly as designed. See DECISIONS.md.
+#
+# The [credential] blocks mirror what `gh auth login`'s git integration writes
+# (gh auth git-credential) -- checked in since they're mechanical and reproducible
+# (no personal data), so a fresh rebuild reproduces the same working config once gh
+# is authenticated again (Phase 8's job). Everything else is Omarchy's own shipped
+# git defaults, adopted near-verbatim (genuinely useful, nothing Omarchy-specific
+# about them) except init.defaultBranch: main, not Omarchy's master, matching this
+# repo's own convention.
+
+[include]
+	path = ~/.gitconfig.local
+
+[credential "https://github.com"]
+	helper =
+	helper = !/usr/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+	helper =
+	helper = !/usr/bin/gh auth git-credential
+
+[alias]
+	co = checkout
+	br = branch
+	ci = commit
+	st = status
+
+[init]
+	defaultBranch = main
+
+[pull]
+	rebase = true
+
+[push]
+	autoSetupRemote = true
+
+[diff]
+	algorithm = histogram
+	colorMoved = plain
+	mnemonicPrefix = true
+
+[commit]
+	verbose = true
+
+[column]
+	ui = auto
+
+[branch]
+	sort = -committerdate
+
+[tag]
+	sort = -version:refname
+
+[rerere]
+	enabled = true
+	autoupdate = true

@@ -1,0 +1,58 @@
+# Target: ~/.bashrc (linked by install/link-home)
+# shellcheck shell=bash
+#
+# Interactive-only -- scripts and non-interactive SSH commands never load this
+# (system/profile/local-bin.sh already puts ~/.local/bin on PATH for every login
+# shell, so this file has no PATH logic of its own -- the stock Arch skel default it
+# replaced prepended ~/.local/bin here too, which would have undone that file's
+# deliberate append-only ordering for real interactive sessions).
+
+[[ $- != *i* ]] && return
+
+HISTCONTROL=ignoreboth
+HISTSIZE=32768
+HISTFILESIZE=32768
+shopt -s histappend
+
+# mise shims (~/.local/share/mise/shims) change every time `mise use`/`mise install`
+# runs; bash's command hash would keep resolving a stale path after that.
+set +h
+
+export EDITOR=nvim
+export VISUAL="$EDITOR"
+
+alias grep='grep --color=auto'
+
+# eza: a modern ls replacement (icons, git-aware, tree view)
+if command -v eza >/dev/null 2>&1; then
+  alias ls='eza --group-directories-first'
+  alias ll='eza -l --group-directories-first'
+  alias la='eza -la --group-directories-first'
+  alias lt='eza --tree --group-directories-first'
+else
+  alias ls='ls --color=auto'
+fi
+
+# bat: syntax-highlighted cat, and a colorized man pager
+if command -v bat >/dev/null 2>&1; then
+  alias cat='bat --paging=never'
+  export MANPAGER="sh -c 'col -bx | bat -l man -p'"
+fi
+
+# n: open the cwd in nvim with no args, otherwise open the given files
+n() {
+  if [ "$#" -eq 0 ]; then
+    nvim .
+  else
+    nvim "$@"
+  fi
+}
+
+# Skip in a dumb terminal (some editors' embedded terminals set $- as interactive
+# but can't render prompt escapes or completion UI properly).
+if [[ $TERM != "dumb" ]]; then
+  command -v starship >/dev/null 2>&1 && eval "$(starship init bash)"
+  command -v mise >/dev/null 2>&1 && eval "$(mise activate bash)"
+  command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init bash)"
+  command -v fzf >/dev/null 2>&1 && eval "$(fzf --bash)"
+fi
