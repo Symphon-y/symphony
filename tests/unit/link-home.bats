@@ -51,7 +51,7 @@ link_all() {
   run "$SCRIPT" apply
   assert_success
   run cat "$STUB_LOG"
-  assert_line "stow --dir=$REPO_COPY/home --target=$HOME --dotfiles --no-folding --restow app shell"
+  assert_line "stow --dir=$REPO_COPY/home --target=$HOME --dotfiles --no-folding --restow --ignore=current\.png$ app shell"
 }
 
 @test "apply fails when stow reports a conflict" {
