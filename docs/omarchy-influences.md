@@ -68,8 +68,8 @@ assumed.
 | Neovim distribution | 5 | 7 | REJECT packaging; personal config used (D-0045) |
 | Language / tool version management | 5 | 7 | ADAPT (mise; D-0046) |
 | Containers | 5 | 7 | REJECT Docker; rootless Podman (D-0047) |
-| Package selection | all | 8 | ADAPT idea; REJECT custom repo/mirror |
-| Update and migration mechanism | cross-cutting | 8 | ADAPT (migrations); REJECT (channels/mirror) |
+| Package selection | all | 8 | ADAPT idea; REJECT custom repo/mirror (D-0050) |
+| Update and migration mechanism | cross-cutting | 8 | ADAPT migrations (D-0051); REJECT channels/mirror |
 
 ## Entries
 
@@ -898,13 +898,17 @@ below are current as of that branch unless a component explicitly discusses v3
   `scripts/pkglist` design (D-0017) is already the better version of this idea.
 - Our decision: **ADAPT** the categorized-list idea (already done, D-0017); **REJECT**
   the custom package repo/mirror and the untracked-interactive-install pattern
-- Our implementation: no change — D-0017 already covers this; future package
-  additions (Phase 8 onward) go through the existing categorized-list + pkglist
-  mechanism, not an ad hoc fzf install.
+- Our implementation: D-0017's categorized lists needed one more thing to stay
+  accurate over time: `scripts/pkg-audit` (D-0050), a standalone script checking
+  drift in both directions (installed-but-undeclared, declared-but-not-present)
+  plus that every foreign/AUR package is declared specifically in
+  `packages/desktop.txt`. Found three real drift items on its first real run
+  (Phase 8) — proof the categorized-list idea needed an actual auditor, not
+  just the acceptance-test spot-checks it had before.
 - Reason: operating a custom pacman repository and mirror is unjustified overhead for
   a single machine, and an install path that bypasses the declared-package manifest is
   exactly the drift D-0017 was built to prevent.
-- Related decision: D-0017, Phase 8
+- Related decision: D-0017, D-0050
 
 ### Update and migration mechanism
 - Omarchy approach: ships itself as pacman packages from a custom repo/mirror, with
@@ -932,12 +936,15 @@ below are current as of that branch unless a component explicitly discusses v3
   the way `omarchy-migrate` complements Omarchy's own package-based file deployment.
 - Our decision: **ADAPT** the migration-script + completion-marker pattern; **REJECT**
   the custom repo/mirror/channel infrastructure
-- Our implementation: decided in Phase 8 — a `migrations/<timestamp>.sh` directory
-  plus a completion-marker runner, modeled on Omarchy's, is a strong candidate for
-  "idempotent bootstrap." The pacman-guard idea is a separate, smaller call Phase 8
-  can make on its own merits.
+- Our implementation: `migrations/<unix-timestamp>-<slug>.sh` + `scripts/migrate
+  check|apply` (D-0051), completion markers under
+  `~/.local/state/autarchy/migrations/`. Shipped with one real first migration
+  (removing an unintended `yay-debug` package `scripts/pkg-audit` found), not an
+  empty directory — a migration needing root calls `sudo` itself, and the user
+  runs `apply`, never Claude. The pacman-guard idea was not adopted at all —
+  no direct-`pacman`-blocking mechanism exists or is planned.
 - Reason: the channel/mirror infrastructure solves a distribution-scale problem (many
   machines pulling from one feed) this project doesn't have; the migration pattern
   solves a real problem (one-time changes, applied exactly once, resumable) that Phase
-  8 explicitly needs an answer for.
-- Related decision: D-0017, Phase 8
+  8 explicitly needed an answer for.
+- Related decision: D-0017, D-0051
