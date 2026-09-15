@@ -1,0 +1,34 @@
+# Target: ~/.config/starship.toml (linked by install/link-home)
+#
+# Deliberately minimal, adapted from Omarchy's own starship.toml -- a taste choice
+# worth keeping as-is: directory + git branch + git status, nothing else. No time,
+# no username/hostname, no language-runtime version clutter.
+
+format = """[$directory$git_branch$git_status]($style)$character"""
+
+[character]
+success_symbol = "[❯](bold cyan)"
+error_symbol = "[✗](bold red)"
+
+[directory]
+truncation_length = 2
+truncation_symbol = "…/"
+style = "bold cyan"
+
+[git_branch]
+style = "italic cyan"
+format = "[$symbol$branch]($style) "
+
+[git_status]
+format = "([\\[$all_status$ahead_behind\\]]($style) )"
+style = "bold yellow"
+ahead = "⇡${count}"
+behind = "⇣${count}"
+diverged = "⇕⇡${ahead_count}⇣${behind_count}"
+conflicted = "="
+untracked = "?${count}"
+modified = "!${count}"
+staged = "+${count}"
+stashed = "*${count}"
+renamed = "»${count}"
+deleted = "✘${count}"
