@@ -111,7 +111,20 @@ Red confirmed: · Green confirmed:
       `ls`/`ll`/`la`/`lt`
 - [x] Close: `DECISIONS.md` (D-0043–D-0049), `docs/omarchy-influences.md` (all four
       Phase 7 entries filled in), `docs/roadmap.md`
-- [ ] Merge to `main`
+- [x] Merge to `main`
+
+## Post-merge follow-up (not this phase's scope)
+
+- Merging the phase branch into `main` briefly broke `~/.gitconfig` (a stow
+  symlink into this repo's own `home/git/dot-gitconfig`, which didn't exist on
+  `main` until the merge landed): checking out `main` mid-merge left the symlink
+  dangling, so `git pull`/commit lost the `gh`-backed credential helper and the
+  repo's own identity. Worked around with an explicit `git -c user.name=... -c
+  user.email=...` for the one merge commit; the symlink self-healed the moment
+  the merge completed and the file existed again. Not a bug to fix -- just a
+  real bootstrapping quirk of a repo that stows its own tooling's config, worth
+  remembering if a future phase ever needs to script cross-branch operations
+  instead of doing them by hand.
 
 ## Implementation log
 
