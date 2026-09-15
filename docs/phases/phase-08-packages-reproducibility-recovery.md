@@ -94,7 +94,7 @@ Green confirmed: 2026-09-15, 4/4
 - [x] Close: `DECISIONS.md` (D-0050–D-0053), `docs/omarchy-influences.md`
       ("Package selection" and "Update and migration mechanism" entries
       filled in), `docs/roadmap.md`
-- [ ] Merge to `main`
+- [x] Merge to `main`
 
 ## Implementation log
 
