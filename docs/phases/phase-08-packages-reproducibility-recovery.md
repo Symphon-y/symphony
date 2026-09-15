@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Status** | In progress |
+| **Status** | Complete |
 | **Driver** | Claude + user |
 | **Branch** | `phase/08-packages-reproducibility-recovery` |
 | **Started** | 2026-09-15 |
-| **Completed** | |
+| **Completed** | 2026-09-15 |
 
 ## Goal
 
@@ -63,7 +63,8 @@ anywhere in this phase.
 | every unit in `system/services-user.txt` is enabled and active |
 | `docs/runbooks/rebuild.md` exists and references real, current commands |
 
-Red confirmed: · Green confirmed:
+Red confirmed: 2026-09-15 (see the implementation log's ordering-deviation note) ·
+Green confirmed: 2026-09-15, 4/4
 
 ## Tasks
 
@@ -86,9 +87,13 @@ Red confirmed: · Green confirmed:
 - [x] `docs/runbooks/rebuild.md`
 - [x] Static acceptance tests green except the two migration-gated ones (2/4);
       `scripts/check` green (90/90 unit tests)
-- [ ] User: run the yay-debug migration, back up the LUKS header, confirm
-      idempotent re-run of the consolidated flow
-- [ ] Close: `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md`
+- [x] User: ran the yay-debug migration (confirmed gone via `pacman -Qi`),
+      backed up the LUKS header to the Unraid host (via `scp` over the
+      on-demand jump-host SSH, after fixing a real ownership snag -- see log),
+      confirmed idempotent re-run of the entire consolidated flow
+- [x] Close: `DECISIONS.md` (D-0050–D-0053), `docs/omarchy-influences.md`
+      ("Package selection" and "Update and migration mechanism" entries
+      filled in), `docs/roadmap.md`
 - [ ] Merge to `main`
 
 ## Implementation log
@@ -165,6 +170,30 @@ Red confirmed: · Green confirmed:
   not because anything is broken; the other two already passed because their
   mechanisms were already built and verified idempotent-clean against the live
   system before the acceptance file existed to check them formally.
+- **User ran the two sudo-gated steps.** `scripts/migrate apply` removed
+  `yay-debug` for real (confirmed after: `pacman -Qi yay-debug` → not found,
+  `scripts/pkg-audit` → no drift). LUKS header backup
+  (`cryptsetup luksHeaderBackup ... --header-backup-file ~/luks-header-backup.img`)
+  needed `sshd` started on-demand first (D-0021 -- it isn't running by
+  default), then hit a real, findable snag: the backup file was created
+  `root:root` mode `400` (an artifact of running the backup command via
+  `sudo`), which the jump-host SSH session (authenticating as `travis`, not
+  root) couldn't read for the `scp` pull -- "remote open permission denied."
+  Fixed with `sudo chown travis:travis` on the file before retrying. Also hit
+  two harmless `hostfile_replace_entries`/`update_known_hosts` warnings on the
+  Unraid side (a `known_hosts` write-permission quirk there, unrelated to the
+  transfer itself) -- confirmed the actual 16MB file landed intact despite the
+  warnings, then deleted the VM's local copy so no unencrypted header sits on
+  the disk it protects.
+- **Idempotent re-run, verified for real** (the user's chosen validation
+  depth, standing in for a from-scratch fresh-VM test): `install/link-home
+  apply`, `install/enable-user-services apply`, and `scripts/migrate apply`
+  all re-ran with zero errors and no changes reported; `scripts/pkg-audit` and
+  `scripts/migrate check` both confirmed clean. The one sudo-gated piece
+  Claude can't run itself, `sudo install/sync-system check`/`apply`, was run
+  by the user directly: "in sync[,] applied 0 updated 12 unchanged" --
+  confirms the full consolidated flow, not just the parts Claude could
+  exercise directly.
 
 ## VM → physical hardware notes
 
@@ -172,7 +201,7 @@ Red confirmed: · Green confirmed:
 
 ## Exit criteria
 
-- [ ] Static acceptance tests pass
-- [ ] `scripts/check` green
-- [ ] `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md` updated
+- [x] Static acceptance tests pass
+- [x] `scripts/check` green
+- [x] `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md` updated
 - [ ] Branch merged to `main`
