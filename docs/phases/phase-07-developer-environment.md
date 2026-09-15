@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Status** | In progress |
+| **Status** | Complete |
 | **Driver** | Claude |
 | **Branch** | `phase/07-developer-environment` |
 | **Started** | 2026-09-14 |
-| **Completed** | |
+| **Completed** | 2026-09-14 |
 
 ## Goal
 
@@ -104,8 +104,13 @@ Red confirmed: · Green confirmed:
 - [x] Static acceptance tests green (6/8 -- the two package-gated tests need the
       user's install); `scripts/check` green; full suite re-run, no regressions in
       any prior phase
-- [ ] User: install packages, confirm the interactive shell/prompt looks right
-- [ ] Close: `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md`
+- [x] User: installed packages (all 9 confirmed via `pacman -Qi`); full acceptance
+      suite re-run: 8/8 green for Phase 7 (including the real Podman
+      `run --rm docker.io/library/hello-world` smoke test), no regressions
+      anywhere else; user visually confirmed the new prompt and eza-backed
+      `ls`/`ll`/`la`/`lt`
+- [x] Close: `DECISIONS.md` (D-0043–D-0049), `docs/omarchy-influences.md` (all four
+      Phase 7 entries filled in), `docs/roadmap.md`
 - [ ] Merge to `main`
 
 ## Implementation log
@@ -174,6 +179,22 @@ Red confirmed: · Green confirmed:
   suite re-run across every phase: no regressions.
 - Waiting on the user: install `packages/tooling.txt`'s new entries, then confirm
   the interactive shell/prompt looks right in a real terminal.
+- **User confirmed the D-0022 identifier leak fix should be handled by rewriting
+  history**, not left as a forward-only patch. Squashed the branch to one clean
+  commit (identity split into `[include] path = ~/.gitconfig.local` from the
+  start) and force-pushed with `--force-with-lease` guarded to the exact known
+  prior remote SHA -- safe here since the branch was brand new, unmerged, and
+  single-developer. CI re-confirmed green on the rewritten history.
+- **User installed all 9 new packages.** Full acceptance suite re-run: Phase 7's
+  own tests 8/8 green, including the real proof-of-work tests this phase's
+  verification section called for -- `podman run --rm
+  docker.io/library/hello-world` actually runs a container with `rootless=true`
+  and no `docker` group in `groups`' output, and `nvim --headless "+qa"` starts
+  cleanly against the user's real cloned config. No regressions in any other
+  phase's tests (the only other failures are the same pre-existing
+  sudo-requires-a-tty and pre-Phase-4 AUR-policy gaps seen since Phase 6).
+- User's visual confirmation: the Starship prompt renders, and `ls`/`ll`/`la`/`lt`
+  are visibly eza-backed ("looks different in a good way").
 
 ## VM → physical hardware notes
 
@@ -181,7 +202,7 @@ Red confirmed: · Green confirmed:
 
 ## Exit criteria
 
-- [ ] Static acceptance tests pass
-- [ ] `scripts/check` green
-- [ ] `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md` updated
+- [x] Static acceptance tests pass
+- [x] `scripts/check` green
+- [x] `DECISIONS.md`, `docs/omarchy-influences.md`, `docs/roadmap.md` updated
 - [ ] Branch merged to `main`
