@@ -13,7 +13,7 @@ outlines; their scope is finalized in their own plan mode.
 | 4 | [Minimal Hyprland session](phases/phase-04-minimal-hyprland-session.md) | 2 | Claude | Hyprland login; terminal, audio, portals, polkit agent, notifications, idle/lock, wallpaper | Complete (2026-09-14) |
 | 5 | [Interaction](phases/phase-05-interaction.md) | 3 | Claude | Launcher, keybinding scheme, clipboard, screenshots, workspaces/rules, status bar, power menu | Complete (2026-09-14) |
 | 6 | [Visual system](phases/phase-06-visual-system.md) | 4 | Claude | Single palette source → component themes; fonts, GTK/Qt, icons, cursor, wallpapers | Complete (2026-09-14) |
-| 7 | Developer environment | 5 | Claude | Shell, prompt, Neovim, version manager, containers, git/gh config | Not started |
+| 7 | [Developer environment](phases/phase-07-developer-environment.md) | 5 | Claude | Shell, prompt, Neovim, version manager, containers, git/gh config | Complete (2026-09-14) |
 | 8 | Packages, reproducibility, recovery | cross-cutting | Claude + user | Categorized package inventory; audit script; idempotent bootstrap; fresh-VM rebuild from repo succeeds; backups | Not started |
 | 9 | Personal automation | 6 | Claude | Scripts, systemd user services/timers, integrations | Not started |
 | 10 | Physical hardware migration | 1–4 | Both | Microcode, GPU drivers, power management, Secure Boot/TPM, hardware package list | Not started |
@@ -34,6 +34,15 @@ outlines; their scope is finalized in their own plan mode.
   simpler than planned -- the wallpaper itself, not a named-theme library (D-0037).
   D-0042 also fixed a real, previously-silent bug: Phase 4's `hyprpaper.conf` never
   actually rendered a wallpaper at all.
+- **Phase 7:** resolved; see D-0043 to D-0049. The roadmap-vs-Phase-3 conflict on
+  containers was resolved in favor of Phase 7 owning it (D-0047, rootless Podman,
+  not Docker). Neovim ended up out of scope entirely -- the user's own personal
+  config is used directly, never packaged by this repo (D-0045). D-0048 records a
+  real incident: a personal email was briefly baked into a tracked file, caught by
+  CI's identifier scanner, fixed by splitting git config into tracked defaults +
+  an untracked local-identity include. D-0049 fixed a latent bug from Phase 6
+  (`install/link-home` silently refusing to link *any* package once
+  `wallpaper-set` had ever run).
 
 ## Cross-cutting concerns (checked in every phase)
 
