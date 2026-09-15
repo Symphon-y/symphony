@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# pkg-audit: compare installed packages against packages/*.txt in both directions.
+#
+# Usage: scripts/pkg-audit [--packages-dir DIR]
+#
+# Exits non-zero and prints findings (never a package name count alone -- always
+# the actual names, since that's the point) if:
+#   - any explicitly-installed package isn't declared anywhere in packages/*.txt
+#   - any declared package isn't installed at all, for any reason (a declared
+#     package present only as someone else's dependency still satisfies the
+#     declared intent -- diffutils/mkinitcpio is a real example found on this
+#     system -- so this checks presence, not install reason)
+#   - any foreign (AUR/hand-built) package isn't declared specifically in
+#     packages/desktop.txt -- the one file allowed to hold them, since CI installs
+#     packages/tooling.txt with plain pacman in a container with no AUR helper
+set -euo pipefail
+
+# comm requires its inputs sorted in the same collation it uses to check that,
+# so this has to cover comm's own invocations too, not just the sort steps that
+# feed it -- one locale for the whole script avoids that mismatch entirely.
+export LC_ALL=C
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+packages_dir=packages
+if [[ ${1:-} == --packages-dir ]]; then
+  packages_dir=$2
+fi
+
+installed=$(pacman -Qqe | sort)
+present=$(pacman -Qq | sort)
+declared=$(scripts/pkglist "$packages_dir"/*.txt)
+desktop_declared=$(scripts/pkglist "$packages_dir/desktop.txt")
+# pacman -Qqm exits non-zero when it finds no foreign packages; only the (empty)
+# output matters then, so a failing pipeline here isn't this script's failure.
+foreign=$(pacman -Qqm 2>/dev/null | sort || true)
+
+indent() {
+  echo "  ${1//$'\n'/$'\n  '}"
+}
+
+problems=0
+
+undeclared=$(comm -23 <(echo "$installed") <(echo "$declared"))
+if [[ -n $undeclared ]]; then
+  echo "installed but not declared in $packages_dir/*.txt:"
+  indent "$undeclared"
+  problems=$((problems + 1))
+fi
+
+not_installed=$(comm -13 <(echo "$present") <(echo "$declared"))
+if [[ -n $not_installed ]]; then
+  echo "declared in $packages_dir/*.txt but not installed at all:"
+  indent "$not_installed"
+  problems=$((problems + 1))
+fi
+
+if [[ -n $foreign ]]; then
+  undeclared_foreign=$(comm -23 <(echo "$foreign") <(echo "$desktop_declared"))
+  if [[ -n $undeclared_foreign ]]; then
+    echo "foreign (AUR/hand-built) but not declared in $packages_dir/desktop.txt:"
+    indent "$undeclared_foreign"
+    problems=$((problems + 1))
+  fi
+fi
+
+if ((problems > 0)); then
+  exit 1
+fi
+echo "pkg-audit: no drift"

@@ -21,12 +21,6 @@ duplicate_fstab_mountpoints() {
   awk '!/^[[:space:]]*#/ && NF { print $2 }' /etc/fstab | sort | uniq -d
 }
 
-undeclared_packages() {
-  LC_ALL=C comm -23 \
-    <(pacman -Qqe | LC_ALL=C sort) \
-    <("$REPO_ROOT/scripts/pkglist" "$REPO_ROOT"/packages/*.txt)
-}
-
 # Listening sockets not bound to loopback. DHCP clients (ports 68 and 546) keep a
 # socket open to receive lease renewals; they are clients, not services. sshd (22)
 # may be running on demand; phase-02.bats proves the firewall restricts who can reach it.
@@ -190,19 +184,16 @@ public_listeners() {
   assert_success
 }
 
-@test "packages: no foreign (AUR or hand-built) packages are installed" {
-  run pacman -Qqe
+@test "packages: installed packages match packages/*.txt in both directions, and every foreign package is a declared choice" {
+  # Originally two separate checks (explicit-vs-declared; zero-foreign-packages
+  # allowed at all). Phase 1 had no AUR packages; Phase 4 onward deliberately
+  # installs some via yay (D-0030), so "zero foreign packages" stopped being the
+  # right invariant -- "every one is declared, confined to desktop.txt" (the one
+  # file CI never installs with plain pacman) is. scripts/pkg-audit (Phase 8) is
+  # now the one place this logic lives; kept as an acceptance test here too since
+  # phase-01.bats is where this invariant started.
+  run "$REPO_ROOT/scripts/pkg-audit"
   assert_success
-  # pacman -Qm exits non-zero when it finds nothing, so only the output matters.
-  run pacman -Qqm
-  assert_output ""
-}
-
-@test "packages: every explicitly installed package is declared in packages/" {
-  run pacman -Qqe
-  assert_success
-  run undeclared_packages
-  assert_output ""
 }
 
 # --- security -----------------------------------------------------------------

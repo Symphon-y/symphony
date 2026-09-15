@@ -1,0 +1,15 @@
+# systemd --user units this repo enables deliberately. Units already enabled by
+# their own package's systemd preset (wireplumber, the pipewire sockets,
+# p11-kit-server) are NOT listed here -- they need nothing from us at all
+# (D-0031: prefer a package's own shipped service over hand-wiring one).
+#
+# install/enable-user-services (check|apply) is the one parser/runner for this
+# file, replacing the scattered `systemctl --user enable --now X Y Z` commands
+# typed by hand across Phases 4-5's tracking docs.
+
+mako.service              # notification daemon (Phase 4)
+hypridle.service          # idle detection (Phase 4)
+hyprpaper.service         # wallpaper (Phase 4)
+hyprpolkitagent.service   # polkit authentication agent (Phase 4)
+waybar.service            # status bar (Phase 5)
+cliphist.service          # clipboard history watcher (Phase 5)
