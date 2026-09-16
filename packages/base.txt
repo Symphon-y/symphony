@@ -11,3 +11,4 @@ man-pages       # Linux and POSIX man pages
 less            # pager for man, git, and systemctl output
 neovim          # system editor (configured in Phase 7)
 pacman-contrib  # paccache timer keeps the package cache from growing forever
+reflector       # keeps /etc/pacman.d/mirrorlist fresh; ships reflector.timer (Phase 9)

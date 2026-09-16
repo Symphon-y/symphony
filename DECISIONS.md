@@ -1172,3 +1172,135 @@ and the old entry is marked `Superseded by D-XXXX`.
   from-scratch rebuild has never been exercised end-to-end -- if one is ever
   needed for real and finds a gap this runbook missed, that's the moment to
   fix it, not a hypothetical to solve preemptively now.
+
+## D-0054 — Phase 9 scope: standard Arch upkeep, not bespoke personal automation
+
+- **Status:** Accepted (2026-09-15, Phase 9)
+- **Decision:** Phase 9's roadmap wording ("Personal automation") was
+  redirected by the user toward standard, idiomatic Arch system-upkeep
+  automation instead — the gap between this system and what a well-maintained
+  Arch install would already have, not bespoke personal scripts, media
+  management, or third-party integrations.
+- **Alternatives considered:** the roadmap's own open-ended framing, which
+  would have left the phase's scope entirely to Claude's guessing at what
+  "personal" automation the user might want with no concrete signal either
+  way.
+- **Reasoning:** "an Arch distribution, not a pile of personal scripts" is a
+  more concrete, verifiable target than an open-ended one — every gap this
+  phase closed (D-0055 through D-0059) was confirmed against the live system
+  first, not invented speculatively.
+- **Consequences:** genuinely personal automation (if ever wanted) stays
+  unscoped and undesigned; revisit only if a concrete need shows up.
+
+## D-0055 — Mirror freshness: reflector
+
+- **Status:** Accepted (2026-09-15, Phase 9)
+- **Decision:** `reflector` (official `extra`), configured via
+  `system/reflector/reflector.conf` (`--save /etc/pacman.d/mirrorlist
+  --protocol https --country "United States" --latest 5 --sort rate`),
+  enabled via its own shipped `reflector.timer`.
+- **Alternatives considered:** leaving the mirrorlist as the static
+  install-media snapshot it had been since Phase 1 — confirmed genuinely
+  stale (dated 2026-09-01, never refreshed).
+- **Reasoning:** reflector's Arch package already ships both
+  `reflector.service` and `reflector.timer` — this is an install-and-enable,
+  not a from-scratch unit. Country inferred from the VM's already-configured
+  timezone (`America/Chicago` → United States) rather than asking a redundant
+  question.
+- **Consequences:** found and fixed a real bug testing this for real, not
+  hypothetically: `--country "United States"` needs its value quoted, since
+  reflector's config parser (Python's `shlex`) splits unquoted words the same
+  way a shell would — the unquoted form silently broke into two arguments,
+  reflector only consuming the first (`United`) and erroring on the stray
+  second (`States`). Confirmed fixed by actually running `reflector.service`
+  and inspecting the regenerated mirrorlist's fresh timestamp, not by reading
+  the config and assuming it was right.
+
+## D-0056 — Btrfs scrub, `pacman -F` freshness, and a root-level services mechanism
+
+- **Status:** Accepted (2026-09-15, Phase 9)
+- **Decision:** enabled `btrfs-scrub@-.timer` (`btrfs-progs`, already
+  installed; `-` is `systemd-escape --path /`, covering this machine's single
+  Btrfs filesystem in one instance) and `pacman-filesdb-refresh.timer`
+  (`pacman-contrib`, already installed) — both package-shipped, found disabled.
+  Enabling them (plus reflector.timer, D-0055) needed a new mechanism:
+  `system/services-root.txt` + `install/enable-root-services check|apply`,
+  mirroring Phase 8's `system/services-user.txt` + `install/
+  enable-user-services` exactly, at root scope (needs root, so the user runs
+  `apply`, never Claude).
+- **Alternatives considered:** continuing to enable root-scope timers as ad hoc
+  inline `systemctl enable` calls (the prior pattern, inside
+  `install/configure-base-system`) — workable for a handful of enables at
+  install time, but this phase alone added three more, past the point where a
+  flat declared list plus a real `check` command is worth having.
+- **Reasoning:** both timers were sitting disabled despite being fully
+  package-shipped — genuine, low-cost gaps, not judgment calls. The mechanism
+  itself was worth building once there were three new root timers to enable in
+  one phase, not just one.
+- **Consequences:** any future root-scope timer this repo wants to enable goes
+  through this same declared-list mechanism instead of another ad hoc
+  `systemctl enable` call.
+
+## D-0057 — Journal size: an explicit cap, not the compiled-in default
+
+- **Status:** Accepted (2026-09-15, Phase 9)
+- **Decision:** `system/journald/10-autarchy.conf` →
+  `/etc/systemd/journald.conf.d/10-autarchy.conf`, setting `SystemMaxUse=500M`.
+- **Alternatives considered:** a periodic `journalctl --vacuum-*` timer —
+  rejected once confirmed that journald already self-limits continuously as it
+  writes (a boundary it enforces itself, not a periodic job); the actual gap
+  was that the boundary was journald's own large, unreasoned compiled-in
+  default (roughly 10% of the journal's filesystem) rather than an explicit,
+  sized one.
+- **Reasoning:** an explicit cap is a one-line, no-timer fix for exactly the
+  problem "unbounded-feeling log growth" describes, matching how journald
+  itself is designed to be configured.
+- **Consequences:** none of note; a config value, changeable in one place if
+  500M ever proves wrong in either direction.
+
+## D-0058 — AUR build cache: yay's own `cleanAfter`, not a periodic clean timer
+
+- **Status:** Accepted (2026-09-15, Phase 9)
+- **Decision:** `home/yay/dot-config/yay/config.json` (`{"cleanAfter": true}`)
+  — yay deletes each package's build sources immediately after a successful
+  build, so `~/.cache/yay` (59M and growing at the time this was checked)
+  never accumulates in the first place.
+- **Alternatives considered:** a custom oneshot service + timer running
+  `yay -Sc --noconfirm` periodically — the user chose `cleanAfter` instead,
+  trading away reusable build caches on a rebuild (which happens rarely here)
+  for not needing a new custom unit at all.
+- **Reasoning:** yay has no systemd integration of its own for cache cleanup;
+  its own persistent-config mechanism already solves the actual problem more
+  simply than a new timer would.
+- **Consequences:** found a real gotcha verifying this empirically before
+  writing it: yay's `--config` flag is pacman's own config-file flag (for an
+  alternate `pacman.conf`), not a way to point at yay's *own* settings file —
+  confirmed by testing directly (`yay --config <file>` on a JSON file produced
+  a pacman-style INI parse error). yay's own settings are only ever
+  auto-discovered at `~/.config/yay/config.json`, confirmed by testing a
+  minimal file there directly and observing no error.
+
+## D-0059 — Update visibility: `checkupdates` + notification, never auto-applying
+
+- **Status:** Accepted (2026-09-15, Phase 9)
+- **Decision:** `home/update-notify/` — a `systemd --user` timer (daily) running
+  a script that calls `checkupdates --change` (`pacman-contrib`, already
+  installed) and sends a desktop notification only when the set of pending
+  updates is new, never applying anything itself.
+- **Alternatives considered:** an unattended `pacman -Syu` timer — the
+  well-known Arch anti-pattern (partial-upgrade risk from an unattended,
+  unreviewed upgrade); never seriously considered.
+- **Reasoning:** `checkupdates` is the standard, safe way to list pending
+  updates without touching the live pacman database (no lock contention, no
+  risk to an in-progress transaction). Its own `--change` flag already solves
+  notification-spam (only prints when the pending set differs from last time)
+  — confirmed from its actual source after the man page's prose describing it
+  proved ambiguous on a first empirical test.
+- **Consequences:** tested end-to-end against this VM's real pending updates
+  (13, at the time), not a synthetic fixture: the first run produced a genuine
+  mako notification (confirmed via `makoctl history`), and a second run
+  correctly produced no duplicate. Also fixed a real, narrow false positive
+  found in `scripts/check-identifiers` along the way: systemd's
+  escaped-root-path instance units (`btrfs-scrub@-.timer`, from D-0056)
+  coincidentally match the email-address detection pattern, the same class of
+  issue already handled for SSH algorithm names.

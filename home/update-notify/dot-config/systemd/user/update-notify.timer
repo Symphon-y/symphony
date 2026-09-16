@@ -1,0 +1,10 @@
+# Target: ~/.config/systemd/user/update-notify.timer (linked by install/link-home)
+[Unit]
+Description=Check for pending package updates daily
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target
