@@ -87,7 +87,9 @@ File: `tests/acceptance/phase-10.bats`
 | release workflow | `.github/workflows/release-iso.yml` exists, is valid YAML, triggers on a date-shaped tag |
 | new scripts | `install/install-base-system` and `scripts/update` exist, are executable, shellcheck/shfmt-clean (via `scripts/check`) |
 
-Red confirmed: · Green confirmed:
+Red confirmed: 2026-09-16, all failing cleanly before implementation existed
+· Green confirmed: 2026-09-16, 13/13; full `scripts/check` green (121/121
+unit tests, shellcheck/shfmt/JSON/YAML/identifiers)
 
 ## Tasks
 
@@ -100,13 +102,13 @@ Red confirmed: · Green confirmed:
 - [x] `scripts/update` + unit tests (11/11 green) + `docs/runbooks/update.md`
 - [x] `scripts/check` updated to cover `iso/` shell files and YAML syntax
 - [x] `docs/runbooks/base-install.md` updated with both paths
-- [ ] Green: 11/13 `phase-10.bats` green; 2 blocked on `yq` (declared in
-      `packages/tooling.txt`, needs the user to install -- Claude can't
-      `sudo`); full unit suite (121/121) and full acceptance suite otherwise
-      unaffected, no regressions
+- [x] Green: 13/13 `phase-10.bats`; full `scripts/check` green (121/121
+      unit tests). User installed `yq`; also caught that Arch's `yq`
+      package is kislyuk/yq (a jq wrapper: `yq '.filter' file`), not
+      mikefarah/yq (`yq eval '.filter' file`) -- fixed both `scripts/check`
+      and the acceptance tests to the real installed syntax
 - [ ] Verify a real tag push produces a release ISO on a real GitHub Release
-      (needs the user's go-ahead -- pushes to the remote and spends real
-      Actions minutes)
+      (in progress -- user approved pushing a test tag)
 - [ ] Exercise `scripts/update` against the live VM for real
 - [x] Close: `DECISIONS.md` (D-0061, D-0062), `docs/omarchy-influences.md`,
       `docs/roadmap.md`

@@ -29,7 +29,7 @@ done < <(find home system -name '*.json')
 
 echo "==> YAML syntax"
 while IFS= read -r yaml; do
-  yq eval '.' "$yaml" >/dev/null
+  yq '.' "$yaml" >/dev/null
 done < <(find .github/workflows -name '*.yml' 2>/dev/null)
 
 echo "==> identifiers"
