@@ -17,6 +17,7 @@ outlines; their scope is finalized in their own plan mode.
 | 8 | [Packages, reproducibility, recovery](phases/phase-08-packages-reproducibility-recovery.md) | cross-cutting | Claude + user | Categorized package inventory; audit script; idempotent bootstrap; fresh-VM rebuild from repo succeeds; backups | Complete (2026-09-15) |
 | 9 | [Personal automation](phases/phase-09-personal-automation.md) | 6 | Claude | Scripts, systemd user services/timers, integrations | Complete (2026-09-16) |
 | 10 | Physical hardware migration | 1–4 | Both | Microcode, GPU drivers, power management, Secure Boot/TPM, hardware package list | Not started |
+| 11 | [Default browser and web-app launching](phases/phase-11-default-browser.md) | 3 | Claude + user | A real default browser installed and declared; Phase 5's dormant web-app-launcher mechanism actually works | Complete (2026-09-16) |
 
 ## Decisions deferred to their phase's plan mode
 
@@ -64,6 +65,21 @@ outlines; their scope is finalized in their own plan mode.
   source. A real, unrelated bug also surfaced mid-phase (the VM hanging on
   guest suspend) -- diagnosed but left open by the user's own choice; see
   the tracking doc's "VM → physical hardware notes."
+- **Phase 10:** paused, not abandoned. Research (t2linux specifics for the
+  2019 16" MacBook Pro) turned up real risk (unsigned kernel repo, a
+  documented GPU hang/overheating pattern on this exact chassis, no LTS
+  kernel fallback equivalent) that led the user to set that specific target
+  aside in favor of a different, not-yet-chosen device. No branch or tracking
+  doc was created; resume with fresh hardware research once a device is
+  picked.
+- **Phase 11:** resolved; see D-0060. Not on the original roadmap -- new,
+  user-requested scope closing a real dormant bug: Phase 5 (D-0034) built the
+  web-app-launcher mechanism assuming a default browser would exist, but no
+  phase ever installed one, and tracing the live, empty `xdg-settings get
+  default-web-browser` output confirmed it would have hard-failed if used.
+  In passing, added `install/install-packages` after the user pointed out
+  the manual `yay -S --needed $(scripts/pkglist packages/*.txt)` command had
+  caused two real past mistakes (Phases 8 and 9) from being retyped by hand.
 
 ## Cross-cutting concerns (checked in every phase)
 
