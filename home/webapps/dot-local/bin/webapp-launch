@@ -15,8 +15,17 @@ fi
 
 url=$1
 default=$(xdg-settings get default-web-browser)
+if [[ -z $default ]]; then
+  echo "webapp-launch: no default web browser is set (xdg-settings get default-web-browser was empty)" >&2
+  exit 1
+fi
+
 exec_line=$(grep -m1 '^Exec=' "/usr/share/applications/$default" 2>/dev/null | sed 's/^Exec=//; s/ %.*//')
 browser=${exec_line%% *}
+if [[ -z $browser ]]; then
+  echo "webapp-launch: couldn't find a usable Exec= line for '$default' in /usr/share/applications" >&2
+  exit 1
+fi
 
 case "$browser" in
   *chromium* | *chrome* | *brave* | *vivaldi* | *edge* | *helium*)

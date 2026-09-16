@@ -1304,3 +1304,39 @@ and the old entry is marked `Superseded by D-XXXX`.
   escaped-root-path instance units (`btrfs-scrub@-.timer`, from D-0056)
   coincidentally match the email-address detection pattern, the same class of
   issue already handled for SSH algorithm names.
+
+## D-0060 — Default browser: Chromium, and closing a dormant Phase 5 gap
+
+- **Status:** Accepted (2026-09-16, Phase 11)
+- **Decision:** `chromium` (official `extra`, FOSS) as the system default
+  browser, registered declaratively via `home/xdg/dot-config/mimeapps.list`
+  (content verified by actually running `xdg-settings set
+  default-web-browser chromium.desktop` and reading the real result, not
+  guessed). `xdg-utils` also declared explicitly (it was already installed as
+  a transitive dependency, never declared). `webapp-launch` (Phase 5, D-0034)
+  fixed to fail with a clear, actionable error instead of a cryptic bash
+  `exec` failure when no default browser is resolvable.
+- **Alternatives considered:** Firefox (official, FOSS, but `webapp-launch`'s
+  app-mode `--app=<url>` only works with a Chromium-family browser — Firefox
+  falls back to a plain tab); Google Chrome (the named example, but AUR-only
+  and proprietary, with no functional advantage over Chromium for this
+  project's actual need).
+- **Reasoning:** research confirmed no browser had ever been installed by any
+  phase — Phase 5 built the web-app-launcher mechanism on the assumption one
+  would exist by the time anyone used it, but that dependency was never
+  closed. Tracing `webapp-launch`'s actual logic with the live, empty
+  `xdg-settings get default-web-browser` output confirmed it would hard-fail
+  if invoked — a real, previously-undiscovered dormant bug, not a
+  hypothetical one. fuzzel (the launcher) needed no changes at all: confirmed
+  via its actual config that it already does standard XDG desktop-file
+  discovery, so any new GUI package's `.desktop` entry becomes launchable
+  automatically.
+- **Consequences:** verified end to end, not just configured: `webapp-install`
+  produces a real, working `.desktop` entry, and `webapp-launch` launches a
+  genuine Chromium process resolved through the new default (confirmed via
+  `hyprctl clients` showing a real window). In passing, added
+  `install/install-packages` (wrapping `yay -S --needed
+  $(scripts/pkglist packages/*.txt)`) after the user pointed out this exact
+  command had been retyped from memory every phase since Phase 4, including
+  two real past mistakes (Phase 8, Phase 9) where plain `pacman -S` silently
+  aborted on AUR-only packages — `docs/runbooks/rebuild.md` updated to use it.
