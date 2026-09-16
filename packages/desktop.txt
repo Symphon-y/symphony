@@ -37,6 +37,14 @@ linux-firmware-intel               # optional dep of gpu-screen-recorder (D-0036
 zbar                              # QR code decoding for capture
 libnotify                          # notify-send, for qr-capture's success/failure feedback
 
+# Default browser (Phase 11): closes a real gap -- Phase 5's webapp-install/
+# webapp-launch assumed a browser would exist by the time anyone used them, but
+# none ever did. Chromium specifically: webapp-launch's app-mode (--app=<url>)
+# only works with a Chromium-family browser.
+chromium                           # default browser; also drives webapp-launch's app-mode windows
+xdg-utils                          # xdg-settings/xdg-open; was already installed transitively,
+                                    # never declared until now (a real pkg-audit gap)
+
 # Visual system (Phase 6): fonts, icons, cursor, GTK/Qt theming -- see D-0037 onward.
 ttf-jetbrains-mono-nerd            # terminal/bar/UI font, matches the fontconfig override
 papirus-icon-theme                 # icon theme (Papirus-Dark)

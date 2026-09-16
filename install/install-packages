@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# install-packages: install every package declared across packages/*.txt.
+#
+# Usage: install/install-packages [--packages-dir DIR] [yay-args...]
+#
+# Thin wrapper around `yay -S --needed $(scripts/pkglist packages/*.txt)` -- the
+# exact command every phase since Phase 4 had the user retype from memory,
+# including two real slip-ups (Phase 8, Phase 9) where plain `pacman -S` got
+# used instead and silently aborted the whole transaction on the AUR-only
+# packages in packages/desktop.txt (pacman validates every target before
+# installing anything). One script, one name, nothing left to misremember.
+set -euo pipefail
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+
+packages_dir="$REPO_ROOT/packages"
+if [[ ${1:-} == --packages-dir ]]; then
+  packages_dir=$2
+  shift 2
+fi
+
+if ! command -v yay &>/dev/null; then
+  echo "install-packages: yay not found -- bootstrap it first (see packages/external.md)" >&2
+  exit 1
+fi
+
+mapfile -t packages < <("$REPO_ROOT/scripts/pkglist" "$packages_dir"/*.txt)
+exec yay -S --needed "$@" "${packages[@]}"
