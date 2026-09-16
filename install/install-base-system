@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+# install-base-system: partition, encrypt, format, and pacstrap a fresh disk,
+# then hand off to configure-base-system (runbook step 6).
+#
+# Usage: install/install-base-system VARS_FILE [TARGET]
+#   VARS_FILE  per-install values (docs/runbooks/base-install.vars.example)
+#   TARGET     where the new system is mounted (default: /mnt)
+#
+# Covers base-install.md steps 4-5 (partition/LUKS/Btrfs/ESP/pacstrap/fstab),
+# then runs configure-base-system (step 6) as its last step. Driven entirely
+# by the vars file and system/storage/{layout.conf,subvolumes.txt} -- the
+# only interactive moment is one destructive-action confirmation before
+# $DISK is touched. Collect-once-then-run-unattended, the same shape
+# Windows/macOS installers use (Phase 10), built our own way: no
+# archinstall, no TUI, no Omarchy code.
+set -Eeuo pipefail
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+readonly REPO_ROOT
+readonly CONFIGURE_SCRIPT="${AUTARCHY_CONFIGURE_SCRIPT:-$REPO_ROOT/install/configure-base-system}"
+
+readonly REQUIRED_VARS=(DISK HOST USERNAME TZONE LOCALE KEYMAP)
+
+trap 'printf "install-base-system: failed at line %s: %s\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
+
+log() {
+  printf '==> %s\n' "$*"
+}
+
+die() {
+  printf 'install-base-system: %s\n' "$*" >&2
+  exit 1
+}
+
+usage() {
+  echo "usage: install-base-system VARS_FILE [TARGET]" >&2
+  exit 2
+}
+
+load_config() {
+  local vars_file=$1 name
+  [[ -r $vars_file ]] || die "cannot read vars file '$vars_file'"
+
+  # shellcheck source-path=SCRIPTDIR source=../system/storage/layout.conf
+  source "$REPO_ROOT/system/storage/layout.conf"
+  # shellcheck disable=SC1090 # per-install file, chosen at runtime
+  source "$vars_file"
+
+  for name in "${REQUIRED_VARS[@]}"; do
+    [[ -n ${!name:-} ]] || die "$name is not set in $vars_file"
+  done
+}
+
+# Every check goes through lsblk so it can be stubbed the same way in tests
+# as every other external command here -- [[ -b ... ]] is a shell builtin
+# and can't be.
+preflight() {
+  (($(id -u) == 0)) || die "must run as root"
+  [[ $(lsblk -dno TYPE "$DISK" 2>/dev/null) == disk ]] || die "'$DISK' is not a block device"
+  mountpoint -q "$TARGET" && die "$TARGET is already mounted -- unmount before running this"
+  local mounted
+  mounted=$(lsblk -no MOUNTPOINT "$DISK" 2>/dev/null | grep -c . || true)
+  ((mounted == 0)) || die "'$DISK' has a mounted partition -- unmount it first"
+}
+
+# The one interactive moment: typing the disk path back, not just y/n, so a
+# reflexive Enter can't confirm the wrong disk.
+confirm_destructive() {
+  log "This will ERASE EVERYTHING on $DISK and partition it for autarchy."
+  local reply
+  read -rp "Type the disk path ($DISK) to continue: " reply
+  [[ $reply == "$DISK" ]] || die "confirmation did not match '$DISK', aborting"
+}
+
+partition_disk() {
+  log "Partitioning $DISK"
+  sgdisk --zap-all "$DISK"
+  sgdisk -n "1:0:+$ESP_SIZE" -t 1:ef00 -c "1:$ESP_PARTLABEL" \
+    -n 2:0:0 -t 2:8309 -c "2:$LUKS_PARTLABEL" "$DISK"
+  partprobe "$DISK"
+  udevadm settle
+}
+
+subvolumes() {
+  grep -Ev '^[[:space:]]*(#|$)' "$REPO_ROOT/system/storage/subvolumes.txt"
+}
+
+encrypt_and_format() {
+  local esp_dev="/dev/disk/by-partlabel/$ESP_PARTLABEL"
+  local luks_dev="/dev/disk/by-partlabel/$LUKS_PARTLABEL"
+  local subvol mountpoint
+
+  log "Encrypting $luks_dev"
+  cryptsetup luksFormat --type luks2 "$luks_dev"
+  cryptsetup open --allow-discards --persistent "$luks_dev" "$LUKS_MAPPER"
+
+  log "Creating Btrfs subvolumes"
+  mkfs.btrfs -L "$BTRFS_LABEL" "/dev/mapper/$LUKS_MAPPER"
+  mount "/dev/mapper/$LUKS_MAPPER" /mnt
+  while read -r subvol mountpoint; do
+    btrfs subvolume create "/mnt/$subvol"
+  done < <(subvolumes)
+  umount /mnt
+
+  while read -r subvol mountpoint; do
+    mount --mkdir -o "$BTRFS_MOUNT_OPTS,subvol=$subvol" \
+      "/dev/mapper/$LUKS_MAPPER" "$TARGET$mountpoint"
+  done < <(subvolumes)
+
+  log "Formatting the ESP"
+  mkfs.fat -F 32 -n ESP "$esp_dev"
+  mount --mkdir -o fmask=0077,dmask=0077 "$esp_dev" "$TARGET$ESP_MOUNT"
+}
+
+install_packages_and_fstab() {
+  log "Installing packages (pacstrap)"
+  local packages=()
+  mapfile -t packages < <("$REPO_ROOT/scripts/pkglist" "$REPO_ROOT"/packages/*.txt)
+  pacstrap -K "$TARGET" "${packages[@]}"
+
+  # `>` not `>>`: re-running this must not duplicate every fstab entry.
+  genfstab -U "$TARGET" >"$TARGET/etc/fstab"
+  # Mount by subvolume name only: subvolid= would pin the IDs and break rollback.
+  sed -i 's/subvolid=[0-9]*,//g' "$TARGET/etc/fstab"
+}
+
+main() {
+  (($# >= 1 && $# <= 2)) || usage
+  local vars_file=$1
+  TARGET=${2:-/mnt}
+
+  load_config "$vars_file"
+  preflight
+  confirm_destructive
+
+  partition_disk
+  encrypt_and_format
+  install_packages_and_fstab
+
+  log "Base disk layout done. Handing off to configure-base-system."
+  "$CONFIGURE_SCRIPT" "$vars_file" "$TARGET"
+}
+
+main "$@"
