@@ -1,0 +1,66 @@
+# Builds a bootable autarchy installer ISO from a tagged commit on main and
+# publishes it as a GitHub Release (Phase 10). Own archiso profile
+# (iso/profile/), no Omarchy code, no custom package mirror/repo (D-0050).
+#
+# mkarchiso needs root/loop-device/squashfs capabilities archiso itself
+# doesn't have on a plain ubuntu-latest runner, so the actual build runs
+# inside a --privileged Arch container via `docker run` -- the same
+# corroborated pattern real archiso-on-GitHub-Actions projects use
+# (including Omarchy's own omarchy-iso, researched directly: same
+# --privileged-container-plus-mkarchiso shape, though that project publishes
+# through its own object storage rather than GitHub Releases).
+name: release-iso
+
+on:
+  push:
+    tags:
+      - "20*.*.*" # date-based tags only, e.g. 2026.09.16
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      # mkarchiso's offline-mirror-free build is still sizeable; the
+      # runner's default free space is tight once Docker images and build
+      # artifacts land alongside the toolcache.
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+        with:
+          tool-cache: true
+          docker-images: false
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Baked into the ISO so autarchy-bootstrap knows which tag to clone.
+      - name: Record the release tag
+        run: echo "${GITHUB_REF_NAME}" >iso/profile/airootfs/etc/autarchy-release
+
+      - name: Build the ISO
+        run: |
+          docker run --rm --privileged \
+            -v "$PWD:/workspace" -w /workspace \
+            archlinux:latest \
+            bash -c "pacman -Sy --noconfirm archiso && \
+                     mkarchiso -v -w /tmp/work -o /workspace/out iso/profile && \
+                     chown -R $(id -u):$(id -g) /workspace/out"
+
+      - name: Rename and checksum the ISO
+        run: |
+          cd out
+          iso=$(ls -- *.iso)
+          mv -- "$iso" "autarchy-${GITHUB_REF_NAME}.iso"
+          sha256sum "autarchy-${GITHUB_REF_NAME}.iso" >"autarchy-${GITHUB_REF_NAME}.iso.sha256"
+
+      - name: Publish the GitHub Release
+        uses: softprops/action-gh-release@6da8fa9354ddfdc4aeace5fc48d7f679b5214090 # v2.4.1
+        with:
+          files: |
+            out/autarchy-${{ github.ref_name }}.iso
+            out/autarchy-${{ github.ref_name }}.iso.sha256
+          generate_release_notes: true

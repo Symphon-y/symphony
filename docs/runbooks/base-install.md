@@ -1,7 +1,31 @@
 # Runbook: Base Arch Install
 
 Reusable procedure for installing the autarchy base system. It is used in Phase 1 (lab
-VM), and again for the rebuild test (Phase 8) and physical hardware (Phase 10).
+VM), and again for the rebuild test (Phase 8) and physical hardware (Phase 12).
+
+**Two ways to run this, since Phase 10:**
+
+- **Release ISO (fast path).** Boot the ISO published on the repo's GitHub
+  Releases page (built by `.github/workflows/release-iso.yml` from a tagged
+  commit on `main`). `git`, `gh`, and the test tools are already installed,
+  and running `autarchy-bootstrap` replaces step 1's manual typing below
+  with one command. Steps 4-6 (partition, encrypt, format, pacstrap,
+  configure) are replaced by one script:
+  ```sh
+  sudo install/install-base-system base-install.local.vars
+  ```
+  It reads the same vars file steps 1-3 below still produce, prints exactly
+  what it's about to do to `$DISK`, requires typing the disk path back to
+  confirm before anything destructive happens, then runs unattended through
+  to a rebootable system -- covering steps 4-6 in one command instead of
+  typing each one by hand. From there, continue at step 7.
+- **Stock Arch ISO (manual path, kept as the documented fallback).** Every
+  step below, typed by hand -- still the recovery path from the "Recovery"
+  section at the end, and still how this runbook stays understandable step
+  by step (D-0009).
+
+Both paths produce an identical result, verified by the same
+`tests/acceptance/phase-01.bats`.
 
 **Result:** an encrypted Btrfs root with snapshots, booted by systemd-boot from unified
 kernel images, with no listening network services. It is verified by
@@ -35,6 +59,12 @@ section at the end of this runbook, or reinstall from step 1.
 ## 1. Get the repo onto the live ISO
 
 Boot the ISO and wait for the root prompt.
+
+**On the release ISO**, `git`/`gh` are already installed and `autarchy-bootstrap`
+replaces everything below down to (not including) `source base-install.local.vars`:
+just run `autarchy-bootstrap`, then follow its printed next steps.
+
+**On a stock Arch ISO:**
 
 ```sh
 # The ISO's writable overlay defaults to a small RAM disk; git, gh, and bats need more.
@@ -98,6 +128,11 @@ git push
 Most tests should report `not ok`. The UEFI test may pass already; that's expected.
 
 ## 4. Partition, encrypt, create filesystems
+
+**On the release ISO**, `install/install-base-system base-install.local.vars`
+does steps 4-6 in one command (see the top of this runbook) -- skip to
+step 7. The manual commands below are the fallback path and what that script
+itself runs.
 
 ```sh
 lsblk                                  # confirm $DISK is the blank target disk

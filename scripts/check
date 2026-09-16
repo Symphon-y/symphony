@@ -11,6 +11,7 @@ done < <(
   find scripts install -type f | sort
   find home -path '*/dot-local/bin/*' -type f | sort
   find migrations -name '*.sh' -type f 2>/dev/null | sort
+  find iso/profile/airootfs -type f -path '*/bin/*' 2>/dev/null | sort
   printf '%s\n' system/*/*.sh tests/helpers/*.bash tests/unit/*.bats tests/acceptance/*.bats
   printf '%s\n' home/bash/dot-bashrc
 )
@@ -25,6 +26,11 @@ echo "==> JSON syntax"
 while IFS= read -r json; do
   jq empty "$json"
 done < <(find home system -name '*.json')
+
+echo "==> YAML syntax"
+while IFS= read -r yaml; do
+  yq '.' "$yaml" >/dev/null
+done < <(find .github/workflows -name '*.yml' 2>/dev/null)
 
 echo "==> identifiers"
 scripts/check-identifiers

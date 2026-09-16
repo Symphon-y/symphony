@@ -41,7 +41,7 @@ assumed.
 
 | Component | Our layer | Phase | Decision |
 |---|---|---|---|
-| Installer / bootstrap flow | 1 | 1, 8 | REJECT (D-0009) |
+| Installer / bootstrap flow | 1 | 1, 8, 10 | REJECT Omarchy's mechanism; own bootable media built independently (D-0009, D-0061) |
 | Disk layout, encryption, snapshots, bootloader | 1 | 1 | ADAPT (D-0010–D-0012) |
 | Firewall | 1 | 1 | ADAPT (D-0015) |
 | Base services | 1 | 1 | ADAPT (D-0014) |
@@ -91,6 +91,22 @@ Phase 1 entries, researched from source on 2026-09-12 (`omacom/omarchy-iso` and
 - Reason: we want to understand every step; our install automation (Phase 8) will be our
   own design.
 - Related decision: D-0009
+
+**Phase 10 addendum (researched 2026-09-16):** revisited when the user asked
+for a custom, releasable installer ISO instead of re-running the manual
+runbook by hand on new hardware. Fresh research into Omarchy's *own* ISO
+tooling (`omacom/omarchy-iso`, not researched in Phase 1) found it depends
+on a self-hosted package mirror and custom repo to work around `archiso`'s
+real limitation (no AUR during a build) — exactly the "custom repo/mirror"
+shape already REJECTed elsewhere in this document (see "Package selection,"
+D-0050). That REJECT stands, corroborated rather than reopened. Separately,
+re-reading D-0009's own REJECT confirmed it targets Omarchy's specific
+mechanism — the gum TUI configurator feeding a Python orchestrator on
+`archinstall` — not custom bootable media as a category. A stock-`archiso`
+profile of our own, no Omarchy code, no archinstall, no TUI, no custom
+mirror, was built independently on that basis: see D-0061. The REJECT verdict
+above is unchanged; this addendum records why building our own installer
+media doesn't reopen it.
 
 ### Disk layout, encryption, snapshots, bootloader
 - Omarchy approach: GPT with a 2 GiB EFI partition and root; LUKS on by default
