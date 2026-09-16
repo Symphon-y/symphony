@@ -92,7 +92,7 @@ design)
 - [x] Close: `DECISIONS.md` (D-0054–D-0059), `docs/roadmap.md` (no
       `docs/omarchy-influences.md` entries -- none of this phase's topics were
       ever covered by Omarchy's source, confirmed during research)
-- [ ] Merge to `main`
+- [x] Merge to `main`
 
 ## Implementation log
 
@@ -179,4 +179,4 @@ design)
 - [x] Static and live-session acceptance tests both pass
 - [x] `scripts/check` green
 - [x] `DECISIONS.md`, `docs/roadmap.md` updated
-- [ ] Branch merged to `main`
+- [x] Branch merged to `main`
