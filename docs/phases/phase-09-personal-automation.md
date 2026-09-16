@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Status** | In progress |
+| **Status** | Complete |
 | **Driver** | Claude + user |
 | **Branch** | `phase/09-personal-automation` |
 | **Started** | 2026-09-15 |
-| **Completed** | |
+| **Completed** | 2026-09-16 |
 
 ## Goal
 
@@ -56,7 +56,8 @@ File: `tests/acceptance/phase-09.bats`
 
 Red confirmed: 2026-09-16, 6/8 failing (1 trivial pass -- `enable-user-services
 check` has nothing to check yet; 1 correctly skipped -- manual live-session) ·
-Green confirmed:
+Green confirmed: 2026-09-16, 7/7 (1 remains a manual live-session skip by
+design)
 
 ## Tasks
 
@@ -82,9 +83,15 @@ Green confirmed:
       out to describe it ambiguously)
 - [x] Static acceptance tests green for everything not gated on root (4/8);
       `scripts/check` green (95/95 unit tests)
-- [ ] User: install reflector, `sync-system apply`, `enable-root-services
-      apply`, confirm mirrorlist refresh
-- [ ] Close: `DECISIONS.md`, `docs/roadmap.md`
+- [x] User: installed packages (via `yay`, after a plain-`pacman` AUR-mismatch
+      false start -- same class of slip as prior phases), `sync-system apply`,
+      `enable-root-services apply`, confirmed a real mirrorlist refresh
+      (`reflector.service` exit 0, `/etc/pacman.d/mirrorlist` regenerated with
+      a fresh timestamp, replacing the stale 2026-09-01 install-media
+      snapshot) -- caught and fixed a real bug along the way (see log)
+- [x] Close: `DECISIONS.md` (D-0054–D-0059), `docs/roadmap.md` (no
+      `docs/omarchy-influences.md` entries -- none of this phase's topics were
+      ever covered by Omarchy's source, confirmed during research)
 - [ ] Merge to `main`
 
 ## Implementation log
@@ -121,6 +128,22 @@ Green confirmed:
   unit tests); static acceptance tests green except the four steps gated on
   the user's own `sudo` (package install, `sync-system apply`,
   `enable-root-services apply`).
+- User ran the sudo-gated steps. First attempt used plain `pacman -S` instead
+  of `yay -S` for the package install -- aborted the whole transaction before
+  installing anything (including `reflector`) because `packages/desktop.txt`
+  deliberately holds AUR-only packages plain pacman can't resolve; same class
+  of mistake documented in earlier phases, fixed by re-running with `yay`.
+- **Found a real bug testing `reflector.service` for real**: it failed with
+  `error: unrecognized arguments: States`. The config's `--country "United
+  States"` value has a space, and reflector's config parser (Python's `shlex`)
+  splits unquoted words the same way a shell would -- `United States`
+  unquoted became two separate tokens, `--country` only consumed `United`,
+  leaving `States` as a stray unrecognized argument. Fixed by quoting the
+  value (`--country "United States"`); confirmed on the next real run:
+  `reflector.service` exited 0 and `/etc/pacman.d/mirrorlist` was regenerated
+  fresh (2026-09-16), replacing the stale 2026-09-01 install-media snapshot.
+  Full acceptance suite re-run: Phase 9's own 7/7 (real checks) green, no
+  regressions anywhere else.
 
 ## VM → physical hardware notes
 
@@ -153,7 +176,7 @@ Green confirmed:
 
 ## Exit criteria
 
-- [ ] Static and live-session acceptance tests both pass
-- [ ] `scripts/check` green
-- [ ] `DECISIONS.md`, `docs/roadmap.md` updated
+- [x] Static and live-session acceptance tests both pass
+- [x] `scripts/check` green
+- [x] `DECISIONS.md`, `docs/roadmap.md` updated
 - [ ] Branch merged to `main`
