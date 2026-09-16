@@ -117,7 +117,7 @@ unit tests, shellcheck/shfmt/JSON/YAML/identifiers)
 - [x] Exercise `scripts/update` against the live VM for real
 - [x] Close: `DECISIONS.md` (D-0061, D-0062), `docs/omarchy-influences.md`,
       `docs/roadmap.md`
-- [ ] Merge to `main`
+- [x] Merge to `main`
 
 ## Implementation log
 
@@ -205,4 +205,4 @@ unit tests, shellcheck/shfmt/JSON/YAML/identifiers)
 - [x] `DECISIONS.md` updated
 - [x] `docs/omarchy-influences.md` updated
 - [x] `docs/roadmap.md` status updated
-- [ ] Branch merged to `main`
+- [x] Branch merged to `main`

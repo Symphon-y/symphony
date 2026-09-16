@@ -16,7 +16,7 @@ outlines; their scope is finalized in their own plan mode.
 | 7 | [Developer environment](phases/phase-07-developer-environment.md) | 5 | Claude | Shell, prompt, Neovim, version manager, containers, git/gh config | Complete (2026-09-14) |
 | 8 | [Packages, reproducibility, recovery](phases/phase-08-packages-reproducibility-recovery.md) | cross-cutting | Claude + user | Categorized package inventory; audit script; idempotent bootstrap; fresh-VM rebuild from repo succeeds; backups | Complete (2026-09-15) |
 | 9 | [Personal automation](phases/phase-09-personal-automation.md) | 6 | Claude | Scripts, systemd user services/timers, integrations | Complete (2026-09-16) |
-| 10 | [Installable release ISO](phases/phase-10-installable-release-iso.md) | 1, cross-cutting | Claude + user | A tag on `main` produces a bootable installer ISO via GitHub Actions, published as a GitHub Release; `scripts/update` gives already-installed machines a snapshotted update path | In progress |
+| 10 | [Installable release ISO](phases/phase-10-installable-release-iso.md) | 1, cross-cutting | Claude + user | A tag on `main` produces a bootable installer ISO via GitHub Actions, published as a GitHub Release; `scripts/update` gives already-installed machines a snapshotted update path | Complete (2026-09-16) |
 | 11 | [Default browser and web-app launching](phases/phase-11-default-browser.md) | 3 | Claude + user | A real default browser installed and declared; Phase 5's dormant web-app-launcher mechanism actually works | Complete (2026-09-16) |
 | 12 | Physical hardware migration (Alienware 14 / P39G) | 1–4 | Both | Boot the Phase 10 release ISO on real hardware; microcode, power management, Secure Boot/TPM revisited with a real machine; NVIDIA/nouveau attempted as an explicit bonus, not a requirement | Not started |
 
@@ -66,7 +66,7 @@ outlines; their scope is finalized in their own plan mode.
   source. A real, unrelated bug also surfaced mid-phase (the VM hanging on
   guest suspend) -- diagnosed but left open by the user's own choice; see
   the tracking doc's "VM → physical hardware notes."
-- **Phase 10:** in progress; see D-0061, D-0062. Originally scoped as
+- **Phase 10:** resolved; see D-0061, D-0062. Originally scoped as
   physical hardware migration; research into three candidate devices (2019
   T2 MacBook Pro — set aside, real GPU/kernel risk; MacBook Pro 7,1 — set
   aside, stacked unknowns; Alienware 14/P39G — chosen) resolved a device,
