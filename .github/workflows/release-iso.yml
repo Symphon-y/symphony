@@ -47,7 +47,8 @@ jobs:
             -v "$PWD:/workspace" -w /workspace \
             archlinux:latest \
             bash -c "pacman -Sy --noconfirm archiso && \
-                     mkarchiso -v -w /tmp/work -o /workspace/out iso/profile"
+                     mkarchiso -v -w /tmp/work -o /workspace/out iso/profile && \
+                     chown -R $(id -u):$(id -g) /workspace/out"
 
       - name: Rename and checksum the ISO
         run: |
