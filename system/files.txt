@@ -29,3 +29,5 @@
 0644  claude/managed-settings.json  /etc/claude-code/managed-settings.json
 0644  sddm/10-wayland.conf          /etc/sddm.conf.d/10-wayland.conf
 -     boot/loader.conf             /efi/loader/loader.conf
+0644  reflector/reflector.conf      /etc/xdg/reflector/reflector.conf
+0644  journald/10-autarchy.conf     /etc/systemd/journald.conf.d/10-autarchy.conf

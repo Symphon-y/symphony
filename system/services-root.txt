@@ -1,0 +1,14 @@
+# Root-scope systemd units this repo enables deliberately. All three are
+# package-shipped units that only need enabling, not custom unit files.
+#
+# install/enable-root-services (check|apply) is the one parser/runner for this
+# file -- needs root, so the user runs `apply`, never Claude. Mirrors
+# system/services-user.txt + install/enable-user-services (Phase 8) at root
+# scope.
+
+reflector.timer                  # keeps /etc/pacman.d/mirrorlist fresh (Phase 9)
+btrfs-scrub@-.timer               # monthly scrub of the root filesystem (Phase 9);
+                                   # "-" is systemd-escape --path / for this machine's
+                                   # single Btrfs filesystem (root, home, .snapshots,
+                                   # var/cache/pacman/pkg, var/log are all one subvol set)
+pacman-filesdb-refresh.timer      # keeps `pacman -F`/-Fl current (Phase 9)

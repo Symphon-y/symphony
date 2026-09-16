@@ -1,0 +1,7 @@
+# Target: ~/.config/systemd/user/update-notify.service (linked by install/link-home)
+[Unit]
+Description=Notify when new package updates are pending
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/update-notify
