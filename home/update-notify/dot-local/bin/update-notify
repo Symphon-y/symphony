@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# update-notify: notify the desktop when the set of pending package updates
+# changes. Never applies anything -- unattended `-Syu` risks a partial upgrade,
+# the well-known Arch anti-pattern; this only ever informs.
+#
+# `checkupdates --change` (pacman-contrib) does the real work: it exits 2 with
+# no output when nothing is pending, exits 0 with output only the first time a
+# given set of updates is seen (silently re-exits 0 with no output on repeat
+# runs against the same pending set, verified against its own source -- so
+# this naturally doesn't spam a notification every single day for the same
+# untouched updates).
+set -uo pipefail
+
+output=$(checkupdates --change 2>/dev/null)
+rc=$?
+
+case $rc in
+  2) exit 0 ;;     # nothing pending
+  0) ;;            # fall through: new, or unchanged (output empty either way)
+  *) exit "$rc" ;; # real failure
+esac
+
+[[ -z $output ]] && exit 0 # pending, but already notified about this exact set
+
+count=$(wc -l <<<"$output")
+plural=$([[ $count -eq 1 ]] && echo "" || echo "s")
+notify-send --app-name="Package updates" \
+  "$count update$plural available" \
+  "Run 'sudo pacman -Syu' when ready. ($(echo "$output" | cut -d' ' -f1 | paste -sd, -))"

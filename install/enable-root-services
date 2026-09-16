@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# enable-root-services: enable+start every root-scope systemd unit declared in
+# system/services-root.txt. Mirrors install/enable-user-services (Phase 8) at
+# root scope -- needs root, so the user runs `apply`, never Claude.
+#
+# Usage: install/enable-root-services check|apply
+#   check  report any declared unit that isn't both enabled and active; exit 1
+#   apply  enable --now every declared unit (safe to re-run: systemctl's own
+#          enable --now is already a no-op on an already-enabled+running unit)
+set -euo pipefail
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+readonly REPO_ROOT
+readonly UNITS_FILE="$REPO_ROOT/system/services-root.txt"
+
+usage() {
+  echo "usage: enable-root-services check|apply" >&2
+  exit 2
+}
+
+# One unit name per line; trailing "# why" comments and blank lines stripped --
+# the same convention as packages/*.txt, but units aren't packages, so this
+# stays its own small parser rather than reusing scripts/pkglist.
+units() {
+  sed -E 's/#.*//; s/[[:space:]]+$//' "$UNITS_FILE" | grep -Ev '^[[:space:]]*$'
+}
+
+check() {
+  local unit problems=0
+  while IFS= read -r unit; do
+    if ! systemctl is-enabled --quiet "$unit"; then
+      echo "not enabled: $unit"
+      problems=$((problems + 1))
+    fi
+    if ! systemctl is-active --quiet "$unit"; then
+      echo "not active: $unit"
+      problems=$((problems + 1))
+    fi
+  done < <(units)
+
+  if ((problems > 0)); then
+    return 1
+  fi
+  echo "enabled and active: $(units | wc -l) units"
+}
+
+apply() {
+  local unit
+  while IFS= read -r unit; do
+    systemctl enable --now "$unit"
+  done < <(units)
+  echo "enabled: $(units | tr '\n' ' ')"
+}
+
+main() {
+  case ${1:-} in
+    check | apply) "$1" ;;
+    *) usage ;;
+  esac
+}
+
+main "$@"

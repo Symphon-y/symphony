@@ -15,7 +15,7 @@ outlines; their scope is finalized in their own plan mode.
 | 6 | [Visual system](phases/phase-06-visual-system.md) | 4 | Claude | Single palette source → component themes; fonts, GTK/Qt, icons, cursor, wallpapers | Complete (2026-09-14) |
 | 7 | [Developer environment](phases/phase-07-developer-environment.md) | 5 | Claude | Shell, prompt, Neovim, version manager, containers, git/gh config | Complete (2026-09-14) |
 | 8 | [Packages, reproducibility, recovery](phases/phase-08-packages-reproducibility-recovery.md) | cross-cutting | Claude + user | Categorized package inventory; audit script; idempotent bootstrap; fresh-VM rebuild from repo succeeds; backups | Complete (2026-09-15) |
-| 9 | Personal automation | 6 | Claude | Scripts, systemd user services/timers, integrations | Not started |
+| 9 | [Personal automation](phases/phase-09-personal-automation.md) | 6 | Claude | Scripts, systemd user services/timers, integrations | Complete (2026-09-16) |
 | 10 | Physical hardware migration | 1–4 | Both | Microcode, GPU drivers, power management, Secure Boot/TPM, hardware package list | Not started |
 
 ## Decisions deferred to their phase's plan mode
@@ -51,6 +51,19 @@ outlines; their scope is finalized in their own plan mode.
   consolidates every manual step Phases 2-7 scattered across their own
   tracking docs, validated by an idempotent re-run against the live VM rather
   than a real from-scratch rebuild (D-0053).
+- **Phase 9:** resolved; see D-0054 to D-0059. The user redirected the
+  roadmap's open-ended "personal automation" scope toward standard,
+  idiomatic Arch upkeep instead (D-0054): mirror freshness (D-0055, reflector
+  -- found and fixed a real quoting bug testing it live), btrfs scrub and
+  `pacman -F` freshness plus a new root-scope services mechanism mirroring
+  Phase 8's user one (D-0056), an explicit journal size cap (D-0057), yay's
+  own `cleanAfter` for AUR build-cache growth (D-0058), and `checkupdates`
+  wired to a real desktop notification, tested against this VM's actual
+  pending updates (D-0059). No `docs/omarchy-influences.md` entries this
+  phase -- confirmed none of these topics were ever covered by Omarchy's own
+  source. A real, unrelated bug also surfaced mid-phase (the VM hanging on
+  guest suspend) -- diagnosed but left open by the user's own choice; see
+  the tracking doc's "VM → physical hardware notes."
 
 ## Cross-cutting concerns (checked in every phase)
 

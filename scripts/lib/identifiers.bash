@@ -39,10 +39,13 @@ identifier_allowed() {
     ipv4) ipv4_identifies_nothing "$match" ;;
     mac) [[ $match == 00:00:00:00:00:00 || $match == ff:ff:ff:ff:ff:ff ]] ;;
     ipv6) [[ $match == 2001:db8:* || $match == 2001:0db8:* ]] ;;
-    # Project addresses, plus SSH algorithm names (chacha20-poly1305@openssh.com,
-    # curve25519-sha256@libssh.org), which look like email addresses but name nobody.
+    # Project addresses, SSH algorithm names (chacha20-poly1305@openssh.com,
+    # curve25519-sha256@libssh.org), and systemd escaped-root-path instance units
+    # (btrfs-scrub@-.timer: "-" is systemd-escape --path / ) -- all look like email
+    # addresses but name nobody.
     email) [[ $match == *@anthropic.com || $match == *@users.noreply.github.com ||
-      $match == *@openssh.com || $match == *@libssh.org ]] ;;
+      $match == *@openssh.com || $match == *@libssh.org || $match == *@-.timer ||
+      $match == *@-.service ]] ;;
     *) return 1 ;;
   esac
 }
