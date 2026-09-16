@@ -53,13 +53,13 @@ setup() {
 @test "release workflow: exists and is valid YAML" {
   local wf="$REPO_ROOT/.github/workflows/release-iso.yml"
   assert [ -f "$wf" ]
-  run yq eval '.' "$wf"
+  run yq '.' "$wf"
   assert_success
 }
 
 @test "release workflow: triggers only on a date-shaped tag push" {
   local wf="$REPO_ROOT/.github/workflows/release-iso.yml"
-  run yq eval '.on.push.tags[]' "$wf"
+  run yq '.on.push.tags[]' "$wf"
   assert_success
   assert_output --partial "20*.*.*"
 }
