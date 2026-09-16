@@ -4,6 +4,13 @@
 # still comes from pacstrap at install time, exactly as base-install.md
 # already does. No AUR packages here -- archiso can't build them, and this
 # project doesn't run a custom repo/mirror to work around that (D-0050).
+#
+# One bare package name per line: mkarchiso reads this file directly (not
+# through scripts/pkglist), and only understands whole-line '#' comments --
+# no trailing inline comments, unlike this project's own packages/*.txt
+# convention. Found the hard way: a trailing inline comment on a package
+# line becomes part of the package name, and mkarchiso fails with
+# "target not found: <name><trailing whitespace>".
 
 # Boot-critical: without these the ISO doesn't boot as a live environment at all.
 base
@@ -11,15 +18,19 @@ linux
 linux-firmware
 mkinitcpio
 mkinitcpio-archiso
-intel-ucode                    # microcode; hardware unknown until first boot (base-install.md step 2)
+# microcode; hardware unknown until first boot (base-install.md step 2)
+intel-ucode
 amd-ucode
 
 # Disk layout tools (base-install.md steps 4-5: partition, LUKS, Btrfs, ESP)
-gptfdisk                       # sgdisk
+# sgdisk
+gptfdisk
 cryptsetup
 btrfs-progs
-dosfstools                     # mkfs.fat for the ESP
-arch-install-scripts           # pacstrap, genfstab, arch-chroot
+# mkfs.fat for the ESP
+dosfstools
+# pacstrap, genfstab, arch-chroot
+arch-install-scripts
 efibootmgr
 
 # Network: wired and wireless, so the live environment can reach GitHub and
