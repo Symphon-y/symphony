@@ -76,7 +76,7 @@ Red confirmed: 2026-09-16, 2/5 failing cleanly · Green confirmed: 2026-09-16,
       Chromium's one-time first-run dialog is the only piece needing the
       user's own hands, as scoped
 - [x] Close: `DECISIONS.md` (D-0060), `docs/roadmap.md`
-- [ ] Merge to `main`
+- [x] Merge to `main`
 
 ## Implementation log
 
@@ -132,4 +132,4 @@ Red confirmed: 2026-09-16, 2/5 failing cleanly · Green confirmed: 2026-09-16,
 - [x] Static and live-session acceptance tests both pass
 - [x] `scripts/check` green
 - [x] `DECISIONS.md`, `docs/roadmap.md` updated
-- [ ] Branch merged to `main`
+- [x] Branch merged to `main`
