@@ -10,6 +10,7 @@ shfmt           # shell formatting check (scripts/check)
 stow            # links home/ config into the home directory (install/link-home)
 tmux            # scrollback, a paste buffer, and windows on the text console
 jq              # JSON parsing: release manifests (install/claude-code), settings checks
+yq              # YAML syntax check for .github/workflows/*.yml (Phase 10, scripts/check)
 diffutils       # cmp: install/sync-system compares installed files with the repo (base doesn't pull it in)
 
 # Developer environment (Phase 7) -- see D-0043 onward.

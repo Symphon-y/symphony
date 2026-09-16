@@ -16,8 +16,9 @@ outlines; their scope is finalized in their own plan mode.
 | 7 | [Developer environment](phases/phase-07-developer-environment.md) | 5 | Claude | Shell, prompt, Neovim, version manager, containers, git/gh config | Complete (2026-09-14) |
 | 8 | [Packages, reproducibility, recovery](phases/phase-08-packages-reproducibility-recovery.md) | cross-cutting | Claude + user | Categorized package inventory; audit script; idempotent bootstrap; fresh-VM rebuild from repo succeeds; backups | Complete (2026-09-15) |
 | 9 | [Personal automation](phases/phase-09-personal-automation.md) | 6 | Claude | Scripts, systemd user services/timers, integrations | Complete (2026-09-16) |
-| 10 | Physical hardware migration | 1–4 | Both | Microcode, GPU drivers, power management, Secure Boot/TPM, hardware package list | Not started |
+| 10 | [Installable release ISO](phases/phase-10-installable-release-iso.md) | 1, cross-cutting | Claude + user | A tag on `main` produces a bootable installer ISO via GitHub Actions, published as a GitHub Release; `scripts/update` gives already-installed machines a snapshotted update path | In progress |
 | 11 | [Default browser and web-app launching](phases/phase-11-default-browser.md) | 3 | Claude + user | A real default browser installed and declared; Phase 5's dormant web-app-launcher mechanism actually works | Complete (2026-09-16) |
+| 12 | Physical hardware migration (Alienware 14 / P39G) | 1–4 | Both | Boot the Phase 10 release ISO on real hardware; microcode, power management, Secure Boot/TPM revisited with a real machine; NVIDIA/nouveau attempted as an explicit bonus, not a requirement | Not started |
 
 ## Decisions deferred to their phase's plan mode
 
@@ -65,13 +66,15 @@ outlines; their scope is finalized in their own plan mode.
   source. A real, unrelated bug also surfaced mid-phase (the VM hanging on
   guest suspend) -- diagnosed but left open by the user's own choice; see
   the tracking doc's "VM → physical hardware notes."
-- **Phase 10:** paused, not abandoned. Research (t2linux specifics for the
-  2019 16" MacBook Pro) turned up real risk (unsigned kernel repo, a
-  documented GPU hang/overheating pattern on this exact chassis, no LTS
-  kernel fallback equivalent) that led the user to set that specific target
-  aside in favor of a different, not-yet-chosen device. No branch or tracking
-  doc was created; resume with fresh hardware research once a device is
-  picked.
+- **Phase 10:** in progress; see D-0061, D-0062. Originally scoped as
+  physical hardware migration; research into three candidate devices (2019
+  T2 MacBook Pro — set aside, real GPU/kernel risk; MacBook Pro 7,1 — set
+  aside, stacked unknowns; Alienware 14/P39G — chosen) resolved a device,
+  then the user redirected mid-plan: build a releasable installer ISO
+  instead of manually re-running `base-install.md` on new hardware. The
+  hardware migration itself moved to **Phase 12**, unchanged in its already-
+  resolved decisions; this phase became the ISO/update-pipeline
+  infrastructure that Phase 12 will use.
 - **Phase 11:** resolved; see D-0060. Not on the original roadmap -- new,
   user-requested scope closing a real dormant bug: Phase 5 (D-0034) built the
   web-app-launcher mechanism assuming a default browser would exist, but no
@@ -80,6 +83,13 @@ outlines; their scope is finalized in their own plan mode.
   In passing, added `install/install-packages` after the user pointed out
   the manual `yay -S --needed $(scripts/pkglist packages/*.txt)` command had
   caused two real past mistakes (Phases 8 and 9) from being retyped by hand.
+- **Phase 12:** not started. Device (Alienware 14/P39G), base-GPU scope
+  (Intel HD 4600 only, NVIDIA/nouveau attempted as an explicit non-blocking
+  bonus), and access model (Claude Code runs locally on the machine once
+  base install and networking work) already resolved from Phase 10's
+  original planning pass; gets its own plan-mode session once Phase 10
+  lands, to re-express those decisions in terms of booting the release ISO
+  rather than a manual runbook.
 
 ## Cross-cutting concerns (checked in every phase)
 

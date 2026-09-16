@@ -1340,3 +1340,87 @@ and the old entry is marked `Superseded by D-XXXX`.
   command had been retyped from memory every phase since Phase 4, including
   two real past mistakes (Phase 8, Phase 9) where plain `pacman -S` silently
   aborted on AUR-only packages — `docs/runbooks/rebuild.md` updated to use it.
+
+## D-0061 — Installable release ISO: our own archiso profile, no custom mirror
+
+- **Status:** Accepted (2026-09-16, Phase 10)
+- **Decision:** `iso/profile/` is a standard `archiso` profile (based on
+  upstream `releng`), built and published by `.github/workflows/
+  release-iso.yml` on a date-shaped tag push to `main` (e.g. `2026.09.16`,
+  matching Arch's own official ISO naming convention). The ISO stays a thin
+  network installer: `packages.x86_64` covers only what the live environment
+  itself needs (git, github-cli, bats, disk-management tools); the desktop
+  stack and everything else still comes from `packages/*.txt` via
+  `pacstrap`/`install/install-packages`, exactly as before. No AUR packages
+  are pre-built into the ISO and no custom pacman repo or mirror backs it.
+  `install/install-base-system` (new) covers `base-install.md` steps 4–6
+  (partition/LUKS/Btrfs/pacstrap/configure) in one script, driven by the
+  existing `base-install.local.vars` and gated by one typed disk-path
+  confirmation before anything destructive happens — the same
+  collect-once-then-run-unattended shape Windows and macOS installers use,
+  built our own way.
+- **Alternatives considered:** keep manually re-running `base-install.md` by
+  hand on each new machine (the original Phase 10 scope, rejected by the
+  user mid-planning: "make a base ISO off this as opposed to having to do a
+  manual set up again"); a full offline/desktop-preloaded ISO the way
+  Omarchy's own `omarchy-iso` works — REJECTed, since research confirmed it
+  depends on a self-hosted package mirror and custom repo to work around
+  archiso's real limitation (no AUR during a build), exactly the shape
+  `docs/omarchy-influences.md` already REJECTed (D-0050); pre-building this
+  project's own small AUR footprint (`yay`, `xdg-terminal-exec`,
+  `bibata-cursor-theme-bin`) into a local repo baked into the ISO —
+  structurally the same rejected shape even at three packages, so left for
+  post-boot instead, unchanged from today.
+- **Reasoning:** D-0009's REJECT, re-read carefully for this decision,
+  targets Omarchy's specific mechanism — "a custom ISO with a gum TUI
+  configurator... feeding a Python orchestrator built on archinstall" — not
+  custom bootable media in general. A stock-`archiso`-based profile, our own
+  plain-bash scripts, no archinstall, no TUI, no custom mirror, doesn't
+  re-open that REJECT; it's recorded explicitly here rather than assumed
+  silently, since the two sit close enough in shape to need saying out loud.
+  `archiso` itself (root/privileged `mkarchiso`, no AUR during a build) is
+  Arch's own standard tool, confirmed via its real upstream source, not
+  invented for this project.
+- **Consequences:** `docs/runbooks/base-install.md` now documents two
+  equivalent paths (release ISO, kept-as-fallback manual runbook) rather
+  than one. `packages/tooling.txt` gained `yq` (YAML syntax checking for
+  `.github/workflows/*.yml`, mirroring the existing `jq`/JSON check in
+  `scripts/check`). The Alienware 14/P39G physical migration (device,
+  Intel-HD-4600-base/NVIDIA-bonus scope, and local-Claude-Code access model
+  already resolved in earlier planning) moves to **Phase 12**, using this
+  ISO instead of a manual runbook replay.
+
+## D-0062 — `scripts/update` takes an unconditional pre-update snapshot (extends D-0011)
+
+- **Status:** Accepted (2026-09-16, Phase 10)
+- **Decision:** `scripts/update apply` runs `snapper -c root create`
+  unconditionally, before touching anything, then reapplies the repo's
+  existing appliers in order (`install/install-packages`, `sudo install/
+  sync-system apply`, `install/link-home apply`, `install/
+  enable-user-services apply`, `scripts/migrate apply`), recording the newly
+  applied release tag only once every step succeeds.
+- **Alternatives considered:** keep relying on `snap-pac`'s automatic
+  pre/post pacman-transaction snapshots (D-0011) as the only safety net —
+  real, but blind to a config-only update (a login-screen tweak, a migration,
+  a `home/` change with no new package), which is exactly the gap the user
+  flagged directly while this phase's plan was still being drafted; require
+  a manual `snapper create` before every update, as the runbook already
+  documented — works, but depends on remembering it every time, the same
+  class of problem `install/install-packages` (D-0060) already solved for
+  the package-install command.
+- **Reasoning:** `snap-pac` only fires on pacman transactions; nothing
+  equivalent existed for the config-only reapply cycle `docs/runbooks/
+  rebuild.md` already documents. An unconditional snapshot on every
+  `scripts/update apply` run — package changes included, since it runs
+  before `install/install-packages` too — makes an update exactly as
+  recoverable as a plain `pacman -S` already is, with no judgment call about
+  which updates "need" a snapshot.
+- **Consequences:** D-0011's original consequence ("rollback is a manual
+  procedure from the ISO") still holds — this doesn't automate the rollback
+  itself, only guarantees a snapshot exists to roll back to. `scripts/update`
+  refuses to run against a dirty working tree or a branch other than `main`,
+  validated before the snapshot is taken, matching this repo's established
+  "validate everything before touching anything" pattern
+  (`install/configure-base-system`, `install/install-base-system`).
+  `docs/runbooks/update.md` documents the normal update flow and the
+  rollback path if a mid-update step fails.
