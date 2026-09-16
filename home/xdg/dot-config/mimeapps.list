@@ -1,0 +1,13 @@
+# Target: ~/.config/mimeapps.list (linked by install/link-home)
+#
+# The exact content `xdg-settings set default-web-browser chromium.desktop`
+# produces (Phase 11) -- verified by actually running it and reading the
+# result, not guessed. webapp-launch (home/webapps/) reads this indirectly via
+# `xdg-settings get default-web-browser`.
+
+[Default Applications]
+text/html=chromium.desktop
+x-scheme-handler/http=chromium.desktop
+x-scheme-handler/https=chromium.desktop
+x-scheme-handler/about=chromium.desktop
+x-scheme-handler/unknown=chromium.desktop

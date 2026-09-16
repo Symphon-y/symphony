@@ -37,7 +37,7 @@ scripted further (an AUR helper can't come from a repo pacman already trusts).
 ## 3. Install every declared package
 
 ```sh
-yay -S --needed $(scripts/pkglist packages/*.txt)
+install/install-packages
 ```
 
 ## 4. Apply system config, home config, user services
