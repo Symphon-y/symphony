@@ -68,15 +68,30 @@ File: `tests/acceptance/phase-12.bats`
 | static (VM-checkable) | `install/install-base-system`'s `SWAP_SIZE` path is correctly optional; the VM itself stays zram-only | Claude |
 | hardware | WiFi connects, `power-profiles-daemon` active, hibernate/resume works, TPM presence/absence recorded as fact | User, on the Alienware |
 
-Red confirmed: · Green confirmed:
+Red confirmed: 2026-09-16, 2/8 failing cleanly before implementation existed
+(a real bug caught along the way: the "VM stays zram-only" test initially
+checked swap TYPE, which zram itself also reports as "partition" -- fixed
+to check by device name instead)
+· Green confirmed (VM-checkable portion): 2026-09-16, 8/8; full
+`scripts/check` green (130/130 unit tests); full acceptance suite green
+(124/124, no regressions)
 
 ## Tasks
 
-- [ ] Branch, tracking doc
-- [ ] Red: `tests/acceptance/phase-12.bats`
-- [ ] `install/install-base-system`: optional `SWAP_SIZE` path + unit tests
-- [ ] `autarchy-bootstrap`: seed `current-release` marker
-- [ ] Verify against the VM with `SWAP_SIZE` unset (no behavior change)
+- [x] Branch, tracking doc
+- [x] Red: `tests/acceptance/phase-12.bats`
+- [x] `install/install-base-system`: optional `SWAP_SIZE` path + unit tests
+      (9 new tests: 3-partition layout, keyfile generation/permissions,
+      LUKS2 format+open+mkswap, crypttab/fstab/mkinitcpio wiring,
+      `AUTARCHY_RESUME_DEVICE` handoff)
+- [x] `install/configure-base-system`: appends `resume=` to the UKI cmdline
+      when `AUTARCHY_RESUME_DEVICE` is set + unit test
+- [x] Release-marker seeding: implemented in `install-base-system` instead
+      of `autarchy-bootstrap` as originally planned (that script runs
+      before the target user/system exist) + 3 unit tests
+- [x] Verify against the VM with `SWAP_SIZE` unset (no behavior change) --
+      confirmed both by the regression test and the full existing test
+      suite staying green
 - [ ] User: ground truth on real hardware, BIOS steps
 - [ ] User: boot release ISO, `autarchy-bootstrap`, `install-base-system`
       with real `SWAP_SIZE`
@@ -96,6 +111,28 @@ Red confirmed: · Green confirmed:
   reused/extended the Phase 10 release-ISO mechanism as the install path
   instead of a manual runbook replay.
 - Branch and tracking doc created.
+- Red: `tests/acceptance/phase-12.bats` written before any implementation.
+  One real bug caught immediately: the "VM stays zram-only" test checked
+  `swapon`'s TYPE column, which reports zram devices as "partition" too
+  (it's kernel swap accounting, not a real block device) -- fixed to check
+  by device name (`/dev/zram*`) instead.
+- Implemented the `SWAP_SIZE` path in `install/install-base-system`
+  (partition/keyfile/LUKS2/mkswap/crypttab/fstab/mkinitcpio wiring) and the
+  `resume=` cmdline addition in `install/configure-base-system`, both
+  unit-tested with stubs -- all green on the first real run.
+  Reconsidered the release-marker-seeding design from the plan while
+  implementing it: the plan said to fix `autarchy-bootstrap`, but that
+  script runs on the live ISO *before* `install-base-system` has even
+  partitioned the disk, let alone created the target user account -- there's
+  nothing to seed yet at that point. Moved the fix to
+  `install-base-system`'s new `seed_release_marker()`, which runs after
+  `configure-base-system` creates the user, reading the live ISO's own
+  `/etc/autarchy-release` (already present, written by the CI build,
+  independent of whether `autarchy-bootstrap` ran) -- no change to
+  `autarchy-bootstrap` needed at all.
+  Full `scripts/check` (130/130 unit tests) and the full acceptance suite
+  (124/124) stayed green throughout -- no regressions to the VM's own
+  still-zram-only, still-`SWAP_SIZE`-unset state.
 
 ## VM → physical hardware notes
 
