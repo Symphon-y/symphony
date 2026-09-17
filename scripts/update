@@ -87,8 +87,9 @@ check() {
 preflight_branch() {
   local branch
   branch=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD)
-  # HEAD (detached) is the state right after autarchy-bootstrap clones at a
-  # release tag -- moved onto main below, same as any other update.
+  # HEAD (detached) is the state right after a release-ISO install, whose
+  # baked-in repo copy (Phase 14) is checked out at the release tag --
+  # moved onto main below, same as any other update.
   if [[ $branch != main && $branch != HEAD ]]; then
     die "on branch '$branch', not main -- switch to main before updating"
   fi

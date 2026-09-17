@@ -22,6 +22,5 @@ bootstrap_tarball_compression=('zstd' '-c' '-T0' '--auto-threads=logical' '--lon
 file_permissions=(
   ["/etc/shadow"]="0:0:400"
   ["/root"]="0:0:750"
-  ["/usr/local/bin/autarchy-bootstrap"]="0:0:755"
   ["/usr/local/bin/autarchy-install"]="0:0:755"
 )

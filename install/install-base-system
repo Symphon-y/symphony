@@ -24,8 +24,9 @@ readonly REQUIRED_VARS=(DISK HOST USERNAME TZONE LOCALE KEYMAP)
 # today. When set, these name the generated hibernation-swap keyfile.
 readonly SWAP_MAPPER=cryptswap
 readonly SWAP_KEYFILE=/etc/cryptsetup-keys.d/swap.key
-# The live ISO's own release marker (Phase 10's autarchy-bootstrap reads the
-# same file) -- not present on a plain stock-ISO manual install.
+# The live ISO's own release marker (baked in by release-iso.yml, Phase 10;
+# scripts/update reads the same file post-install) -- not present on a
+# plain stock-ISO manual install.
 readonly LIVE_RELEASE_FILE="${AUTARCHY_LIVE_RELEASE_FILE:-/etc/autarchy-release}"
 
 trap 'printf "install-base-system: failed at line %s: %s\n" "$LINENO" "$BASH_COMMAND" >&2' ERR

@@ -1,6 +1,9 @@
 # Builds a bootable, fully offline-installable autarchy ISO from a tagged
 # commit on main and publishes it as a GitHub Release (Phase 10, made
-# offline-capable in Phase 13). Own archiso profile (iso/profile/), no
+# offline-capable in Phase 13, made genuinely network-free in Phase 14 --
+# Phase 13 baked in the *package* closure but not the *repo* driving the
+# install, so the install still needed a GitHub clone; this workflow now
+# bakes the repo itself in too). Own archiso profile (iso/profile/), no
 # Omarchy code, no standing/continuously-operated package mirror (D-0050) --
 # iso/build-offline-repo builds a local pacman repo fresh in this job, baked
 # into the ISO, then discarded when the job ends.
@@ -40,9 +43,26 @@ jobs:
         with:
           persist-credentials: false
 
-      # Baked into the ISO so autarchy-bootstrap knows which tag to clone.
+      # Baked into the ISO so scripts/update (post-install) knows the
+      # installed release.
       - name: Record the release tag
         run: echo "${GITHUB_REF_NAME}" >iso/profile/airootfs/etc/autarchy-release
+
+      # The core install needs the repo itself, not just the package cache
+      # build-offline-repo populates below -- without this, autarchy-install
+      # would still need a GitHub clone (Phase 14). Excludes:
+      #   .git                    -- not needed to run install scripts
+      #   iso/profile/airootfs    -- the destination lives under this path
+      #                              (avoids copying into itself), and it's
+      #                              where build-offline-repo is about to put
+      #                              a ~1.4 GiB local package cache that has
+      #                              no business being duplicated inside a
+      #                              second, nested copy of the repo
+      - name: Bake the repo into the live environment
+        run: |
+          mkdir -p iso/profile/airootfs/root/autarchy
+          rsync -a --exclude='.git' --exclude='iso/profile/airootfs' \
+            ./ iso/profile/airootfs/root/autarchy/
 
       - name: Disk space before the build
         run: df -h

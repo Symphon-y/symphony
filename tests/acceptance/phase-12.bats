@@ -79,9 +79,9 @@ setup() {
   assert [ -x "$script" ]
 
   # No new install logic here -- only orchestration of what already exists
-  # and is already tested elsewhere (autarchy-bootstrap, install-base-system).
-  run grep -q 'autarchy-bootstrap' "$script"
-  assert_success
+  # and is already tested elsewhere (install-base-system). The repo itself
+  # is baked into the live environment at build time (Phase 14), so there
+  # is no bootstrap/clone step to orchestrate here any more.
   run grep -q 'scripts/system-report' "$script"
   assert_success
   run grep -q 'install/install-base-system' "$script"
