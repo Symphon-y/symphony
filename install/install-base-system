@@ -20,6 +20,13 @@ readonly REPO_ROOT
 readonly CONFIGURE_SCRIPT="${AUTARCHY_CONFIGURE_SCRIPT:-$REPO_ROOT/install/configure-base-system}"
 
 readonly REQUIRED_VARS=(DISK HOST USERNAME TZONE LOCALE KEYMAP)
+# SWAP_SIZE is optional (Phase 12): unset means zram-only, unchanged from
+# today. When set, these name the generated hibernation-swap keyfile.
+readonly SWAP_MAPPER=cryptswap
+readonly SWAP_KEYFILE=/etc/cryptsetup-keys.d/swap.key
+# The live ISO's own release marker (Phase 10's autarchy-bootstrap reads the
+# same file) -- not present on a plain stock-ISO manual install.
+readonly LIVE_RELEASE_FILE="${AUTARCHY_LIVE_RELEASE_FILE:-/etc/autarchy-release}"
 
 trap 'printf "install-base-system: failed at line %s: %s\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
 
@@ -75,8 +82,14 @@ confirm_destructive() {
 partition_disk() {
   log "Partitioning $DISK"
   sgdisk --zap-all "$DISK"
-  sgdisk -n "1:0:+$ESP_SIZE" -t 1:ef00 -c "1:$ESP_PARTLABEL" \
-    -n 2:0:0 -t 2:8309 -c "2:$LUKS_PARTLABEL" "$DISK"
+  if [[ -n ${SWAP_SIZE:-} ]]; then
+    sgdisk -n "1:0:+$ESP_SIZE" -t 1:ef00 -c "1:$ESP_PARTLABEL" \
+      -n "2:0:+$SWAP_SIZE" -t 2:8309 -c "2:$SWAP_PARTLABEL" \
+      -n 3:0:0 -t 3:8309 -c "3:$LUKS_PARTLABEL" "$DISK"
+  else
+    sgdisk -n "1:0:+$ESP_SIZE" -t 1:ef00 -c "1:$ESP_PARTLABEL" \
+      -n 2:0:0 -t 2:8309 -c "2:$LUKS_PARTLABEL" "$DISK"
+  fi
   partprobe "$DISK"
   udevadm settle
 }
@@ -124,6 +137,52 @@ install_packages_and_fstab() {
   sed -i 's/subvolid=[0-9]*,//g' "$TARGET/etc/fstab"
 }
 
+# Hibernation-capable swap (Phase 12): a generated random keyfile, not a
+# memorized passphrase -- swap holds no data worth a typed secret, only
+# encryption-at-rest, unlocked automatically at boot via the copy embedded
+# in the initramfs (system/mkinitcpio's FILES=, written below). Runs after
+# install_packages_and_fstab: the keyfile and crypttab/fstab entries need
+# $TARGET/etc, which pacstrap creates, and genfstab overwrites fstab with
+# `>`, so this must come after genfstab too. No-op unless SWAP_SIZE is set.
+configure_swap() {
+  [[ -n ${SWAP_SIZE:-} ]] || return 0
+
+  local swap_dev="/dev/disk/by-partlabel/$SWAP_PARTLABEL" swap_uuid
+
+  log "Setting up encrypted swap for hibernation"
+  install -d -m 0700 "$TARGET$(dirname "$SWAP_KEYFILE")"
+  dd if=/dev/urandom of="$TARGET$SWAP_KEYFILE" bs=4096 count=1 status=none
+  chmod 0600 "$TARGET$SWAP_KEYFILE"
+
+  cryptsetup luksFormat --type luks2 --batch-mode --key-file "$TARGET$SWAP_KEYFILE" "$swap_dev"
+  cryptsetup open --key-file "$TARGET$SWAP_KEYFILE" "$swap_dev" "$SWAP_MAPPER"
+  mkswap "/dev/mapper/$SWAP_MAPPER"
+
+  swap_uuid=$(blkid -s UUID -o value "$swap_dev")
+  echo "$SWAP_MAPPER UUID=$swap_uuid $SWAP_KEYFILE luks" >>"$TARGET/etc/crypttab"
+  echo "/dev/mapper/$SWAP_MAPPER none swap defaults 0 0" >>"$TARGET/etc/fstab"
+
+  mkdir -p "$TARGET/etc/mkinitcpio.conf.d"
+  echo "FILES=($SWAP_KEYFILE)" >"$TARGET/etc/mkinitcpio.conf.d/20-swap-resume.conf"
+}
+
+# Only meaningful when booted from a release ISO (the live environment's own
+# /etc/autarchy-release, written by the CI build -- not anything on
+# $TARGET). A no-op for a plain stock-ISO manual install, where this file
+# doesn't exist. Runs after configure-base-system so $USERNAME's home
+# already exists to seed.
+seed_release_marker() {
+  [[ -r $LIVE_RELEASE_FILE ]] || return 0
+  local release
+  release=$(<"$LIVE_RELEASE_FILE")
+  [[ -n $release && $release != unreleased ]] || return 0
+
+  log "Recording the installed release ($release) for scripts/update"
+  install -d -m 0755 "$TARGET/home/$USERNAME/.local/state/autarchy"
+  echo "$release" >"$TARGET/home/$USERNAME/.local/state/autarchy/current-release"
+  arch-chroot "$TARGET" chown -R "$USERNAME:$USERNAME" "/home/$USERNAME/.local"
+}
+
 main() {
   (($# >= 1 && $# <= 2)) || usage
   local vars_file=$1
@@ -136,9 +195,14 @@ main() {
   partition_disk
   encrypt_and_format
   install_packages_and_fstab
+  configure_swap
 
   log "Base disk layout done. Handing off to configure-base-system."
+  if [[ -n ${SWAP_SIZE:-} ]]; then
+    export AUTARCHY_RESUME_DEVICE="/dev/mapper/$SWAP_MAPPER"
+  fi
   "$CONFIGURE_SCRIPT" "$vars_file" "$TARGET"
+  seed_release_marker
 }
 
 main "$@"

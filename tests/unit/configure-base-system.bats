@@ -174,6 +174,13 @@ calls() {
   assert_line "blkid -s UUID -o value /dev/disk/by-partlabel/cryptroot"
 }
 
+@test "adds resume= to the cmdline when AUTARCHY_RESUME_DEVICE is set (Phase 12 hibernation)" {
+  AUTARCHY_RESUME_DEVICE=/dev/mapper/cryptswap run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  assert_equal "$(cat "$TARGET/etc/kernel/cmdline")" \
+    "rd.luks.name=1111-2222=root root=/dev/mapper/root rootflags=subvol=@ rw resume=/dev/mapper/cryptswap"
+}
+
 @test "replaces stock initramfs images with unified kernel images and installs the boot loader" {
   run "$SCRIPT" "$VARS" "$TARGET"
   assert_success

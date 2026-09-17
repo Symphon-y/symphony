@@ -13,3 +13,9 @@ USERNAME=               # your login name
 TZONE=                  # timezone, e.g. America/Chicago (list: ls /usr/share/zoneinfo)
 LOCALE=en_US.UTF-8      # system language
 KEYMAP=us               # console keyboard layout; the LUKS prompt uses it too
+
+# Optional (Phase 12). Leave blank for zram-only swap (the default, D-0013).
+# Set to add a dedicated LUKS2-encrypted swap partition sized for hibernation
+# -- size it to this machine's actual RAM (confirm with `free -h`), e.g. 16G.
+# Unlocked automatically at boot via a generated keyfile, no extra passphrase.
+SWAP_SIZE=
