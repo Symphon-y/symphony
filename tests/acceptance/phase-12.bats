@@ -65,6 +65,15 @@ setup() {
   done
 }
 
+@test "release workflow: pins the release to the tagged commit, not the default branch" {
+  # A real publish failure found testing this phase: without an explicit
+  # target_commitish, action-gh-release defaulted to main, producing a
+  # silently-drafted, "untagged-<hash>"-URLed release for a tag pushed
+  # against any other commit.
+  run grep -q 'target_commitish:.*github.sha' "$REPO_ROOT/.github/workflows/release-iso.yml"
+  assert_success
+}
+
 @test "packages/alienware-14.txt does not exist yet -- ground truth comes first" {
   # Written only after real hardware ground truth (lscpu/lspci/free/lsblk),
   # not assumed in advance -- this test documents that ordering and will be
