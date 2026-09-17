@@ -43,11 +43,6 @@ setup() {
   assert_line "[extra]"
 }
 
-@test "iso: a first-boot bootstrap helper exists and is executable" {
-  local helper="$REPO_ROOT/iso/profile/airootfs/usr/local/bin/autarchy-bootstrap"
-  assert [ -x "$helper" ]
-}
-
 # --- release workflow -------------------------------------------------------
 
 @test "release workflow: exists and is valid YAML" {

@@ -152,7 +152,7 @@ calls() {
   refute_output --partial "snapper"
 }
 
-@test "apply: moves a detached HEAD (post-bootstrap clone) onto main" {
+@test "apply: moves a detached HEAD (post-install baked-in repo checkout) onto main" {
   export STUB_BRANCH=HEAD
   run "$SCRIPT" apply
   assert_success

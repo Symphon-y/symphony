@@ -8,10 +8,10 @@ VM), and again for the rebuild test (Phase 8) and physical hardware (Phase 12).
 - **Release ISO (fast path).** Boot the ISO published on the repo's GitHub
   Releases page (built by `.github/workflows/release-iso.yml` from a tagged
   commit on `main`). Since Phase 13, this ISO is fully offline-capable: the
-  entire `packages/*.txt` closure is baked in, so no network connection is
-  needed at all to install -- only `autarchy-bootstrap`'s repo clone and
-  `gh auth login` need one (skip both and use the stock-ISO manual path
-  below if there's genuinely no network available at all).
+  entire `packages/*.txt` closure is baked in. Since Phase 14, the repo
+  itself is baked in too, at `/root/autarchy`. No network connection or
+  GitHub access is needed at all to install (use the stock-ISO manual path
+  below only if there's some other reason to run it by hand).
 
   **If the release is split into multiple files** (`autarchy-<tag>.iso.00.part`,
   `.01.part`, etc. -- GitHub Releases refuses any single file at or above
@@ -29,7 +29,7 @@ VM), and again for the rebuild test (Phase 8) and physical hardware (Phase 12).
   ```sh
   autarchy-install
   ```
-  It clones the repo (if needed), shows a ground-truth report of the
+  It shows a ground-truth report of the
   machine (CPU/memory/GPU/storage/network), asks a handful of plain
   questions in order (disk, hostname, username, timezone, locale, keymap,
   optional hibernation size), shows a review screen, then hands off to
@@ -80,9 +80,9 @@ section at the end of this runbook, or reinstall from step 1.
 
 Boot the ISO and wait for the root prompt.
 
-**On the release ISO**, `git`/`gh` are already installed and `autarchy-bootstrap`
-replaces everything below down to (not including) `source base-install.local.vars`:
-just run `autarchy-bootstrap`, then follow its printed next steps.
+**On the release ISO**, the repo is already at `/root/autarchy` (baked in at
+build time, Phase 14) -- everything below down to (not including) `source
+base-install.local.vars` is unnecessary: just `cd /root/autarchy`.
 
 **On a stock Arch ISO:**
 
