@@ -119,9 +119,14 @@ configure_boot() {
   [[ -n $luks_uuid ]] || die "cannot read the UUID of $luks_device"
 
   # rootflags names the @ subvolume, the first entry in system/storage/subvolumes.txt.
+  local cmdline="rd.luks.name=$luks_uuid=$LUKS_MAPPER root=/dev/mapper/$LUKS_MAPPER rootflags=subvol=@ rw"
+  # Hibernation (Phase 12): set only when install-base-system configured a
+  # dedicated swap mapper. Baked in explicitly rather than relying on
+  # systemd's EFI-variable auto-detect, which has known rough edges on some
+  # firmware and isn't needed for a plain partition.
+  [[ -n ${AUTARCHY_RESUME_DEVICE:-} ]] && cmdline+=" resume=$AUTARCHY_RESUME_DEVICE"
   mkdir -p "$TARGET/etc/kernel"
-  echo "rd.luks.name=$luks_uuid=$LUKS_MAPPER root=/dev/mapper/$LUKS_MAPPER rootflags=subvol=@ rw" \
-    >"$TARGET/etc/kernel/cmdline"
+  echo "$cmdline" >"$TARGET/etc/kernel/cmdline"
 
   # pacstrap built separate initramfs images with the stock presets; UKIs replace them.
   rm -f "$TARGET"/boot/initramfs-*.img

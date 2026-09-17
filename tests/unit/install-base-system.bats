@@ -12,6 +12,10 @@ setup() {
   mkdir -p "$TARGET"
   export STUB_LOG="$BATS_TEST_TMPDIR/calls.log"
   : >"$STUB_LOG"
+  # Absent by default so seed_release_marker no-ops in every test that
+  # doesn't explicitly exercise it -- a real /etc/autarchy-release on the
+  # machine running these tests must never leak in.
+  export AUTARCHY_LIVE_RELEASE_FILE="$BATS_TEST_TMPDIR/no-release-file"
   make_vars
   make_stubs
 }
@@ -64,6 +68,9 @@ EOF
   stub "$bin/umount" 'echo "umount $*" >>"$STUB_LOG"'
   stub "$bin/pacstrap" 'echo "pacstrap $*" >>"$STUB_LOG"; mkdir -p "$2/etc"'
   stub "$bin/genfstab" 'echo "UUID=x / btrfs subvolid=256,subvol=/@ 0 0"'
+  stub "$bin/blkid" 'echo "blkid $*" >>"$STUB_LOG"; echo "3333-4444"'
+  stub "$bin/mkswap" 'echo "mkswap $*" >>"$STUB_LOG"'
+  stub "$bin/arch-chroot" 'echo "arch-chroot $*" >>"$STUB_LOG"'
 
   cat >"$bin/autarchy-configure-stub" <<'EOF'
 #!/usr/bin/env bash
@@ -179,4 +186,93 @@ run_confirmed() {
   assert_success
   run calls
   assert_line "configure-base-system $VARS $TARGET"
+}
+
+@test "SWAP_SIZE unset: partitions only ESP and cryptroot, no swap-related calls" {
+  run_confirmed
+  assert_success
+  run calls
+  refute_output --partial "cryptswap"
+  refute_output --partial "mkswap"
+  assert [ ! -e "$TARGET/etc/crypttab" ]
+}
+
+# --- SWAP_SIZE set: hibernation-capable swap partition (Phase 12) ----------
+
+with_swap() {
+  echo "SWAP_SIZE=16G" >>"$VARS"
+}
+
+@test "SWAP_SIZE set: partitions ESP, swap, and cryptroot in that order" {
+  with_swap
+  run_confirmed
+  assert_success
+  run calls
+  assert_line --regexp \
+    'sgdisk -n 1:0:\+2G -t 1:ef00 -c 1:ESP -n 2:0:\+16G -t 2:8309 -c 2:cryptswap -n 3:0:0 -t 3:8309 -c 3:cryptroot /dev/vda'
+}
+
+@test "SWAP_SIZE set: generates a keyfile and LUKS2-formats the swap partition with it, no prompt" {
+  with_swap
+  run_confirmed
+  assert_success
+
+  assert [ -f "$TARGET/etc/cryptsetup-keys.d/swap.key" ]
+  run stat -c '%a' "$TARGET/etc/cryptsetup-keys.d/swap.key"
+  assert_output "600"
+
+  run calls
+  assert_line "cryptsetup luksFormat --type luks2 --batch-mode --key-file $TARGET/etc/cryptsetup-keys.d/swap.key /dev/disk/by-partlabel/cryptswap"
+  assert_line "cryptsetup open --key-file $TARGET/etc/cryptsetup-keys.d/swap.key /dev/disk/by-partlabel/cryptswap cryptswap"
+  assert_line "mkswap /dev/mapper/cryptswap"
+}
+
+@test "SWAP_SIZE set: adds crypttab and fstab entries, and embeds the keyfile via mkinitcpio FILES=" {
+  with_swap
+  run_confirmed
+  assert_success
+
+  assert_equal "$(cat "$TARGET/etc/crypttab")" \
+    "cryptswap UUID=3333-4444 /etc/cryptsetup-keys.d/swap.key luks"
+  run grep -Fx '/dev/mapper/cryptswap none swap defaults 0 0' "$TARGET/etc/fstab"
+  assert_success
+  assert_equal "$(cat "$TARGET/etc/mkinitcpio.conf.d/20-swap-resume.conf")" \
+    "FILES=(/etc/cryptsetup-keys.d/swap.key)"
+}
+
+@test "SWAP_SIZE set: passes AUTARCHY_RESUME_DEVICE to configure-base-system" {
+  with_swap
+  cat >"$BATS_TEST_TMPDIR/bin/autarchy-configure-stub" <<'EOF'
+#!/usr/bin/env bash
+echo "configure-base-system $* resume=${AUTARCHY_RESUME_DEVICE:-unset}" >>"$STUB_LOG"
+EOF
+  chmod +x "$BATS_TEST_TMPDIR/bin/autarchy-configure-stub"
+  run_confirmed
+  assert_success
+  run calls
+  assert_line "configure-base-system $VARS $TARGET resume=/dev/mapper/cryptswap"
+}
+
+# --- seed_release_marker (Phase 12) ----------------------------------------
+
+@test "release marker: no-ops when not booted from a release ISO (default)" {
+  run_confirmed
+  assert_success
+  assert [ ! -e "$TARGET/home/alice/.local/state/autarchy/current-release" ]
+}
+
+@test "release marker: no-ops when the live ISO marker says 'unreleased'" {
+  echo "unreleased" >"$AUTARCHY_LIVE_RELEASE_FILE"
+  run_confirmed
+  assert_success
+  assert [ ! -e "$TARGET/home/alice/.local/state/autarchy/current-release" ]
+}
+
+@test "release marker: seeds the new user's state dir with the ISO's release tag" {
+  echo "2026.09.16" >"$AUTARCHY_LIVE_RELEASE_FILE"
+  run_confirmed
+  assert_success
+  assert_equal "$(cat "$TARGET/home/alice/.local/state/autarchy/current-release")" "2026.09.16"
+  run calls
+  assert_line "arch-chroot $TARGET chown -R alice:alice /home/alice/.local"
 }

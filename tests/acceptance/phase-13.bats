@@ -77,11 +77,6 @@ setup() {
   assert_success
 }
 
-@test "release workflow: pins the release to the tagged commit, not the default branch" {
-  run grep -q 'target_commitish:.*github.sha' "$REPO_ROOT/.github/workflows/release-iso.yml"
-  assert_success
-}
-
 @test "docs: base-install.md documents reassembling a split ISO before writing to USB" {
   local doc="$REPO_ROOT/docs/runbooks/base-install.md"
   run grep -q 'cat autarchy' "$doc"
@@ -90,31 +85,7 @@ setup() {
   assert_success
 }
 
-# --- regression: the live medium must actually boot (real Phase 10 failure,
-# re-lost and re-fixed during Phase 13 -- see the tracking doc) -----------
-
-@test "iso: the live environment can actually find its own root (archiso HOOKS, gpt-auto-generator masked)" {
-  local base="$REPO_ROOT/iso/profile/airootfs"
-  run grep -q '^archiso_config=' "$base/etc/mkinitcpio.d/linux.preset"
-  assert_success
-  run grep -q 'HOOKS=.*archiso' "$base/etc/mkinitcpio.conf.d/archiso.conf"
-  assert_success
-  run readlink "$base/etc/systemd/system-generators/systemd-gpt-auto-generator"
-  assert_output "/dev/null"
-}
-
-@test "iso: root is unlocked and auto-logs-in on the live medium" {
-  local base="$REPO_ROOT/iso/profile/airootfs"
-  run grep -q '^root::' "$base/etc/shadow"
-  assert_success
-  run grep -q 'autologin root' "$base/etc/systemd/system/getty@tty1.service.d/autologin.conf"
-  assert_success
-}
-
-@test "iso: dhcpcd, iwd, and systemd-resolved are enabled on the live medium" {
-  local wants="$REPO_ROOT/iso/profile/airootfs/etc/systemd/system/multi-user.target.wants"
-  local svc
-  for svc in dhcpcd.service iwd.service systemd-resolved.service; do
-    assert [ -L "$wants/$svc" ]
-  done
-}
+# The target_commitish and live-medium-boot regression tests that used to be
+# here now live in tests/acceptance/phase-12.bats -- Phase 12 and 13 were
+# never two separate stories (the offline ISO exists for the Alienware
+# install), so that's the one file tracking both going forward.

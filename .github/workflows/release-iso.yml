@@ -86,6 +86,14 @@ jobs:
       - name: Publish the GitHub Release
         uses: softprops/action-gh-release@6da8fa9354ddfdc4aeace5fc48d7f679b5214090 # v2.4.1
         with:
+          # Without this, the action defaults to the repo's default branch
+          # (main) as the release's target commit -- fine for a real release
+          # (always tagged from main), but produces an inconsistent,
+          # silently-parked-as-draft release when a tag is pushed against
+          # any other commit (a real test-tag push hit this: GitHub showed
+          # the release as draft, under an "untagged-<hash>" URL, despite
+          # the build having succeeded). The exact commit the tag points to
+          # is always correct.
           target_commitish: ${{ github.sha }}
           # One glob, not two: it already covers the checksum file, and a
           # separate literal path for it risked the same file being
