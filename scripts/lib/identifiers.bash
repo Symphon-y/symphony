@@ -40,12 +40,13 @@ identifier_allowed() {
     mac) [[ $match == 00:00:00:00:00:00 || $match == ff:ff:ff:ff:ff:ff ]] ;;
     ipv6) [[ $match == 2001:db8:* || $match == 2001:0db8:* ]] ;;
     # Project addresses, SSH algorithm names (chacha20-poly1305@openssh.com,
-    # curve25519-sha256@libssh.org), and systemd escaped-root-path instance units
-    # (btrfs-scrub@-.timer: "-" is systemd-escape --path / ) -- all look like email
-    # addresses but name nobody.
+    # curve25519-sha256@libssh.org), and systemd instance units -- escaped-root-path
+    # ones (btrfs-scrub@-.timer: "-" is systemd-escape --path /) and template ones
+    # referenced by path (getty@tty1.service, from getty@tty1.service.d/) -- all
+    # look like email addresses but name nobody.
     email) [[ $match == *@anthropic.com || $match == *@users.noreply.github.com ||
       $match == *@openssh.com || $match == *@libssh.org || $match == *@-.timer ||
-      $match == *@-.service ]] ;;
+      $match == *@-.service || $match == *@tty1.service ]] ;;
     *) return 1 ;;
   esac
 }
