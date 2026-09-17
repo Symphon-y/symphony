@@ -28,7 +28,11 @@ permissions:
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # 45 was cut close by a real run (Phase 14, 2026.09.17-test1): the
+    # build itself finished around the 20-minute mark as usual, but
+    # uploading the ~2.7 GB split ISO to the Release took longer than
+    # usual on that runner and got killed by the timeout mid-upload.
+    timeout-minutes: 70
     steps:
       # mkarchiso's offline-mirror-free build is still sizeable; the
       # runner's default free space is tight once Docker images and build
