@@ -1424,3 +1424,63 @@ and the old entry is marked `Superseded by D-XXXX`.
   (`install/configure-base-system`, `install/install-base-system`).
   `docs/runbooks/update.md` documents the normal update flow and the
   rollback path if a mid-update step fails.
+
+## D-0063 — Offline-capable release ISO: a build-time-only local repo, extends D-0061
+
+- **Status:** Accepted (2026-09-17, Phase 13)
+- **Decision:** The release ISO bakes in the *entire* `packages/*.txt`
+  closure — every official-repo package plus the 3 AUR-only ones (`yay`,
+  `xdg-terminal-exec`, `bibata-cursor-theme-bin`) — so installing needs zero
+  network connectivity, matching the "buy a Windows key, plug in a USB"
+  experience the user asked for. `iso/build-offline-repo` (new) downloads
+  the official closure via `pacman -Syw` against a throwaway blank dbpath
+  (the Arch Wiki's own documented fix for a real dependency-resolution
+  gotcha: the build container's own dbpath resolves wrong), builds the 3
+  AUR packages via `makepkg` as a non-root user, and `repo-add`s both sets
+  into one local repo baked into `iso/profile/airootfs/var/lib/
+  autarchy-repo` — gitignored, regenerated fresh by every CI run, never
+  committed. A **new** `iso/profile/airootfs/etc/pacman.conf` (distinct
+  from the already-existing, still build-time-only `iso/profile/
+  pacman.conf`) makes this the live/install-time environment's real
+  `/etc/pacman.conf`, with `[localrepo]` (`SigLevel = Optional TrustAll`)
+  ranked above `[core]`/`[extra]`, which stay enabled as a network
+  fallback. `install/install-base-system`'s existing `pacstrap` call needed
+  zero changes — it already just resolves through whatever `/etc/
+  pacman.conf` the live environment has.
+- **Alternatives considered:** keep the thin network-installer ISO from
+  D-0061 (real gap surfaced when Phase 12's first physical-hardware attempt
+  had no network connection at all — a brand-new machine on WiFi isn't
+  connected until someone explicitly associates it, same as any OS
+  installer); ship an already-installed, pre-configured live filesystem
+  where "install" means copying/unsquashing it to disk, ArcoLinux's actual
+  approach (confirmed via a real forum thread that its offline-*looking*
+  ISOs don't do a package-based offline install either) — would likely
+  compress smaller, but abandons "`install-base-system` runs `pacstrap`
+  against a declared package list" as the install mechanism, a much bigger,
+  more invasive redesign not warranted just to solve a file-size problem
+  GitHub Releases already accommodates via multiple files.
+- **Reasoning:** D-0050's and D-0061's REJECTs both target Omarchy's
+  *continuously-operated* mirror/repo service (`omarchy-pkgs`,
+  `omarchy-mirror`) and its interactive, manifest-bypassing install
+  pattern — real, standing infrastructure with its own maintenance and
+  availability burden. A repo built fresh inside this phase's own CI job,
+  baked into one versioned release artifact, and discarded when the job
+  ends is a materially different thing: no server, nothing to maintain, no
+  ongoing availability commitment. Two real, non-Omarchy precedent projects
+  (`Torxed/archoffline`, `Dogcatfee/Archiso_XFCE4`) do exactly this shape.
+  This distinction is real but close enough to the letter of D-0050/D-0061
+  that it needs to be recorded explicitly, the same discipline D-0061
+  itself applied to D-0009.
+- **Consequences:** the built ISO measured **2,439,299,072 bytes (≈2.27
+  GiB)** on its first successful real build — confirmed, not the ~2.5-2.8GB
+  estimate research produced beforehand — which is at or over GitHub
+  Releases' 2 GiB per-file limit. `release-iso.yml` now measures the real
+  built file's size and only splits it (`split -d -b 1800M`, numbered
+  `.NN.part` files) when it actually needs to; a future smaller build still
+  publishes as a single file exactly like D-0061's original ISO did.
+  `docs/runbooks/base-install.md` documents reassembly (`cat` the parts,
+  `sha256sum -c` the result) before writing to USB. Disk space on the
+  GitHub-hosted runner was never actually the constraint research flagged
+  as a real risk (72 GB total, peaked at 33 GB used, well under the
+  guaranteed-14GB floor's worst case) — worth knowing for any future,
+  heavier build, but not something this phase needed to work around.

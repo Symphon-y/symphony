@@ -18,7 +18,8 @@ outlines; their scope is finalized in their own plan mode.
 | 9 | [Personal automation](phases/phase-09-personal-automation.md) | 6 | Claude | Scripts, systemd user services/timers, integrations | Complete (2026-09-16) |
 | 10 | [Installable release ISO](phases/phase-10-installable-release-iso.md) | 1, cross-cutting | Claude + user | A tag on `main` produces a bootable installer ISO via GitHub Actions, published as a GitHub Release; `scripts/update` gives already-installed machines a snapshotted update path | Complete (2026-09-16) |
 | 11 | [Default browser and web-app launching](phases/phase-11-default-browser.md) | 3 | Claude + user | A real default browser installed and declared; Phase 5's dormant web-app-launcher mechanism actually works | Complete (2026-09-16) |
-| 12 | Physical hardware migration (Alienware 14 / P39G) | 1–4 | Both | Boot the Phase 10 release ISO on real hardware; microcode, power management, Secure Boot/TPM revisited with a real machine; NVIDIA/nouveau attempted as an explicit bonus, not a requirement | Not started |
+| 12 | Physical hardware migration (Alienware 14 / P39G) | 1–4 | Both | Boot the Phase 13 offline release ISO on real hardware; microcode, power management, Secure Boot/TPM revisited with a real machine; NVIDIA/nouveau attempted as an explicit bonus, not a requirement | Paused, pending Phase 13 |
+| 13 | [Offline-capable release ISO](phases/phase-13-offline-release-iso.md) | 1, cross-cutting | Claude + user | The release ISO installs the full `packages/*.txt` closure with zero network needed, matching a purchased-OS-key install experience | Complete (2026-09-17) |
 
 ## Decisions deferred to their phase's plan mode
 
@@ -83,13 +84,28 @@ outlines; their scope is finalized in their own plan mode.
   In passing, added `install/install-packages` after the user pointed out
   the manual `yay -S --needed $(scripts/pkglist packages/*.txt)` command had
   caused two real past mistakes (Phases 8 and 9) from being retyped by hand.
-- **Phase 12:** not started. Device (Alienware 14/P39G), base-GPU scope
-  (Intel HD 4600 only, NVIDIA/nouveau attempted as an explicit non-blocking
-  bonus), and access model (Claude Code runs locally on the machine once
-  base install and networking work) already resolved from Phase 10's
-  original planning pass; gets its own plan-mode session once Phase 10
-  lands, to re-express those decisions in terms of booting the release ISO
-  rather than a manual runbook.
+- **Phase 12:** paused mid-implementation (VM-side hibernation `SWAP_SIZE`
+  work already done and green), not abandoned. Device (Alienware
+  14/P39G), base-GPU scope (Intel HD 4600 only, NVIDIA/nouveau attempted
+  as an explicit non-blocking bonus), and access model (Claude Code runs
+  locally on the machine once base install and networking work) already
+  resolved. The first real hardware attempt surfaced that Phase 10's ISO
+  was network-dependent for install, which didn't match what the user
+  actually wanted -- see Phase 13. Resumes once Phase 13's offline ISO
+  lands.
+- **Phase 13:** resolved; see D-0063. Not on the original roadmap -- a
+  real gap surfaced by Phase 12's first physical-hardware attempt: the
+  Alienware had no network connection at boot (expected for any new
+  machine on WiFi), and the user clarified the actual intended experience
+  was "buy a Windows key, plug in a USB, install" -- zero network needed
+  until choosing to `scripts/update` afterward. Bakes the full
+  `packages/*.txt` closure (including the 3 AUR packages) into a
+  build-time-only local repo, explicitly distinguished in `DECISIONS.md`
+  from the continuously-operated mirror infrastructure D-0050/D-0061
+  already rejected. The real built ISO measured over GitHub Releases'
+  2 GiB per-file limit on the first try -- confirmed, not assumed from the
+  research estimate -- so publishing now splits conditionally on the
+  actual measured size.
 
 ## Cross-cutting concerns (checked in every phase)
 
