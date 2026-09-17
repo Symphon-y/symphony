@@ -107,20 +107,41 @@ jobs:
             "autarchy-${GITHUB_REF_NAME}.iso" "autarchy-${GITHUB_REF_NAME}.iso."
           rm "autarchy-${GITHUB_REF_NAME}.iso"
 
+      # Publishes with the gh CLI directly, not softprops/action-gh-release:
+      # a real run (Phase 14, twice in a row -- 2026.09.17-test1 and
+      # -test2) uploaded the tiny .sha256 instantly, then hung with zero
+      # progress on the two multi-GB .iso.part files uploaded concurrently,
+      # for the entire job timeout (45 min, then 70 min) both times. Not a
+      # slow-network problem -- a dead stop, reproduced twice. gh uploads
+      # assets one at a time (sidesteps whatever the action's concurrent
+      # octokit upload was hitting), and each upload gets its own timeout
+      # and one retry, so a hang like this fails fast with a clear error
+      # instead of silently eating the whole job's budget again.
       - name: Publish the GitHub Release
-        uses: softprops/action-gh-release@6da8fa9354ddfdc4aeace5fc48d7f679b5214090 # v2.4.1
-        with:
-          # Without this, the action defaults to the repo's default branch
-          # (main) as the release's target commit -- fine for a real release
-          # (always tagged from main), but produces an inconsistent,
-          # silently-parked-as-draft release when a tag is pushed against
-          # any other commit (a real test-tag push hit this: GitHub showed
-          # the release as draft, under an "untagged-<hash>" URL, despite
-          # the build having succeeded). The exact commit the tag points to
-          # is always correct.
-          target_commitish: ${{ github.sha }}
-          # One glob, not two: it already covers the checksum file, and a
-          # separate literal path for it risked the same file being
-          # resolved (and possibly uploaded) twice.
-          files: out/autarchy-${{ github.ref_name }}.iso*
-          generate_release_notes: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd out
+          # --target: without this, gh defaults the release to the repo's
+          # default branch (main) -- fine for a real release (always
+          # tagged from main), but wrong for a tag pushed against any
+          # other commit. Same real failure mode action-gh-release had
+          # (D-0063 / phase-12.bats), same fix.
+          gh release create "$GITHUB_REF_NAME" \
+            --target "$GITHUB_SHA" \
+            --generate-notes
+
+          for f in autarchy-"$GITHUB_REF_NAME".iso*; do
+            uploaded=false
+            for attempt in 1 2; do
+              if timeout 600 gh release upload "$GITHUB_REF_NAME" "$f" --clobber; then
+                uploaded=true
+                break
+              fi
+              echo "upload of $f timed out or failed (attempt $attempt/2) -- retrying" >&2
+            done
+            "$uploaded" || {
+              echo "upload of $f failed twice -- giving up" >&2
+              exit 1
+            }
+          done
