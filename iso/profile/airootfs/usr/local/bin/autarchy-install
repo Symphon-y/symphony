@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# autarchy-install: the one guided command the release ISO points you at.
+# Clones the repo if needed, shows ground truth, asks a handful of plain
+# questions in a fixed order, shows a review screen, then hands off to the
+# existing, already-tested install pipeline (install/install-base-system)
+# to run unattended. No install logic lives here -- see Phase 12's plan
+# (docs/phases/phase-12-alienware-migration.md) for why: a linear
+# sequential flow ending in one review screen, not a free-navigation menu,
+# researched against archinstall/Calamares/Windows Setup precedent before
+# being designed. The destructive-action confirmation stays entirely in
+# install-base-system's own typed-disk-path gate -- this script's review
+# screen is a separate, lighter "did I answer these right" checkpoint, not
+# a replacement for it.
+set -euo pipefail
+
+readonly CLONE_DIR=/root/autarchy
+readonly VARS_FILE="$CLONE_DIR/base-install.local.vars"
+
+log() {
+  printf '==> %s\n' "$*"
+}
+
+# ask PROMPT [DEFAULT] -> the entered value, or DEFAULT if given and the
+# reply was empty.
+ask() {
+  local prompt=$1 default=${2:-} reply
+  if [[ -n $default ]]; then
+    read -rp "$prompt [$default]: " reply
+    printf '%s' "${reply:-$default}"
+  else
+    read -rp "$prompt: " reply
+    printf '%s' "$reply"
+  fi
+}
+
+main() {
+  if [[ ! -d $CLONE_DIR ]]; then
+    autarchy-bootstrap
+  fi
+  cd "$CLONE_DIR"
+
+  echo
+  log "Gathering ground truth about this machine..."
+  echo
+  scripts/system-report || true
+
+  echo
+  log "A few questions, then this runs unattended."
+  local disk host username tzone locale keymap swap_size
+  disk=$(ask "Target disk (see Storage above, e.g. /dev/sda) -- EVERYTHING on it will be erased")
+  host=$(ask "Hostname")
+  username=$(ask "Username")
+  tzone=$(ask "Timezone (e.g. America/Chicago; list: ls /usr/share/zoneinfo)")
+  locale=$(ask "Locale" "en_US.UTF-8")
+  keymap=$(ask "Console keymap" "us")
+  swap_size=$(ask "Hibernation swap size (blank to skip, e.g. 16G -- see Memory above)")
+
+  echo
+  log "Review:"
+  cat <<SUMMARY
+    Disk:        $disk   (EVERYTHING on this disk will be erased)
+    Hostname:    $host
+    Username:    $username
+    Timezone:    $tzone
+    Locale:      $locale
+    Keymap:      $keymap
+    Hibernation: ${swap_size:-none}
+SUMMARY
+  echo
+  local confirm
+  read -rp "Proceed with these values? [y/N] " confirm
+  [[ $confirm =~ ^[Yy]$ ]] || {
+    echo "Aborted -- nothing was changed."
+    exit 1
+  }
+
+  cat >"$VARS_FILE" <<EOF
+DISK=$disk
+HOST=$host
+USERNAME=$username
+TZONE=$tzone
+LOCALE=$locale
+KEYMAP=$keymap
+SWAP_SIZE=$swap_size
+EOF
+
+  install/install-base-system "$VARS_FILE"
+
+  echo
+  log "Base install done."
+  local next
+  read -rp "Reboot now? [Y/n] " next
+  if [[ ! $next =~ ^[Nn]$ ]]; then
+    log "Unmounting and closing the encrypted volume..."
+    umount -R /mnt
+    # shellcheck source-path=SCRIPTDIR source=../../../../../../system/storage/layout.conf
+    source system/storage/layout.conf
+    cryptsetup close "$LUKS_MAPPER"
+    log "Rebooting -- remove the USB drive now."
+    sleep 3
+    reboot
+  else
+    echo "Staying at the shell. When ready: umount -R /mnt; cryptsetup close root; poweroff"
+  fi
+}
+
+main "$@"
