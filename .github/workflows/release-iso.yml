@@ -1,6 +1,9 @@
-# Builds a bootable autarchy installer ISO from a tagged commit on main and
-# publishes it as a GitHub Release (Phase 10). Own archiso profile
-# (iso/profile/), no Omarchy code, no custom package mirror/repo (D-0050).
+# Builds a bootable, fully offline-installable autarchy ISO from a tagged
+# commit on main and publishes it as a GitHub Release (Phase 10, made
+# offline-capable in Phase 13). Own archiso profile (iso/profile/), no
+# Omarchy code, no standing/continuously-operated package mirror (D-0050) --
+# iso/build-offline-repo builds a local pacman repo fresh in this job, baked
+# into the ISO, then discarded when the job ends.
 #
 # mkarchiso needs root/loop-device/squashfs capabilities archiso itself
 # doesn't have on a plain ubuntu-latest runner, so the actual build runs
@@ -41,14 +44,20 @@ jobs:
       - name: Record the release tag
         run: echo "${GITHUB_REF_NAME}" >iso/profile/airootfs/etc/autarchy-release
 
-      - name: Build the ISO
+      - name: Disk space before the build
+        run: df -h
+
+      - name: Build the offline package repo and the ISO
         run: |
           docker run --rm --privileged \
             -v "$PWD:/workspace" -w /workspace \
             archlinux:latest \
-            bash -c "pacman -Sy --noconfirm archiso && \
+            bash -c "/workspace/iso/build-offline-repo && \
                      mkarchiso -v -w /tmp/work -o /workspace/out iso/profile && \
                      chown -R $(id -u):$(id -g) /workspace/out"
+
+      - name: Disk space after the build
+        run: df -h
 
       - name: Rename and checksum the ISO
         run: |

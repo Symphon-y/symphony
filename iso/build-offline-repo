@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# build-offline-repo: download every official-repo package packages/*.txt
+# declares, build the 3 AUR-only packages, and repo-add both into one local
+# pacman repository baked into the release ISO's airootfs (Phase 13).
+#
+# Runs as root inside the same privileged Arch container release-iso.yml
+# already uses to build the ISO itself, immediately before mkarchiso --
+# not on a developer machine, not unit-tested (real pacman/makepkg/repo-add
+# calls against the network and a real package database, same reasoning
+# base-install.md's own install steps aren't unit-tested either).
+set -euo pipefail
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+readonly REPO_ROOT
+readonly REPO_DIR="$REPO_ROOT/iso/profile/airootfs/var/lib/autarchy-repo"
+readonly WORK_DIR=/tmp/offline-repo-work
+readonly BLANK_DBPATH=/tmp/offline-repo-blank-db
+# Can't be resolved by pacman -Syw; built from source, same as this repo's
+# own VM already does via yay (D-0030).
+readonly AUR_PACKAGES=(xdg-terminal-exec bibata-cursor-theme-bin yay)
+
+log() {
+  printf '==> %s\n' "$*"
+}
+
+main() {
+  log "Installing build tooling"
+  pacman -Sy --noconfirm --needed archiso base-devel git
+
+  mkdir -p "$WORK_DIR" "$REPO_DIR" "$BLANK_DBPATH"
+
+  log "Downloading the official-repo package closure"
+  local all_pkgs=() official_pkgs=()
+  mapfile -t all_pkgs < <("$REPO_ROOT/scripts/pkglist" "$REPO_ROOT"/packages/*.txt)
+  mapfile -t official_pkgs < <(printf '%s\n' "${all_pkgs[@]}" |
+    grep -vxFf <(printf '%s\n' "${AUR_PACKAGES[@]}"))
+  # A blank dbpath, not the container's real one: pacman -Syw against an
+  # already-populated database resolves dependencies incorrectly (Arch
+  # Wiki, "Pacman/Tips and tricks" -- Custom local repository).
+  pacman -Syw --noconfirm --cachedir "$WORK_DIR" --dbpath "$BLANK_DBPATH" \
+    "${official_pkgs[@]}"
+
+  log "Building AUR packages: ${AUR_PACKAGES[*]}"
+  useradd -m builder
+  echo 'builder ALL=(ALL) NOPASSWD: ALL' >/etc/sudoers.d/builder
+  chown -R builder:builder "$WORK_DIR"
+
+  local pkg
+  for pkg in "${AUR_PACKAGES[@]}"; do
+    su builder -c "
+      set -eu
+      cd '$WORK_DIR'
+      git clone --depth 1 https://aur.archlinux.org/$pkg.git
+      cd $pkg
+      makepkg -s --noconfirm
+      mv -- *.pkg.tar.zst '$WORK_DIR/'
+    "
+  done
+
+  log "Building the local repo database"
+  cp "$WORK_DIR"/*.pkg.tar.zst "$REPO_DIR/"
+  (cd "$REPO_DIR" && repo-add autarchy.db.tar.zst ./*.pkg.tar.zst)
+
+  log "Local repo built: $(find "$REPO_DIR" -name '*.pkg.tar.zst' | wc -l) packages"
+}
+
+main "$@"
