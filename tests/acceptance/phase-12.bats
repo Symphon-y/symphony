@@ -33,6 +33,38 @@ setup() {
   assert_output ""
 }
 
+@test "iso: the live environment can actually find its own root (archiso HOOKS, gpt-auto-generator masked)" {
+  # A real boot failure on the first hardware attempt: without these, the
+  # live medium's initramfs falls back to systemd's generic root-finding,
+  # which times out waiting for a nonexistent /dev/gpt-auto-root.
+  local base="$REPO_ROOT/iso/profile/airootfs"
+  run grep -q '^archiso_config=' "$base/etc/mkinitcpio.d/linux.preset"
+  assert_success
+  run grep -q 'HOOKS=.*archiso' "$base/etc/mkinitcpio.conf.d/archiso.conf"
+  assert_success
+  run readlink "$base/etc/systemd/system-generators/systemd-gpt-auto-generator"
+  assert_output "/dev/null"
+}
+
+@test "iso: root is unlocked and auto-logs-in on the live medium" {
+  # Also a real boot failure: without these, root is locked by the shadow
+  # package's own default state, and the live environment is unusable even
+  # if it does boot.
+  local base="$REPO_ROOT/iso/profile/airootfs"
+  run grep -q '^root::' "$base/etc/shadow"
+  assert_success
+  run grep -q 'autologin root' "$base/etc/systemd/system/getty@tty1.service.d/autologin.conf"
+  assert_success
+}
+
+@test "iso: dhcpcd, iwd, and systemd-resolved are enabled on the live medium" {
+  local wants="$REPO_ROOT/iso/profile/airootfs/etc/systemd/system/multi-user.target.wants"
+  local svc
+  for svc in dhcpcd.service iwd.service systemd-resolved.service; do
+    assert [ -L "$wants/$svc" ]
+  done
+}
+
 @test "packages/alienware-14.txt does not exist yet -- ground truth comes first" {
   # Written only after real hardware ground truth (lscpu/lspci/free/lsblk),
   # not assumed in advance -- this test documents that ordering and will be

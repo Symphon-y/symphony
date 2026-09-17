@@ -61,6 +61,12 @@ setup() {
   assert_output ""
 }
 
+@test "allows getty@tty1.service referenced by path, which also looks like an email address" {
+  printf '%s\n' "etc/systemd/system/getty@tty1.service.d/autologin.conf" >"$FIXTURE"
+  run find_identifiers "$FIXTURE"
+  assert_output ""
+}
+
 @test "does not mistake times, dates, or version numbers for identifiers" {
   printf '%s\n' "Local time: 04:00:13" "released 2026-09-13" "Claude Code 2.1.236" \
     "OpenSSH 10.5p1" "Summer 2024: notes" "sha256 3a624a5a7cd79bbad4d32bd7" >"$FIXTURE"
