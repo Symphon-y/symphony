@@ -67,10 +67,12 @@ setup() {
 
 @test "release workflow: pins the release to the tagged commit, not the default branch" {
   # A real publish failure found testing this phase: without an explicit
-  # target_commitish, action-gh-release defaulted to main, producing a
-  # silently-drafted, "untagged-<hash>"-URLed release for a tag pushed
-  # against any other commit.
-  run grep -q 'target_commitish:.*github.sha' "$REPO_ROOT/.github/workflows/release-iso.yml"
+  # target commit, the release publish step defaulted to main, producing
+  # a silently-drafted, "untagged-<hash>"-URLed release for a tag pushed
+  # against any other commit. Still true after Phase 14 switched the
+  # publish step from action-gh-release to the gh CLI directly.
+  # shellcheck disable=SC2016 # a literal grep pattern, not meant to expand
+  run grep -q -- '--target "\$GITHUB_SHA"' "$REPO_ROOT/.github/workflows/release-iso.yml"
   assert_success
 }
 
