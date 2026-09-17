@@ -163,10 +163,25 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   `autarchy-install`'s other tests already live). The "prompts are in a
   terminal, not a nice GUI" half of the same feedback is Phase 15's
   already-planned scope, not addressed here.
+- `2026.09.17-test4` (disk-selection fix baked in): the build and the
+  now-fixed gh-CLI publish pipeline both worked again, but a *different*,
+  genuine failure showed up immediately -- a real `HTTP 500: Error saving
+  asset` from GitHub's own upload API, hit twice in a row within seconds.
+  This is exactly the fail-fast behavior the gh-CLI switch was meant to
+  produce (a clear, immediate, actionable error instead of the old
+  action's silent multi-hour hang), but two attempts with no delay
+  between them wasn't enough to ride out a transient server error.
+  Widened to 3 attempts with a 20-second backoff between them.
 
 ## VM → physical hardware notes
 
-- Fully verifiable from CI — no physical hardware needed for this phase.
+- The CI/static half is fully verifiable without hardware. The actual
+  goal -- zero network access needed for the core install -- is only
+  really provable on real hardware, so the user boot-tested each real
+  release build on the Alienware as attempts landed. `test3` was the
+  first to get far enough to reach `autarchy-install` with no network
+  connection at all and surfaced the disk-selection bug fixed above;
+  `test4` verifies that fix specifically.
 
 ## Exit criteria
 
