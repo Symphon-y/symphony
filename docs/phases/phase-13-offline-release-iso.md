@@ -62,13 +62,21 @@ Red confirmed: · Green confirmed:
 
 ## Tasks
 
-- [ ] Branch, tracking doc
-- [ ] Red: `tests/acceptance/phase-13.bats`
-- [ ] `release-iso.yml`: package-download/AUR-build/repo-add steps + `df -h`
-      logging
-- [ ] `iso/profile/airootfs/etc/pacman.conf`
-- [ ] Green: real test-tag push, verify actual build succeeds and real ISO
-      size
+- [x] Branch, tracking doc
+- [x] Red: `tests/acceptance/phase-13.bats` (6/6 failing cleanly before
+      implementation)
+- [x] `iso/build-offline-repo`: downloads the official closure (blank
+      dbpath), builds the 3 AUR packages as a non-root build user,
+      repo-adds both into one local repo
+- [x] `iso/profile/airootfs/etc/pacman.conf`: `[localrepo]` ranked above
+      `[core]`/`[extra]`, `SigLevel = Optional TrustAll`; confirmed
+      `iso/profile/pacman.conf` (build-time-only) stays untouched
+- [x] `release-iso.yml`: calls `build-offline-repo` before `mkarchiso`;
+      `df -h` logging before/after the build
+- [x] Green (static): 7/7 `phase-13.bats`; full `scripts/check` (121/121
+      unit tests); full acceptance suite (123/123, no regressions)
+- [ ] Green (real): push a real test tag, verify the actual CI build
+      succeeds within resource limits and get the real ISO size
 - [ ] Close: `DECISIONS.md`, `docs/roadmap.md`, merge to `main`
 - [ ] Resume Phase 12 with the new offline ISO
 
@@ -86,6 +94,14 @@ Red confirmed: · Green confirmed:
   mechanism entirely unchanged, and don't decide splitting at all until a
   real build gives a real, measured size.
 - Branch and tracking doc created.
+- Implemented `iso/build-offline-repo` (pacman -Syw with a blank dbpath,
+  makepkg as a non-root build user for the 3 AUR packages, repo-add) and
+  `iso/profile/airootfs/etc/pacman.conf` ([localrepo] ranked above
+  [core]/[extra]); wired into `release-iso.yml` with `df -h` logging
+  before/after the build. All 7/7 `phase-13.bats`, full `scripts/check`
+  (121/121), and the full acceptance suite (123/123) green, no
+  regressions -- confirmed `iso/profile/pacman.conf` (build-time-only)
+  correctly stayed untouched.
 
 ## VM → physical hardware notes
 
