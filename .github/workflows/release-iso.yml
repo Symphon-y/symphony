@@ -60,16 +60,35 @@ jobs:
         run: df -h
 
       - name: Rename and checksum the ISO
+        id: iso
         run: |
           cd out
           iso=$(ls -- *.iso)
           mv -- "$iso" "autarchy-${GITHUB_REF_NAME}.iso"
           sha256sum "autarchy-${GITHUB_REF_NAME}.iso" >"autarchy-${GITHUB_REF_NAME}.iso.sha256"
+          echo "size=$(stat -c%s "autarchy-${GITHUB_REF_NAME}.iso")" >>"$GITHUB_OUTPUT"
+
+      # GitHub Releases refuses any single asset >= 2 GiB. Only decided here,
+      # against the real built file's size -- not assumed in advance from the
+      # ~2.5-2.8 GB estimate research produced (Phase 13), which turned out
+      # to genuinely exceed the limit on the first real build
+      # ("size must be less than 2147483648"). The .sha256 above is computed
+      # over the whole, unsplit file, so `cat`-ing the parts back together
+      # and checking it is how the runbook verifies a correct reassembly.
+      - name: Split the ISO if it exceeds GitHub's 2 GiB per-file release limit
+        if: fromJSON(steps.iso.outputs.size) >= 2147483648
+        run: |
+          cd out
+          split -d -b 1800M --additional-suffix=.part \
+            "autarchy-${GITHUB_REF_NAME}.iso" "autarchy-${GITHUB_REF_NAME}.iso."
+          rm "autarchy-${GITHUB_REF_NAME}.iso"
 
       - name: Publish the GitHub Release
         uses: softprops/action-gh-release@6da8fa9354ddfdc4aeace5fc48d7f679b5214090 # v2.4.1
         with:
-          files: |
-            out/autarchy-${{ github.ref_name }}.iso
-            out/autarchy-${{ github.ref_name }}.iso.sha256
+          target_commitish: ${{ github.sha }}
+          # One glob, not two: it already covers the checksum file, and a
+          # separate literal path for it risked the same file being
+          # resolved (and possibly uploaded) twice.
+          files: out/autarchy-${{ github.ref_name }}.iso*
           generate_release_notes: true

@@ -7,10 +7,27 @@ VM), and again for the rebuild test (Phase 8) and physical hardware (Phase 12).
 
 - **Release ISO (fast path).** Boot the ISO published on the repo's GitHub
   Releases page (built by `.github/workflows/release-iso.yml` from a tagged
-  commit on `main`). `git`, `gh`, and the test tools are already installed,
-  and running `autarchy-bootstrap` replaces step 1's manual typing below
-  with one command. Steps 4-6 (partition, encrypt, format, pacstrap,
-  configure) are replaced by one script:
+  commit on `main`). Since Phase 13, this ISO is fully offline-capable: the
+  entire `packages/*.txt` closure is baked in, so no network connection is
+  needed at all to install -- only `autarchy-bootstrap`'s repo clone and
+  `gh auth login` need one (skip both and use the stock-ISO manual path
+  below if there's genuinely no network available at all).
+
+  **If the release is split into multiple files** (`autarchy-<tag>.iso.00.part`,
+  `.01.part`, etc. -- GitHub Releases refuses any single file at or above
+  2 GiB, and this ISO's full offline package set can exceed that), download
+  every part plus `autarchy-<tag>.iso.sha256`, then reassemble and verify
+  before writing to USB:
+  ```sh
+  cat autarchy-<tag>.iso.*.part >autarchy-<tag>.iso
+  sha256sum -c autarchy-<tag>.iso.sha256
+  ```
+  Only write the reassembled file to USB once that reports `OK`.
+
+  `git`, `gh`, and the test tools are already installed, and running
+  `autarchy-bootstrap` replaces step 1's manual typing below with one
+  command. Steps 4-6 (partition, encrypt, format, pacstrap, configure) are
+  replaced by one script:
   ```sh
   sudo install/install-base-system base-install.local.vars
   ```

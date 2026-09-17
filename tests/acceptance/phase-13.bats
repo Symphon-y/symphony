@@ -64,3 +64,28 @@ setup() {
   run grep -q 'df -h' "$REPO_ROOT/.github/workflows/release-iso.yml"
   assert_success
 }
+
+@test "release workflow: splits the ISO only if the real built file exceeds GitHub's 2 GiB limit" {
+  # A real, measured failure on the first offline build:
+  # "size must be less than 2147483648" -- confirmed via a real tag push,
+  # not assumed from the ~2.5-2.8GB estimate. Splitting is conditional on
+  # the actual file size, not applied unconditionally.
+  local wf="$REPO_ROOT/.github/workflows/release-iso.yml"
+  run grep -q '2147483648' "$wf"
+  assert_success
+  run grep -q -- '-d -b 1800M' "$wf"
+  assert_success
+}
+
+@test "release workflow: pins the release to the tagged commit, not the default branch" {
+  run grep -q 'target_commitish:.*github.sha' "$REPO_ROOT/.github/workflows/release-iso.yml"
+  assert_success
+}
+
+@test "docs: base-install.md documents reassembling a split ISO before writing to USB" {
+  local doc="$REPO_ROOT/docs/runbooks/base-install.md"
+  run grep -q 'cat autarchy' "$doc"
+  assert_success
+  run grep -q 'sha256sum -c' "$doc"
+  assert_success
+}
