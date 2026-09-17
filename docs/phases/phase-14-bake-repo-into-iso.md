@@ -65,7 +65,7 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
 - [x] Retire `autarchy-bootstrap` + 4 ripple-effect fixes
 - [x] Simplify `autarchy-install`
 - [x] Green: static checks
-- [ ] Green: real test tag (fresh name, not reusing `2026.09.17`), real
+- [x] Green: real test tag (fresh name, not reusing `2026.09.17`), real
       verification of zero-network install
 - [ ] Close: `DECISIONS.md`, `docs/roadmap.md`, merge to `main`
 
@@ -117,6 +117,52 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   retired mechanism ("post-bootstrap clone" -> "post-install baked-in
   repo checkout") for accuracy, since that test itself is not a
   historical record. `scripts/check` now exits 0, zero `not ok` lines.
+- Real verification, three attempts. `2026.09.17-test1`: the build itself
+  succeeded (a correct, correctly-split 2.7 GB ISO), but the job got
+  killed by its 45-minute timeout mid-upload of the release assets --
+  only the tiny `.sha256` had uploaded. Diagnosed as upload-speed
+  variance at first; bumped `timeout-minutes` to 70 (separate commit,
+  `e5fbd59`) and retried as `2026.09.17-test2` after deleting the poisoned
+  partial release+tag. `2026.09.17-test2` reproduced the *exact same*
+  symptom -- zero progress on the two `.iso.part` files for the entire
+  70-minute window, only `.sha256` again -- which ruled out "just needs
+  more time" and pointed at a real, reproducible bug in
+  `softprops/action-gh-release`'s concurrent large-asset upload. Switched
+  the publish step to the `gh` CLI directly (`gh release create` +
+  sequential `gh release upload` per asset, each under its own `timeout
+  600` with one retry) -- commit `7ffd32f`. `2026.09.17-test3` succeeded
+  cleanly, all three assets uploaded in ~17 minutes. Downloaded and
+  reassembled the real built ISO, `sha256sum -c` verified, confirmed the
+  standard archiso layout (`autarchy/x86_64/airootfs.sfs`) is present.
+  Deep squashfs-content inspection was attempted but blocked -- no
+  `unsquashfs`/`squashfs-tools` available and no `sudo` to install it (nor
+  does `bsdtar`/libarchive read squashfs) -- so full verification deferred
+  to the user's own real USB boot test instead of a sudo-assisted
+  inspection, per their choice.
+- Real hardware boot test (user, `2026.09.17-test3`): got further than
+  any previous attempt -- reached the guided `autarchy-install` flow with
+  no network connection. Found two real problems at the disk-selection
+  prompt: no way to see the available disks, and leaving it blank and
+  pressing enter surfaced only as an unrelated, unhelpful "permission
+  denied" much later rather than a clear error at the point of input.
+  Root cause: the disk prompt used the same generic, unvalidated `ask()`
+  as every other field, so a blank value could flow all the way into
+  `install-base-system` before anything caught it. Fixed with dedicated
+  `list_disks`/`ask_disk` functions in `autarchy-install`: lists every
+  whole disk (name/size/model), labels the one the live medium itself is
+  booted from (identified via archiso's own `/run/archiso/bootmnt`, not a
+  hard block -- the existing typed-disk-path confirmation in
+  `install-base-system` remains the real safety net), defaults to the
+  sole non-installer-media disk when there's exactly one, and loops
+  instead of ever returning a blank or unrecognized value. Verified with
+  stubbed `lsblk`/`findmnt` covering: default-on-blank-Enter,
+  explicit-valid-entry, blank-then-valid (loops), selecting the
+  installer-media disk itself (allowed, labeled), invalid-then-valid
+  (loops), and the ambiguous-multiple-disks case (no default, blank
+  rejected). New acceptance coverage in `phase-12.bats` (where
+  `autarchy-install`'s other tests already live). The "prompts are in a
+  terminal, not a nice GUI" half of the same feedback is Phase 15's
+  already-planned scope, not addressed here.
 
 ## VM → physical hardware notes
 

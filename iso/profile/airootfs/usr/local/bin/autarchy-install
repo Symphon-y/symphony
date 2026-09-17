@@ -34,6 +34,70 @@ ask() {
   fi
 }
 
+# boot_disk -> the whole disk the live medium itself is booted from, if it
+# can be identified (empty otherwise -- a best-effort label, not a hard
+# block). /run/archiso/bootmnt is archiso's own mount point for the actual
+# boot device.
+boot_disk() {
+  lsblk -no PKNAME "$(findmnt -no SOURCE /run/archiso/bootmnt 2>/dev/null)" 2>/dev/null || true
+}
+
+# list_disks: prints every whole disk (name, size, model) to stderr, one per
+# line, labeling the live medium's own disk when identifiable.
+list_disks() {
+  local boot
+  boot=$(boot_disk)
+  lsblk -dno NAME,SIZE,MODEL,TYPE | awk -v boot="$boot" '
+    $NF == "disk" {
+      name = $1
+      label = (name == boot) ? "  (installer media -- do not select)" : ""
+      $1 = ""; $NF = ""
+      print "  /dev/" name "  " $0 label
+    }' >&2
+}
+
+# ask_disk -> the validated target disk path on stdout. Lists every
+# candidate disk first -- there was previously no way to know the options
+# -- and defaults to the one non-installer-media disk when there's exactly
+# one, closer to a GUI installer's "everything else is picked for you"
+# feel even inside a terminal prompt (a real TUI is Phase 15's job).
+# Loops instead of accepting a blank or invalid value: previously a blank
+# answer here silently made it all the way into install-base-system before
+# surfacing as an unhelpful, unrelated-looking error.
+ask_disk() {
+  local boot disk reply default="" candidates=() name
+
+  echo >&2
+  log "Available disks:" >&2
+  list_disks
+  boot=$(boot_disk)
+
+  while read -r name; do
+    [[ $name == "$boot" ]] || candidates+=("/dev/$name")
+  done < <(lsblk -dno NAME,TYPE | awk '$2 == "disk" {print $1}')
+  ((${#candidates[@]} == 1)) && default=${candidates[0]}
+
+  while true; do
+    if [[ -n $default ]]; then
+      read -rp "Target disk [$default] -- EVERYTHING on it will be erased: " reply
+      reply=${reply:-$default}
+    else
+      read -rp "Target disk (e.g. /dev/sda) -- EVERYTHING on it will be erased: " reply
+    fi
+    if [[ -z $reply ]]; then
+      echo "Enter one of the disk paths listed above." >&2
+      continue
+    fi
+    if [[ $(lsblk -dno TYPE "$reply" 2>/dev/null) != disk ]]; then
+      echo "'$reply' is not one of the disks listed above." >&2
+      continue
+    fi
+    disk=$reply
+    break
+  done
+  printf '%s' "$disk"
+}
+
 main() {
   cd "$CLONE_DIR"
 
@@ -45,7 +109,7 @@ main() {
   echo
   log "A few questions, then this runs unattended."
   local disk host username tzone locale keymap swap_size
-  disk=$(ask "Target disk (see Storage above, e.g. /dev/sda) -- EVERYTHING on it will be erased")
+  disk=$(ask_disk)
   host=$(ask "Hostname")
   username=$(ask "Username")
   tzone=$(ask "Timezone (e.g. America/Chicago; list: ls /usr/share/zoneinfo)")
