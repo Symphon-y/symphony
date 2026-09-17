@@ -284,6 +284,25 @@ to check by device name instead)
 - Deleted the incomplete `2026.09.17` release (object + tag) a second
   time and cut a genuinely fresh one from the now fully-merged `main`,
   containing the offline ISO, the boot fix, and hibernation together.
+- Added `autarchy-install` (a guided sequential prompt flow) and merged,
+  cut a third `2026.09.17` release. **User tested it for real and found
+  two more real gaps, both architectural, not cosmetic**: (1) the ISO
+  still needed `gh repo clone`/`gh auth login` to get the actual install
+  *scripts* -- Phase 13 baked in the package cache but never the repo
+  content that drives the install, so "offline" was only half-true; (2)
+  even a fully successful base install only reaches a bare TTY, not the
+  working desktop the user actually wants at reboot -- `rebuild.md`'s
+  scope was never automated. Root-caused honestly (see the user's own
+  framing: each fix this session solved *the symptom just hit* rather
+  than the whole stated goal) and, after real research (`dialog`/
+  `whiptail` vs. Textual's real footprint difference; Omarchy's actual
+  chroot-vs-first-boot desktop-bringup mechanism, read from its real
+  source, not guessed), split the remaining work into three properly
+  independent, individually-planned phases rather than another one-shot
+  patch: **Phase 14** (bake the repo itself into the ISO), **Phase 15**
+  (a real TUI installer), **Phase 16** (fully automated desktop
+  bring-up, closing the actual "reboot into a working GUI" goal). This
+  phase's own remaining hardware-install work resumes once those land.
 
 ## VM → physical hardware notes
 

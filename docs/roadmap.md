@@ -20,6 +20,9 @@ outlines; their scope is finalized in their own plan mode.
 | 11 | [Default browser and web-app launching](phases/phase-11-default-browser.md) | 3 | Claude + user | A real default browser installed and declared; Phase 5's dormant web-app-launcher mechanism actually works | Complete (2026-09-16) |
 | 12 | [Offline release ISO + physical hardware migration (Alienware 14 / P39G)](phases/phase-12-alienware-migration.md) | 1, cross-cutting, 1–4 | Both | The release ISO installs the full `packages/*.txt` closure with zero network needed; boots and installs on real hardware; microcode, power management, Secure Boot/TPM revisited with a real machine; NVIDIA/nouveau attempted as an explicit bonus, not a requirement | In progress (offline ISO + hibernation code merged; real hardware install pending) |
 | 13 | [Offline-capable release ISO](phases/phase-13-offline-release-iso.md) | 1, cross-cutting | Claude + user | The release ISO installs the full `packages/*.txt` closure with zero network needed, matching a purchased-OS-key install experience | Folded into Phase 12 (2026-09-17) — see that phase's restructuring note. This doc stays as an accurate record of what it built. |
+| 14 | Bake the repo itself into the ISO | 1 | Claude | Live environment has `install/`/`system/`/`packages/*.txt` with zero GitHub access needed for the core install | Not started |
+| 15 | A real, polished guided installer | 1 | Claude | `dialog`/`whiptail`/`gum`-based TUI, auto-started on boot, replacing the raw sequential prompts | Not started |
+| 16 | Fully automated desktop bring-up | 1, 6 | Claude | Reboot after install lands in a working Hyprland desktop with zero manual steps (`rebuild.md`'s scope, automated) | Not started |
 
 ## Decisions deferred to their phase's plan mode
 
