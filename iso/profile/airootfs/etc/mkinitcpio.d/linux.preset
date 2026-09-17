@@ -1,0 +1,14 @@
+# mkinitcpio preset for the 'linux' package on the autarchy live/install medium.
+# Unmodified from upstream archiso's own releng profile except for this header --
+# points mkarchiso's build-time mkinitcpio invocation at the archiso-aware HOOKS
+# in archiso.conf, instead of the stock linux package's own default preset (which
+# builds a normal, non-live-aware initramfs with no archiso search mechanism at
+# all -- this was the root cause of a real boot failure this ISO hit before the
+# preset override existed here).
+
+PRESETS=('archiso')
+
+ALL_kver='/boot/vmlinuz-linux'
+archiso_config='/etc/mkinitcpio.conf.d/archiso.conf'
+
+archiso_image="/boot/initramfs-linux.img"

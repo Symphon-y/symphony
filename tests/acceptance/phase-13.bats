@@ -89,3 +89,32 @@ setup() {
   run grep -q 'sha256sum -c' "$doc"
   assert_success
 }
+
+# --- regression: the live medium must actually boot (real Phase 10 failure,
+# re-lost and re-fixed during Phase 13 -- see the tracking doc) -----------
+
+@test "iso: the live environment can actually find its own root (archiso HOOKS, gpt-auto-generator masked)" {
+  local base="$REPO_ROOT/iso/profile/airootfs"
+  run grep -q '^archiso_config=' "$base/etc/mkinitcpio.d/linux.preset"
+  assert_success
+  run grep -q 'HOOKS=.*archiso' "$base/etc/mkinitcpio.conf.d/archiso.conf"
+  assert_success
+  run readlink "$base/etc/systemd/system-generators/systemd-gpt-auto-generator"
+  assert_output "/dev/null"
+}
+
+@test "iso: root is unlocked and auto-logs-in on the live medium" {
+  local base="$REPO_ROOT/iso/profile/airootfs"
+  run grep -q '^root::' "$base/etc/shadow"
+  assert_success
+  run grep -q 'autologin root' "$base/etc/systemd/system/getty@tty1.service.d/autologin.conf"
+  assert_success
+}
+
+@test "iso: dhcpcd, iwd, and systemd-resolved are enabled on the live medium" {
+  local wants="$REPO_ROOT/iso/profile/airootfs/etc/systemd/system/multi-user.target.wants"
+  local svc
+  for svc in dhcpcd.service iwd.service systemd-resolved.service; do
+    assert [ -L "$wants/$svc" ]
+  done
+}
