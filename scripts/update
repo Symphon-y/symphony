@@ -43,7 +43,14 @@ current_release() {
 }
 
 latest_release() {
-  git -C "$REPO_ROOT" tag --list '20*.*.*' --sort=-v:refname | head -1
+  # Not `git tag --list ... | head -1`: with pipefail, head closing the pipe
+  # after its one line can race the writer and SIGPIPE it (exit 141) --
+  # rare, but real (hit in CI once, timing-dependent). Read every line into
+  # bash first so git always runs to completion before anything downstream
+  # can close the pipe.
+  local tags
+  mapfile -t tags < <(git -C "$REPO_ROOT" tag --list '20*.*.*' --sort=-v:refname)
+  printf '%s\n' "${tags[0]:-}"
 }
 
 fetch() {
@@ -96,7 +103,12 @@ sync_repo_to_main() {
 
 apply() {
   preflight_branch
-  git -C "$REPO_ROOT" status --porcelain | grep -q . &&
+  # Not `... | grep -q .`: same SIGPIPE risk as latest_release() above --
+  # grep -q can close the pipe as soon as it matches, before git finishes
+  # writing the rest of a multi-line status.
+  local status
+  status=$(git -C "$REPO_ROOT" status --porcelain)
+  [[ -z $status ]] ||
     die "working tree has uncommitted changes -- commit or stash first"
 
   fetch

@@ -38,7 +38,10 @@ case "$1" in
   fetch) exit 0 ;;
   tag) printf '%s\n' "$STUB_TAGS" ;;
   diff) echo "(diff stat)" ;;
-  status) [[ -n $STUB_PORCELAIN ]] && printf '%s\n' "$STUB_PORCELAIN" ;;
+  status)
+    [[ -n $STUB_PORCELAIN ]] && printf '%s\n' "$STUB_PORCELAIN"
+    exit 0
+    ;;
   rev-parse) echo "$STUB_BRANCH" ;;
   checkout | pull) exit 0 ;;
   *) exit 0 ;;
