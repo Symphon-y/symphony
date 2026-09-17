@@ -92,8 +92,13 @@ to check by device name instead)
 - [x] Verify against the VM with `SWAP_SIZE` unset (no behavior change) --
       confirmed both by the regression test and the full existing test
       suite staying green
+- [x] **Unplanned, real**: fix the release ISO itself, which turned out not
+      to boot at all -- see log. Also hardened `release-iso.yml`'s
+      `target_commitish` after the fix's own test-tag publish surfaced a
+      second, separate real bug.
 - [ ] User: ground truth on real hardware, BIOS steps
-- [ ] User: boot release ISO, `autarchy-bootstrap`, `install-base-system`
+- [ ] User: re-flash the corrected `2026.09.16` ISO, boot, `autarchy-bootstrap`,
+      `git checkout phase/12-alienware-migration`, `install-base-system`
       with real `SWAP_SIZE`
 - [ ] `packages/alienware-14.txt`; verify base system boots + networks
 - [ ] Install Claude Code locally; hand off driving to a local session
@@ -133,6 +138,58 @@ to check by device name instead)
   Full `scripts/check` (130/130 unit tests) and the full acceptance suite
   (124/124) stayed green throughout -- no regressions to the VM's own
   still-zram-only, still-`SWAP_SIZE`-unset state.
+- Pushed a test tag, user flashed it via Rufus (DD mode) and booted it on
+  the real Alienware for the first time. **It didn't boot**: hung on
+  `timed out waiting for device /dev/gpt-auto-root`, six dependency
+  failures, then an emergency shell with root locked -- unusable. This is
+  the actual boot test the Phase 10 plan flagged as a stretch goal and
+  never did; the gap was real.
+  Root cause, found by pulling upstream releng's *complete* airootfs tree
+  via the GitHub API (Phase 10 only skimmed the top-level directories):
+  three things missing that mkarchiso/mkinitcpio-archiso do not supply
+  automatically -- `etc/mkinitcpio.d/linux.preset` +
+  `etc/mkinitcpio.conf.d/archiso.conf` (without pointing the build-time
+  mkinitcpio invocation at the archiso-aware HOOKS, the stock `linux`
+  package's own default preset built a normal, non-live-aware initramfs
+  with no medium-search mechanism at all); a mask for
+  `systemd-gpt-auto-generator` (`/etc/.../systemd-gpt-auto-generator ->
+  /dev/null`, the same convention as masking a unit) -- without it,
+  systemd's generic root-finding races the archiso-specific one and loses,
+  which is exactly the reported timeout; and root being locked by the
+  `shadow` package's own default (releng ships its own unlocked
+  `etc/shadow`/`etc/passwd` + a tty1 autologin drop-in for the live
+  medium). Also found and fixed in passing: `dhcpcd`/`iwd`/
+  `systemd-resolved` were never enabled (mkarchiso doesn't auto-enable
+  installed packages' services; releng enables its own explicitly the same
+  way) -- without them the live environment has no network at all.
+  Adapted rather than copied verbatim: root's shell is `/bin/bash`, not
+  releng's `zsh` -- no reason to add a zsh dependency this ISO doesn't
+  otherwise need.
+  New regression tests added to `tests/acceptance/phase-12.bats` (archiso
+  HOOKS + gpt-auto mask present; root unlocked + autologin; the three
+  services enabled) so this class of bug can't silently recur.
+  `check-identifiers` flagged `getty@tty1.service` as a false-positive
+  email match (the path `getty@tty1.service.d/autologin.conf` -- same
+  class already handled for `btrfs-scrub@-.timer`); added to the existing
+  allowlist with a unit test.
+  Rebuilt under the same `2026.09.16` test tag (deleted and recreated,
+  since the previous build under that tag was genuinely broken and
+  shouldn't stay published) -- **the rebuild succeeded, but the GitHub
+  Release itself came back in a broken state**: `draft: true`, parked
+  under an `untagged-<hash>` URL, `target_commitish: main` even though the
+  tag was pushed against this phase's own branch. Root cause:
+  `action-gh-release` had no explicit `target_commitish`, so it defaulted
+  to the repo's default branch -- fine when a tag is always cut from
+  `main` (the real, intended production case), but produces this exact
+  inconsistent state for a tag pushed against any other ref, which is
+  precisely what test-tagging a phase branch does. Un-drafted the release
+  manually to unblock the user immediately, and hardened
+  `release-iso.yml` with `target_commitish: ${{ github.sha }}` so a real
+  release is never exposed to this class of bug either, with a new
+  acceptance test. This fix itself was not re-verified with a fresh CI run
+  (would only change how the release object is published, not the ISO
+  content already fixed and published) -- it gets real exercise the next
+  time any tag is pushed.
 
 ## VM → physical hardware notes
 
