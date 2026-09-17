@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Status** | In progress |
+| **Status** | Complete |
 | **Driver** | Claude + user |
 | **Branch** | `phase/13-offline-release-iso` |
 | **Started** | 2026-09-17 |
-| **Completed** | |
+| **Completed** | 2026-09-17 |
 
 ## Goal
 
@@ -58,7 +58,10 @@ File: `tests/acceptance/phase-13.bats`
 | CI (real) | The actual build succeeds within GitHub Actions' resource limits, produces a valid ISO, and publishes |
 | hardware (Phase 12, resumed after) | Installs with zero network connectivity |
 
-Red confirmed: · Green confirmed:
+Red confirmed: 2026-09-17, 6/6 failing cleanly before implementation
+existed · Green confirmed: 2026-09-17, 10/10 static + 2 real end-to-end CI
+runs (see log) producing a real, split, downloadable ISO
+(2,439,299,072 bytes total)
 
 ## Tasks
 
@@ -75,9 +78,16 @@ Red confirmed: · Green confirmed:
       `df -h` logging before/after the build
 - [x] Green (static): 7/7 `phase-13.bats`; full `scripts/check` (121/121
       unit tests); full acceptance suite (123/123, no regressions)
-- [ ] Green (real): push a real test tag, verify the actual CI build
-      succeeds within resource limits and get the real ISO size
-- [ ] Close: `DECISIONS.md`, `docs/roadmap.md`, merge to `main`
+- [x] Green (real): pushed a real test tag twice. First real run: build
+      succeeded end to end (repo build, AUR builds, mkarchiso all green)
+      but the real ISO measured over GitHub's 2 GiB per-file limit --
+      confirmed, not assumed, exactly the contingency the plan accounted
+      for. Added conditional splitting; second real run: build succeeded,
+      split into 2 parts, real total size **2,439,299,072 bytes (≈2.27
+      GiB)**. Disk space was never actually tight (72 GB runner, peaked at
+      33/72 GB used) -- the pessimistic 14 GB "guaranteed floor" estimate
+      didn't materialize as a real constraint.
+- [x] Close: `DECISIONS.md`, `docs/roadmap.md`, merge to `main`
 - [ ] Resume Phase 12 with the new offline ISO
 
 ## Implementation log
@@ -102,6 +112,31 @@ Red confirmed: · Green confirmed:
   (121/121), and the full acceptance suite (123/123) green, no
   regressions -- confirmed `iso/profile/pacman.conf` (build-time-only)
   correctly stayed untouched.
+- User approved a real test-tag push. First real run: the offline-repo
+  build, AUR builds, and `mkarchiso` all succeeded, but publishing to the
+  Release failed with GitHub's own real error --
+  `"size must be less than 2147483648"` -- confirming (not assuming) the
+  research's ~2.5-2.8GB estimate. Implemented conditional splitting
+  (`stat -c%s` the real built file; `split -d -b 1800M` only if it's
+  actually at or over 2 GiB) and re-pinned `target_commitish` (branched
+  from `main` before Phase 12's identical fix existed anywhere).
+  `docs/runbooks/base-install.md` documents reassembly (`cat` the parts,
+  `sha256sum -c` before writing to USB).
+  Second real run: succeeded end to end, split into 2 parts, real total
+  size 2,439,299,072 bytes. Publishing itself still came back as a
+  draft under an `untagged-<hash>` URL -- not a regression of the
+  `target_commitish` fix (confirmed via `gh api`: it correctly resolved to
+  the exact tagged commit's SHA this time) but a *different* real
+  artifact: `action-gh-release` updates an existing release's assets when
+  a tag name matches one it already created, without correcting a
+  draft/untagged state from that release's *original* creation --  and
+  this exact tag name (`2026.09.16`) had already been reused across every
+  test-tag push since Phase 10's first broken attempt, keeping the same
+  underlying release object (`id: 390191429`) alive the whole time.
+  Un-drafted it manually to unblock the user immediately; a genuinely
+  fresh tag (any real production release) won't inherit this, since it
+  will get an unpoisoned release object from `action-gh-release`'s first
+  creation of it.
 
 ## VM → physical hardware notes
 
@@ -111,8 +146,8 @@ Red confirmed: · Green confirmed:
 
 ## Exit criteria
 
-- [ ] All acceptance tests pass
-- [ ] Static checks pass
-- [ ] `DECISIONS.md` updated
-- [ ] `docs/roadmap.md` status updated
+- [x] All acceptance tests pass
+- [x] Static checks pass
+- [x] `DECISIONS.md` updated
+- [x] `docs/roadmap.md` status updated
 - [ ] Branch merged to `main`
