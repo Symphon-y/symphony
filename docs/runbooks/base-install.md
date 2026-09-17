@@ -24,18 +24,21 @@ VM), and again for the rebuild test (Phase 8) and physical hardware (Phase 12).
   ```
   Only write the reassembled file to USB once that reports `OK`.
 
-  `git`, `gh`, and the test tools are already installed, and running
-  `autarchy-bootstrap` replaces step 1's manual typing below with one
-  command. Steps 4-6 (partition, encrypt, format, pacstrap, configure) are
-  replaced by one script:
+  **The whole runbook below (steps 1-7) is replaced by one guided
+  command**, printed on screen the moment you log in:
   ```sh
-  sudo install/install-base-system base-install.local.vars
+  autarchy-install
   ```
-  It reads the same vars file steps 1-3 below still produce, prints exactly
-  what it's about to do to `$DISK`, requires typing the disk path back to
-  confirm before anything destructive happens, then runs unattended through
-  to a rebootable system -- covering steps 4-6 in one command instead of
-  typing each one by hand. From there, continue at step 7.
+  It clones the repo (if needed), shows a ground-truth report of the
+  machine (CPU/memory/GPU/storage/network), asks a handful of plain
+  questions in order (disk, hostname, username, timezone, locale, keymap,
+  optional hibernation size), shows a review screen, then hands off to
+  `install/install-base-system` -- which prints exactly what it's about to
+  do to the disk, requires typing the disk path back to confirm before
+  anything destructive happens (a second, stronger checkpoint, not a
+  duplicate of the review screen), then runs unattended through to a
+  rebootable system and offers to reboot. No steps below need typing by
+  hand on this path.
 - **Stock Arch ISO (manual path, kept as the documented fallback).** Every
   step below, typed by hand -- still the recovery path from the "Recovery"
   section at the end, and still how this runbook stays understandable step
