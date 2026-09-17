@@ -74,6 +74,40 @@ setup() {
   assert_success
 }
 
+@test "iso: autarchy-install exists and composes the existing, already-tested scripts in order" {
+  local script="$REPO_ROOT/iso/profile/airootfs/usr/local/bin/autarchy-install"
+  assert [ -x "$script" ]
+
+  # No new install logic here -- only orchestration of what already exists
+  # and is already tested elsewhere (autarchy-bootstrap, install-base-system).
+  run grep -q 'autarchy-bootstrap' "$script"
+  assert_success
+  run grep -q 'scripts/system-report' "$script"
+  assert_success
+  run grep -q 'install/install-base-system' "$script"
+  assert_success
+
+  # The review screen (a plain proceed? gate) must come before
+  # install-base-system runs -- its own typed-disk-path gate is a second,
+  # separate checkpoint, not a replacement.
+  local review_line install_line
+  review_line=$(grep -n 'Proceed with these values' "$script" | head -1 | cut -d: -f1)
+  install_line=$(grep -n '^  install/install-base-system' "$script" | head -1 | cut -d: -f1)
+  assert [ -n "$review_line" ]
+  assert [ -n "$install_line" ]
+  assert [ "$review_line" -lt "$install_line" ]
+}
+
+@test "iso: the live medium prints autarchy-install as the one obvious thing to run" {
+  run grep -q 'autarchy-install' "$REPO_ROOT/iso/profile/airootfs/root/.bash_profile"
+  assert_success
+}
+
+@test "docs: base-install.md documents the guided autarchy-install flow" {
+  run grep -q 'autarchy-install' "$REPO_ROOT/docs/runbooks/base-install.md"
+  assert_success
+}
+
 @test "packages/alienware-14.txt does not exist yet -- ground truth comes first" {
   # Written only after real hardware ground truth (lscpu/lspci/free/lsblk),
   # not assumed in advance -- this test documents that ordering and will be
