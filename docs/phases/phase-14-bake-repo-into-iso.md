@@ -172,6 +172,31 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   action's silent multi-hour hang), but two attempts with no delay
   between them wasn't enough to ride out a transient server error.
   Widened to 3 attempts with a 20-second backoff between them.
+- `2026.09.17-test5` (disk-selection fix + wider retry): published
+  cleanly. The user boot-tested it -- the disk listing/validation worked
+  (real progress: "it looked like it was going to work better"), but
+  after answering all the guided prompts and confirming the review
+  screen, `autarchy-install` itself failed: `line 149:
+  install/install-base-system: Permission denied` (bash's own
+  exec-permission error, not one of our `die()` messages). `git ls-files
+  -s install/install-base-system` confirmed the script is committed as
+  `100755` -- so the executable bit is getting lost somewhere in the
+  checkout -> rsync -> mkarchiso pipeline that bakes the repo into the
+  ISO, a regression specific to Phase 14's new rsync-based bake-in
+  (`autarchy-bootstrap`'s old live `git clone` always set the bit
+  correctly from the git index at boot time; nothing exercised this path
+  before). Reproduced the rsync step locally with `cp -a` as a stand-in
+  (no `rsync` binary on this dev VM) -- permissions survived fine
+  locally, which points at mkarchiso's own airootfs-to-squashfs staging
+  rather than the rsync step itself, though the exact point was never
+  pinned down for certain. Rather than chase it further, added a new CI
+  step right after the bake-in (`git ls-files -s | awk '$1 ==
+  "100755"'` -> `chmod 755` on each matching path inside the baked-in
+  copy) that re-stamps every file git's own index says should be
+  executable, immediately before mkarchiso ever reads the tree -- robust
+  regardless of which downstream step was actually stripping it. New
+  acceptance coverage in `phase-14.bats` (ordering: after the rsync
+  bake-in, before the mkarchiso build).
 
 ## VM → physical hardware notes
 
