@@ -258,6 +258,26 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   `customize_airootfs.sh` chroot-hook mechanism found in the same
   source -- not used; `file_permissions` is the current, sanctioned
   mechanism for exactly this.
+- `2026.09.17-test8` failed fast (~5 min, mid-build) with `fatal:
+  detected dubious ownership in repository at '/workspace'` -- a real
+  git safety feature: the checkout is owned by whichever user
+  `actions/checkout` ran as, outside the `--privileged` container, and
+  git (root, inside the container) refuses to open a repo it doesn't own
+  unless told it's safe. My `repo_root=$(git -C ... rev-parse
+  --show-toplevel)` line was itself the git call hitting this, before
+  ever reaching the real `ls-files` call. Fixed by finding `repo_root`
+  with plain `cd`/`pwd` instead (no git needed for that part), then
+  explicitly `git config --global --add safe.directory "$repo_root"`
+  before the one git call that actually needs it. Caught a second,
+  self-inflicted problem while re-verifying locally: the new acceptance
+  test sources `profiledef.sh` directly, which runs that same `git
+  config --global` line -- on a developer's own machine, that would
+  silently append a duplicate `safe.directory` entry to their real
+  `~/.gitconfig` every time the test suite runs. Fixed by isolating
+  `HOME=$BATS_TEST_TMPDIR` for that one test invocation. Verified: full
+  `scripts/check` green, and confirmed `git config --global --get-all
+  safe.directory` on this dev machine is empty before and after running
+  the suite.
 
 ## VM → physical hardware notes
 

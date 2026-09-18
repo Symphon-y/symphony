@@ -59,9 +59,11 @@ setup() {
   # Dry-run the exact logic against this real repo (mirroring mkarchiso's
   # own pre-declared associative array) and confirm it actually finds
   # install-base-system and system-report -- the two scripts a real boot
-  # test found broken.
+  # test found broken. HOME is isolated: profiledef.sh runs `git config
+  # --global --add safe.directory`, which must NOT write to the
+  # developer's real ~/.gitconfig every time this test runs.
   # shellcheck disable=SC2016 # single-quoted on purpose -- $PD expands in the subshell, not here
-  run env PD="$pd" bash -c 'declare -A file_permissions; source "$PD"; echo "${file_permissions[/root/autarchy/install/install-base-system]:-}"; echo "${file_permissions[/root/autarchy/scripts/system-report]:-}"'
+  run env PD="$pd" HOME="$BATS_TEST_TMPDIR" bash -c 'declare -A file_permissions; source "$PD"; echo "${file_permissions[/root/autarchy/install/install-base-system]:-}"; echo "${file_permissions[/root/autarchy/scripts/system-report]:-}"'
   assert_success
   assert_output "$(printf '0:0:755\n0:0:755')"
 }

@@ -38,7 +38,14 @@ file_permissions=(
 # the real `.git` checkout (unlike the airootfs/root/autarchy bake-in
 # copy, which deliberately excludes it) are both present in the build
 # container by the time mkarchiso sources this file.
-repo_root=$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)
+#
+# repo_root is found with plain `cd`/`pwd`, not `git rev-parse --show-
+# toplevel`: the checkout is owned by whichever user actions/checkout
+# ran as, outside this --privileged container, and git (root in here)
+# refuses to even open it ("detected dubious ownership in repository")
+# until explicitly told it's safe -- confirmed by a real build failure.
+repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+git config --global --add safe.directory "$repo_root"
 while IFS= read -r rel_path; do
   file_permissions["/root/autarchy/$rel_path"]="0:0:755"
 done < <(git -C "$repo_root" ls-files -s | awk '$1 == "100755" {print $4}')
