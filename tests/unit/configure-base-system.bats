@@ -52,7 +52,14 @@ make_stubs() {
 
   stub "$bin/systemctl" 'echo "systemctl $*" >>"$STUB_LOG"'
   stub "$bin/mountpoint" 'echo "mountpoint $*" >>"$STUB_LOG"; exit "${STUB_MOUNTPOINT_RC:-0}"'
-  stub "$bin/blkid" 'echo "blkid $*" >>"$STUB_LOG"; echo "1111-2222"'
+  # Device-specific, not a single hardcoded value: a stub that can't tell
+  # devices apart can't catch a bug about resolving the wrong device's
+  # UUID (D-0065 -- the swap UUID must differ from root's for the
+  # rd.luks.name= invariant test below to mean anything).
+  stub "$bin/blkid" 'echo "blkid $*" >>"$STUB_LOG"; case "$*" in
+    *by-partlabel/cryptroot) echo "1111-2222" ;;
+    *by-partlabel/cryptswap) echo "5555-6666" ;;
+  esac'
   stub "$bin/visudo" 'echo "visudo $*" >>"$STUB_LOG"'
   stub "$bin/id" 'if [[ ${1:-} == -u ]]; then echo 0; else exec /usr/bin/id "$@"; fi'
 
@@ -178,7 +185,26 @@ calls() {
   AUTARCHY_RESUME_DEVICE=/dev/mapper/cryptswap run "$SCRIPT" "$VARS" "$TARGET"
   assert_success
   assert_equal "$(cat "$TARGET/etc/kernel/cmdline")" \
-    "rd.luks.name=1111-2222=root root=/dev/mapper/root rootflags=subvol=@ rw resume=/dev/mapper/cryptswap"
+    "rd.luks.name=1111-2222=root root=/dev/mapper/root rootflags=subvol=@ rw rd.luks.name=5555-6666=cryptswap resume=/dev/mapper/cryptswap resumeflags=x-systemd.device-timeout=30s"
+  run calls
+  assert_line "blkid -s UUID -o value /dev/disk/by-partlabel/cryptswap"
+}
+
+@test "resume= is never added without a matching rd.luks.name= for the same device (D-0065)" {
+  # The exact invariant a real hardware boot deadlock violated:
+  # systemd-hibernate-resume.service runs inside the initramfs and can
+  # only find the resume device if sd-encrypt already unlocked it there
+  # via its own rd.luks.name= -- a resume= device unlocked only later,
+  # via crypttab on the not-yet-mounted real root, is a permanent hang,
+  # not a slow one. Whenever resume=/dev/mapper/X appears, rd.luks.name=
+  # ...=X must also appear in the same cmdline.
+  AUTARCHY_RESUME_DEVICE=/dev/mapper/cryptswap run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  local cmdline mapper_name
+  cmdline=$(cat "$TARGET/etc/kernel/cmdline")
+  mapper_name=$(basename "$AUTARCHY_RESUME_DEVICE")
+  [[ $cmdline == *"resume=/dev/mapper/$mapper_name"* ]]
+  [[ $cmdline == *"rd.luks.name="*"=$mapper_name"* ]]
 }
 
 @test "replaces stock initramfs images with unified kernel images and installs the boot loader" {

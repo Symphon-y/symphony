@@ -23,7 +23,13 @@ readonly REQUIRED_VARS=(DISK HOST USERNAME TZONE LOCALE KEYMAP)
 # SWAP_SIZE is optional (Phase 12): unset means zram-only, unchanged from
 # today. When set, these name the generated hibernation-swap keyfile.
 readonly SWAP_MAPPER=cryptswap
-readonly SWAP_KEYFILE=/etc/cryptsetup-keys.d/swap.key
+# Named after $SWAP_MAPPER, not arbitrarily: crypttab(5)'s automatic
+# per-device keyfile discovery (a keyfile named after the mapper,
+# suffixed .key, under /etc/cryptsetup-keys.d/) is what lets sd-encrypt
+# find this key from inside the initramfs when configure-base-system
+# unlocks this device early via rd.luks.name= -- no separate
+# rd.luks.key= cmdline parameter needed.
+readonly SWAP_KEYFILE=/etc/cryptsetup-keys.d/$SWAP_MAPPER.key
 # The live ISO's own release marker (baked in by release-iso.yml, Phase 10;
 # scripts/update reads the same file post-install) -- not present on a
 # plain stock-ISO manual install.
@@ -168,7 +174,13 @@ configure_swap() {
   mkswap "/dev/mapper/$SWAP_MAPPER"
 
   swap_uuid=$(blkid -s UUID -o value "$swap_dev")
-  echo "$SWAP_MAPPER UUID=$swap_uuid $SWAP_KEYFILE luks" >>"$TARGET/etc/crypttab"
+  # x-initrd.attach: configure-base-system's rd.luks.name= does the real
+  # unlock early, inside the initramfs (required for resume= to work at
+  # all -- a real boot deadlock otherwise, see D-0065). This crypttab
+  # entry's job becomes correct shutdown ordering (detaching cleanly),
+  # not the unlock itself -- crypttab(5)'s documented option for exactly
+  # this "also used in the initrd" case.
+  echo "$SWAP_MAPPER UUID=$swap_uuid $SWAP_KEYFILE luks,x-initrd.attach" >>"$TARGET/etc/crypttab"
   echo "/dev/mapper/$SWAP_MAPPER none swap defaults 0 0" >>"$TARGET/etc/fstab"
 
   mkdir -p "$TARGET/etc/mkinitcpio.conf.d"

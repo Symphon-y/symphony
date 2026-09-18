@@ -1545,3 +1545,85 @@ and the old entry is marked `Superseded by D-XXXX`.
   shape, byte-for-byte matching the error text seen on real hardware for
   the broken shape and a clean `exit 0` + correct package resolution for
   the fixed one.
+
+## D-0065 — Hibernation's `resume=` needs its own `rd.luks.name=`, or it deadlocks boot
+
+- **Status:** Accepted (2026-09-18, Phase 14, closes an open item from
+  Phase 12)
+- **Decision:** `install/configure-base-system`'s `configure_boot()`
+  adds a second `rd.luks.name=$swap_uuid=$swap_mapper` to the kernel
+  cmdline (alongside root's existing one) whenever hibernation swap is
+  configured, plus `resumeflags=x-systemd.device-timeout=30s`.
+  `install/install-base-system` renames the swap keyfile from
+  `/etc/cryptsetup-keys.d/swap.key` to `/etc/cryptsetup-keys.d/
+  cryptswap.key` (matching `crypttab(5)`'s automatic per-mapper keyfile
+  discovery, so `sd-encrypt` finds it from inside the initramfs with no
+  extra `rd.luks.key=` parameter) and adds `x-initrd.attach` to the
+  swap `/etc/crypttab` entry's options (correct shutdown-ordering now
+  that the initramfs does the real unlock, not this entry).
+- **Alternatives considered:** defer hibernation entirely (stop
+  appending `resume=`, keep encrypted swap for memory-pressure relief
+  only) — genuinely simpler and was the initially recommended path, but
+  the user explicitly wanted real, working hibernation delivered now,
+  not deferred; a swap *file* on the encrypted root instead of a
+  dedicated LUKS2 partition — Phase 12 already rejected this for real,
+  documented `resume_offset=`-on-Btrfs fragility found during that
+  phase's own research, unrelated to this bug.
+- **Reasoning:** a real hardware boot hung indefinitely
+  (`A start job is running for /dev/mapper/cryptswap ... no limit`)
+  after a fully successful install. Root-caused by reading
+  `systemd-hibernate-resume-generator`'s and `systemd-cryptsetup-
+  generator`'s actual C source directly (not secondary docs):
+  `systemd-hibernate-resume.service` runs *only inside the initramfs*,
+  ordered `Before=local-fs-pre.target` (before the real root is even
+  mounted) and `BindsTo=`/`After=` the resume device's unit. That
+  device could only be created by unlocking `/etc/crypttab`'s
+  `cryptswap` entry — but crypttab lives on the not-yet-mounted real
+  root, only processed by `systemd-cryptsetup-generator` *after* root
+  mounts, which was itself blocked on the resume service. A genuine,
+  airtight circular dependency, not a slow race: `JobTimeoutSec=
+  infinity` applies whenever `resume=` comes from the kernel cmdline
+  and no `x-systemd.device-timeout` is set (via `resumeflags=` or
+  `rootflags=`), which was the case here — it was never going to
+  time out, not at 27 minutes, not ever. The embedded swap keyfile
+  (`FILES=` in the mkinitcpio conf.d drop-in) was never the problem or
+  the fix: present in the initramfs, but nothing there ever read it,
+  since no `rd.luks.*` entry told `sd-encrypt` the swap device existed
+  at all. The Arch Wiki's own "dm-crypt/Swap encryption" article states
+  the fix's requirement unambiguously: *"To resume from an encrypted
+  swap partition, the encrypted partition must be unlocked in the
+  initramfs."* Confirmed against a real, working reference setup using
+  the identical `sd-encrypt`/systemd-boot/UKI shape this repo already
+  uses ([orhun's gist](https://gist.github.com/orhun/02102b3af3acfdaf9a5a2164bea7c3d6)),
+  and matches real, independently-reported instances of the exact same
+  symptom ([systemd#7242](https://github.com/systemd/systemd/issues/7242)
+  — origin of the infinite-timeout behavior and the `resumeflags=` fix;
+  [pop-os/pop#316](https://github.com/pop-os/pop/issues/316) — identical
+  "no limit" hang; [Arch BBS #309114](https://bbs.archlinux.org/viewtopic.php?id=309114)
+  — same root-cause class, "swap partition decrypted too late").
+- **Consequences:** this class of bug — systemd generator/unit ordering
+  during a real kernel boot — cannot be verified in a local sandbox the
+  way D-0064's pacman fix was (`unshare -r` can simulate a userspace
+  pacman sync; nothing safely simulates initramfs/PID1 behavior without
+  sudo or a real boot). Confidence here comes from reading systemd's
+  actual generator source directly and matching a real, confirmed-
+  working setup, but real verification is still only a real hardware
+  boot plus an actual `systemctl hibernate` + resume cycle — Phase 12's
+  own hardware acceptance test (`hardware: hibernate and resume works`,
+  `tests/acceptance/phase-12.bats`) has been a `skip "manual: ..."` stub
+  since it was written, and stays that way until that real cycle is run
+  and confirmed; this decision closes the *boot-hang* half of that open
+  item, not the full hibernate-then-resume verification itself. Also
+  worth recording: this exact interaction (`resume=` set unconditionally
+  whenever a swap mapper exists, with no `rd.luks.name=` counterpart)
+  was never discussed in `docs/phases/phase-12-alienware-migration.md`
+  or tested by any acceptance/unit test before this — every existing
+  test in this area was a stub-based string/content assertion,
+  structurally incapable of catching a boot-time ordering bug like this
+  one (it can only prove "the right strings landed in the right files").
+  The new `configure-base-system.bats` test added alongside this fix
+  encodes the actual invariant that was violated (`resume=/dev/mapper/X`
+  implies `rd.luks.name=...=X` in the same cmdline) rather than only a
+  brittle full-string match, so a future regression here is more likely
+  to be caught even though the deeper boot-ordering behavior itself
+  still can't be.

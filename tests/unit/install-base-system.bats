@@ -217,13 +217,13 @@ with_swap() {
   run_confirmed
   assert_success
 
-  assert [ -f "$TARGET/etc/cryptsetup-keys.d/swap.key" ]
-  run stat -c '%a' "$TARGET/etc/cryptsetup-keys.d/swap.key"
+  assert [ -f "$TARGET/etc/cryptsetup-keys.d/cryptswap.key" ]
+  run stat -c '%a' "$TARGET/etc/cryptsetup-keys.d/cryptswap.key"
   assert_output "600"
 
   run calls
-  assert_line "cryptsetup luksFormat --type luks2 --batch-mode --key-file $TARGET/etc/cryptsetup-keys.d/swap.key /dev/disk/by-partlabel/cryptswap"
-  assert_line "cryptsetup open --key-file $TARGET/etc/cryptsetup-keys.d/swap.key /dev/disk/by-partlabel/cryptswap cryptswap"
+  assert_line "cryptsetup luksFormat --type luks2 --batch-mode --key-file $TARGET/etc/cryptsetup-keys.d/cryptswap.key /dev/disk/by-partlabel/cryptswap"
+  assert_line "cryptsetup open --key-file $TARGET/etc/cryptsetup-keys.d/cryptswap.key /dev/disk/by-partlabel/cryptswap cryptswap"
   assert_line "mkswap /dev/mapper/cryptswap"
 }
 
@@ -233,11 +233,11 @@ with_swap() {
   assert_success
 
   assert_equal "$(cat "$TARGET/etc/crypttab")" \
-    "cryptswap UUID=3333-4444 /etc/cryptsetup-keys.d/swap.key luks"
+    "cryptswap UUID=3333-4444 /etc/cryptsetup-keys.d/cryptswap.key luks,x-initrd.attach"
   run grep -Fx '/dev/mapper/cryptswap none swap defaults 0 0' "$TARGET/etc/fstab"
   assert_success
   assert_equal "$(cat "$TARGET/etc/mkinitcpio.conf.d/20-swap-resume.conf")" \
-    "FILES=(/etc/cryptsetup-keys.d/swap.key)"
+    "FILES=(/etc/cryptsetup-keys.d/cryptswap.key)"
 }
 
 @test "SWAP_SIZE set: passes AUTARCHY_RESUME_DEVICE to configure-base-system" {

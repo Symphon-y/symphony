@@ -124,7 +124,26 @@ configure_boot() {
   # dedicated swap mapper. Baked in explicitly rather than relying on
   # systemd's EFI-variable auto-detect, which has known rough edges on some
   # firmware and isn't needed for a plain partition.
-  [[ -n ${AUTARCHY_RESUME_DEVICE:-} ]] && cmdline+=" resume=$AUTARCHY_RESUME_DEVICE"
+  #
+  # resume= alone is not enough (D-0065, a real boot deadlock found on
+  # real hardware): systemd-hibernate-resume.service runs *inside the
+  # initramfs*, before the real root is even mounted, and binds to the
+  # resume device's unit. A device only unlocked later via /etc/crypttab
+  # (which lives on the not-yet-mounted real root) can never satisfy
+  # that -- a permanent hang, not a slow one (JobTimeoutSec=infinity
+  # when resume= comes from the kernel cmdline and no
+  # x-systemd.device-timeout is set, hence resumeflags= below too). The
+  # swap device needs its own rd.luks.name=, exactly like root already
+  # has, so sd-encrypt unlocks it early, inside the initramfs, before
+  # systemd-hibernate-resume.service needs it.
+  if [[ -n ${AUTARCHY_RESUME_DEVICE:-} ]]; then
+    local swap_mapper swap_device swap_uuid
+    swap_mapper=$(basename "$AUTARCHY_RESUME_DEVICE")
+    swap_device="/dev/disk/by-partlabel/$SWAP_PARTLABEL"
+    swap_uuid=$(blkid -s UUID -o value "$swap_device" || true)
+    [[ -n $swap_uuid ]] || die "cannot read the UUID of $swap_device"
+    cmdline+=" rd.luks.name=$swap_uuid=$swap_mapper resume=$AUTARCHY_RESUME_DEVICE resumeflags=x-systemd.device-timeout=30s"
+  fi
   mkdir -p "$TARGET/etc/kernel"
   echo "$cmdline" >"$TARGET/etc/kernel/cmdline"
 

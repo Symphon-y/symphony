@@ -402,6 +402,64 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   (core/extra enabled, empty mirrorlist) in the same sandbox and got the
   byte-for-byte identical error text seen on real hardware, confirming
   both the diagnosis and the fix before pushing `2026.09.17-test13`.
+- `2026.09.17-test13` succeeded and, on real hardware, got all the way
+  through `pacstrap`'s full package install this time -- then the
+  *installed system's own first boot* hung indefinitely: `A start job
+  is running for /dev/mapper/cryptswap (27min / no limit)`. Not an
+  install-script bug -- a real boot-time deadlock in Phase 12's
+  hibernation feature (`SWAP_SIZE`). The user asked for the same depth
+  of investigation again: ran two parallel research agents, one reading
+  every line of this repo's swap/hibernation wiring, one reading
+  systemd's actual generator source (`hibernate-resume-generator.c`,
+  `cryptsetup-generator.c`) and the Arch Wiki. Root cause, confirmed
+  from systemd's own source: `resume=/dev/mapper/cryptswap` was appended
+  to the kernel cmdline (`configure_boot()`), but nothing ever added a
+  matching `rd.luks.name=` for the swap device -- only root has one.
+  `systemd-hibernate-resume.service` runs *inside the initramfs*,
+  ordered before the real root mount, and binds to the resume device's
+  unit; that device can only be created by unlocking `/etc/crypttab`'s
+  `cryptswap` entry, which lives on the not-yet-mounted real root and is
+  only processed *after* root mounts -- itself blocked on the resume
+  service. A genuine, airtight deadlock, not a race, and with
+  `JobTimeoutSec=infinity` (no `x-systemd.device-timeout` was set) it
+  was never going to resolve on its own. Full root cause, fix design,
+  and citations recorded in **D-0065**.
+
+  Full fix implemented (user's explicit choice: wire up real
+  hibernation now, not defer it) -- `configure_boot()` now looks up the
+  swap partition's UUID the same way root's already is and adds
+  `rd.luks.name=$swap_uuid=$swap_mapper` (mapper name derived from
+  `$AUTARCHY_RESUME_DEVICE` via `basename`, no new env var) plus
+  `resumeflags=x-systemd.device-timeout=30s` as unconditional insurance
+  against a similar future hang ever being unbounded again. The swap
+  keyfile is renamed `swap.key` -> `cryptswap.key` (matches
+  `crypttab(5)`'s automatic per-mapper keyfile discovery, letting
+  `sd-encrypt` find it from inside the initramfs with no extra
+  `rd.luks.key=` parameter), and the crypttab entry gains
+  `x-initrd.attach` (correct shutdown ordering now that the initramfs
+  does the real unlock). `tests/unit/configure-base-system.bats`'s
+  `blkid` stub -- previously a single hardcoded UUID for *any* queried
+  device, which would have masked exactly this class of wrong-device
+  bug -- made device-specific; added a new test directly encoding the
+  invariant that was violated (`resume=/dev/mapper/X` implies
+  `rd.luks.name=...=X` in the same cmdline), not just an update to the
+  existing brittle full-string-match test. Given the user was mid-hang
+  on real hardware, also handed them an immediate, out-of-band recovery
+  procedure (power-cycle, boot the install USB, `arch-chroot` in, strip
+  `resume=` from `/etc/kernel/cmdline`, rebuild the UKI) rather than
+  making them wait on a fresh CI build.
+
+  Explicitly **not** claimed: unlike the pacstrap fix, this class of bug
+  (systemd generator/unit ordering during a real kernel boot) cannot be
+  verified in a local sandbox -- there's no safe, no-sudo way to
+  simulate initramfs/PID1 behavior the way `unshare -r pacman -Sy`
+  simulated the pacman sync. Confidence comes from reading systemd's
+  actual generator source directly and matching a real, confirmed-
+  working reference setup, but real verification is still only a real
+  hardware boot plus an actual `systemctl hibernate` + resume cycle --
+  Phase 12's own hardware acceptance test for this has been a `skip
+  "manual: ..."` stub since it was written and stays that way until
+  that real cycle actually runs.
 
 ## VM → physical hardware notes
 
