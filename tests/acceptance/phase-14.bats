@@ -33,25 +33,37 @@ setup() {
   assert_success
 }
 
-@test "release workflow: re-stamps executable bits on the baked-in repo copy, from git, after the bake-in and before the build" {
+@test "profiledef.sh: derives file_permissions for every baked-in script from git, not a hand-typed list" {
   # A real hardware boot test hit "install/install-base-system: Permission
-  # denied" -- the executable bit was lost somewhere in the checkout ->
-  # rsync -> mkarchiso pipeline for a script git's own index confirms is
-  # 100755. Re-stamped from git (the one place the bit is guaranteed
-  # correct) right before mkarchiso reads the tree.
-  local wf="$REPO_ROOT/.github/workflows/release-iso.yml"
-  run grep -q "git ls-files -s" "$wf"
+  # denied" (and, less visibly, the same for scripts/system-report and
+  # every other baked-in script -- its call site swallows the failure
+  # with `|| true`). Root cause, confirmed directly from archiso's own
+  # source (archlinux/archiso, archiso/mkarchiso, _make_custom_airootfs):
+  # mkarchiso copies the whole airootfs/ tree with `cp -af --no-preserve=
+  # ownership,mode`, unconditionally stripping every mode bit, then
+  # restores it only for paths explicitly listed in profiledef.sh's
+  # file_permissions array. A CI-side chmod pass *before* mkarchiso runs
+  # (tried first, didn't work) can never survive that copy. The fix has
+  # to populate file_permissions itself, and it has to be derived from
+  # git's own index (the one place the bit is already tracked correctly)
+  # rather than hand-listed, so a script added later doesn't silently
+  # ship non-executable.
+  local pd="$REPO_ROOT/iso/profile/profiledef.sh"
+  run grep -q 'ls-files -s' "$pd"
   assert_success
-  run grep -q '100755' "$wf"
+  run grep -q '100755' "$pd"
+  assert_success
+  run grep -q 'file_permissions\["/root/autarchy/' "$pd"
   assert_success
 
-  local bake_line chmod_line build_line
-  bake_line=$(grep -n 'rsync' "$wf" | head -1 | cut -d: -f1)
-  chmod_line=$(grep -n 'git ls-files -s' "$wf" | head -1 | cut -d: -f1)
-  build_line=$(grep -n '/workspace/iso/build-offline-repo' "$wf" | head -1 | cut -d: -f1)
-  assert [ -n "$chmod_line" ]
-  assert [ "$bake_line" -lt "$chmod_line" ]
-  assert [ "$chmod_line" -lt "$build_line" ]
+  # Dry-run the exact logic against this real repo (mirroring mkarchiso's
+  # own pre-declared associative array) and confirm it actually finds
+  # install-base-system and system-report -- the two scripts a real boot
+  # test found broken.
+  # shellcheck disable=SC2016 # single-quoted on purpose -- $PD expands in the subshell, not here
+  run env PD="$pd" bash -c 'declare -A file_permissions; source "$PD"; echo "${file_permissions[/root/autarchy/install/install-base-system]:-}"; echo "${file_permissions[/root/autarchy/scripts/system-report]:-}"'
+  assert_success
+  assert_output "$(printf '0:0:755\n0:0:755')"
 }
 
 @test "autarchy-bootstrap is fully retired -- no trace outside historical records" {

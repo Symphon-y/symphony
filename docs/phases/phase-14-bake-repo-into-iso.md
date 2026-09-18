@@ -215,6 +215,49 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   loop completes; one file present with its bit deliberately stripped:
   loop completes and the bit is restored) before pushing `test6`'s
   replacement.
+- `2026.09.17-test7` (with the CI-side chmod fix, correctly working this
+  time) still failed on the real hardware boot test, with the *exact
+  same* error. This meant the whole CI-side-chmod approach was wrong,
+  not just buggy. Asked the user to check the live system directly:
+  `ls -la` on both `install/install-base-system` and `scripts/
+  system-report` showed `-rw-r--r--` for **both** -- not file-specific
+  after all. `system-report`'s failure had simply been invisible the
+  whole time: its call site is `scripts/system-report || true`
+  (swallowed), while `install-base-system`'s call has no such guard
+  (fatal, visible). Fetched `mkarchiso`'s actual source
+  (`archlinux/archiso`, `archiso/mkarchiso`) directly to find the real
+  mechanism rather than guess a fourth time:
+  `_make_custom_airootfs()` copies the *entire* `airootfs/` tree with
+  `cp -af --no-preserve=ownership,mode` -- deliberately stripping every
+  mode bit on every file, unconditionally -- then restores ownership/
+  mode **only** for paths explicitly listed in `profiledef.sh`'s
+  `file_permissions` array. That fully explains every observation:
+  `/usr/local/bin/autarchy-install` (listed) worked; everything else
+  baked in under `/root/autarchy` (not listed) didn't. A CI-side chmod
+  applied *before* `mkarchiso` runs can never survive this -- it's
+  unconditionally discarded by the copy regardless of what mode was
+  there beforehand, which is exactly why `test6`/`test7`'s fix, though
+  itself correct and bug-free, could never have worked.
+
+  Real fix: deleted the now-proven-dead CI chmod step entirely, and made
+  `profiledef.sh`'s `file_permissions` array populate itself dynamically
+  from git's own index (`git ls-files -s | awk '$1 == "100755"'`) for
+  every path landing under the baked-in `/root/autarchy` copy, rather
+  than hand-listing each script (a footgun -- a script added later would
+  silently ship non-executable unless someone remembered to also list it
+  here). `git` and the real `.git` checkout are both present in the
+  build container when `mkarchiso` sources `profiledef.sh` (`iso/build-
+  offline-repo` installs `git` first in the same `&&` chain; only the
+  *bake-in destination copy* excludes `.git`, not the actual checkout).
+  Verified by simulating `mkarchiso`'s own pre-declaration
+  (`declare -A file_permissions`) and sourcing the real `profiledef.sh`
+  locally: all 32 expected paths populate correctly, including both
+  previously-broken scripts. New acceptance test dry-runs this exact
+  logic against the real repo. Considered the (deprecated, explicitly
+  flagged for removal in a future archiso version)
+  `customize_airootfs.sh` chroot-hook mechanism found in the same
+  source -- not used; `file_permissions` is the current, sanctioned
+  mechanism for exactly this.
 
 ## VM → physical hardware notes
 

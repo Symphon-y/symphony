@@ -68,32 +68,6 @@ jobs:
           rsync -a --exclude='.git' --exclude='iso/profile/airootfs' \
             ./ iso/profile/airootfs/root/autarchy/
 
-      # A real hardware boot test hit "install/install-base-system:
-      # Permission denied" running the guided installer, on a script that
-      # `git ls-files -s` confirms is 100755 in the repo -- the
-      # executable bit is getting lost somewhere in the checkout -> rsync
-      # -> mkarchiso pipeline that bakes the repo in. Rather than chase
-      # which exact step drops it, re-stamp every file git's own index
-      # says should be executable -- git is the one place the bit is
-      # guaranteed correct -- right before mkarchiso reads the tree, so
-      # nothing after this point can lose it again.
-      - name: Guarantee executable bits on the baked-in repo copy
-        run: |
-          git ls-files -s | awk '$1 == "100755" {print $4}' | while IFS= read -r f; do
-            path="iso/profile/airootfs/root/autarchy/$f"
-            # git ls-files lists every tracked file, including ones under
-            # iso/profile/airootfs/ itself -- excluded from the bake-in
-            # above to avoid copying the tree into itself, so they were
-            # never rsynced into $path and don't exist here. `if`, not
-            # `[[ ]] &&`: under this step's `set -e`, a loop whose last
-            # iteration skips a missing file still "fails" (the compound
-            # command's exit status is 1) and kills the step -- `if`
-            # always exits 0 when its condition is false.
-            if [[ -e $path ]]; then
-              chmod 755 "$path"
-            fi
-          done
-
       - name: Disk space before the build
         run: df -h
 

@@ -24,3 +24,21 @@ file_permissions=(
   ["/root"]="0:0:750"
   ["/usr/local/bin/autarchy-install"]="0:0:755"
 )
+
+# mkarchiso's own airootfs copy (_make_custom_airootfs, archiso/mkarchiso)
+# does `cp -af --no-preserve=ownership,mode` for the *entire* airootfs/
+# tree, deliberately stripping every mode bit, then restores ownership/
+# mode only for paths listed above -- confirmed directly from archiso's
+# source after a real hardware boot test found every script baked into
+# /root/autarchy (Phase 14) silently losing its executable bit. Hand-
+# listing each one here would be a real footgun (a script added later
+# would silently ship non-executable unless someone remembered to also
+# list it here), so derive the list from git's own index instead -- the
+# one place the executable bit is already tracked correctly. `git` and
+# the real `.git` checkout (unlike the airootfs/root/autarchy bake-in
+# copy, which deliberately excludes it) are both present in the build
+# container by the time mkarchiso sources this file.
+repo_root=$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)
+while IFS= read -r rel_path; do
+  file_permissions["/root/autarchy/$rel_path"]="0:0:755"
+done < <(git -C "$repo_root" ls-files -s | awk '$1 == "100755" {print $4}')
