@@ -80,7 +80,18 @@ jobs:
       - name: Guarantee executable bits on the baked-in repo copy
         run: |
           git ls-files -s | awk '$1 == "100755" {print $4}' | while IFS= read -r f; do
-            chmod 755 "iso/profile/airootfs/root/autarchy/$f"
+            path="iso/profile/airootfs/root/autarchy/$f"
+            # git ls-files lists every tracked file, including ones under
+            # iso/profile/airootfs/ itself -- excluded from the bake-in
+            # above to avoid copying the tree into itself, so they were
+            # never rsynced into $path and don't exist here. `if`, not
+            # `[[ ]] &&`: under this step's `set -e`, a loop whose last
+            # iteration skips a missing file still "fails" (the compound
+            # command's exit status is 1) and kills the step -- `if`
+            # always exits 0 when its condition is false.
+            if [[ -e $path ]]; then
+              chmod 755 "$path"
+            fi
           done
 
       - name: Disk space before the build
