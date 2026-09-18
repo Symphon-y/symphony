@@ -64,7 +64,9 @@ make_stubs() {
   stub "$bin/id" 'if [[ ${1:-} == -u ]]; then echo 0; else exec /usr/bin/id "$@"; fi'
 
   # arch-chroot TARGET CMD...: answers the "is it already done?" queries from
-  # STUB_USER_EXISTS and STUB_BOOTCTL_INSTALLED; everything else succeeds.
+  # STUB_USER_EXISTS and STUB_BOOTCTL_INSTALLED; logs chpasswd's stdin too
+  # (the one case a test needs to see what actually flowed through -- the
+  # password read from fd 8); everything else succeeds.
   cat >"$bin/arch-chroot" <<'EOF'
 #!/usr/bin/env bash
 echo "arch-chroot $*" >>"$STUB_LOG"
@@ -75,6 +77,7 @@ case "$1 ${2:-}" in
     if [[ ${STUB_USER_EXISTS:-0} == 1 ]]; then echo "$3 P 2026-09-13 0 99999 7 -1"; else echo "$3 L"; fi
     ;;
   "bootctl is-installed") [[ ${STUB_BOOTCTL_INSTALLED:-0} == 1 ]] ;;
+  "chpasswd "*) echo "arch-chroot stdin: $(cat)" >>"$STUB_LOG" ;;
   *) exit 0 ;;
 esac
 EOF
@@ -221,12 +224,26 @@ calls() {
   assert_line "arch-chroot $TARGET bootctl install"
 }
 
-@test "creates the wheel user, sets its password, and locks root" {
+@test "creates the wheel user, sets its password interactively when no password fd is given, and locks root" {
+  # No fd 8 here: the documented manual/recovery runbook path calls this
+  # script directly, with no collector at all, and must keep working
+  # exactly like today -- passwd's own interactive prompt, no chpasswd.
   run "$SCRIPT" "$VARS" "$TARGET"
   assert_success
   run calls
   assert_line "arch-chroot $TARGET useradd -m -G wheel alice"
   assert_line "arch-chroot $TARGET passwd alice"
+  assert_line "arch-chroot $TARGET passwd -l root"
+}
+
+@test "creates the wheel user and sets its password unattended when a password fd is given (Phase 15/D-0066)" {
+  run bash -c "\"$SCRIPT\" \"$VARS\" \"$TARGET\" 8<<<'userpass456'"
+  assert_success
+  run calls
+  assert_line "arch-chroot $TARGET useradd -m -G wheel alice"
+  refute_line "arch-chroot $TARGET passwd alice"
+  assert_line "arch-chroot $TARGET chpasswd"
+  assert_line "arch-chroot stdin: alice:userpass456"
   assert_line "arch-chroot $TARGET passwd -l root"
 }
 

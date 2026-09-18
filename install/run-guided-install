@@ -8,11 +8,11 @@
 #              is running (docs/runbooks/base-install.vars.example)
 #
 # No install logic here -- see install/install-base-system, the real,
-# already-tested, unattended installer this just execs. If fd 9 is open
-# on this process (the typed-and-confirmed LUKS passphrase from the
-# collector), it's inherited automatically; this script doesn't need to
-# touch it itself -- see install-base-system's own header for the fd-9
-# contract.
+# already-tested, unattended installer this just execs. If fd 8 (user
+# account password) and/or fd 9 (LUKS passphrase) are open on this
+# process, they're inherited automatically; this script doesn't need to
+# touch either itself -- see install-base-system's and
+# configure-base-system's own headers for the fd-8/fd-9 contract.
 set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)

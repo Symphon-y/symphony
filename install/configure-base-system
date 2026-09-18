@@ -11,6 +11,13 @@
 # Every input is validated before anything changes. Safe to re-run: steps that
 # are already done (user account, boot loader) are skipped, and every other step
 # rewrites the same result.
+#
+# fd 8, when open on this process (inherited from install-base-system,
+# which itself just inherits it from whichever collector is running --
+# never touched or read in between), carries the typed-and-confirmed
+# user account password -- same contract as install-base-system's own
+# fd 9 for the LUKS passphrase (Phase 15/D-0066). Falls back to
+# `passwd`'s own interactive prompt when fd 8 isn't open.
 set -Eeuo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -164,10 +171,20 @@ create_user() {
   if ! in_target id -u "$USERNAME" >/dev/null 2>&1; then
     in_target useradd -m -G wheel "$USERNAME"
   fi
-  # A new account starts locked (L). Prompt only until a usable password (P) is set,
-  # so a mistyped password can be retried by re-running the script.
+  # A new account starts locked (L). Set a usable password (P) if one isn't
+  # set yet. fd 8 (see header) lets this run unattended via chpasswd --
+  # the standard, non-interactive way to set a Linux password; passwd(1)
+  # itself has no such mode on shadow-utils. Without fd 8, falls back to
+  # passwd's own interactive prompt, so a mistyped password can still be
+  # retried by re-running the script.
   if [[ $(in_target passwd -S "$USERNAME" | awk '{ print $2 }') != P ]]; then
-    in_target passwd "$USERNAME"
+    if [[ -e /dev/fd/8 ]]; then
+      local user_password
+      read -r user_password <&8
+      printf '%s:%s' "$USERNAME" "$user_password" | in_target chpasswd
+    else
+      in_target passwd "$USERNAME"
+    fi
   fi
   in_target passwd -l root
 }

@@ -82,9 +82,18 @@ EOF
   stub "$bin/mkswap" 'echo "mkswap $*" >>"$STUB_LOG"'
   stub "$bin/arch-chroot" 'echo "arch-chroot $*" >>"$STUB_LOG"'
 
+  # Also logs fd 8's content, if open -- the one way a test can confirm
+  # install-base-system passes it through to configure-base-system
+  # untouched (D-0066: fd 8 is the user password, fd 9 the LUKS
+  # passphrase -- install-base-system consumes fd 9 itself but must never
+  # touch fd 8, which isn't its concern).
   cat >"$bin/autarchy-configure-stub" <<'EOF'
 #!/usr/bin/env bash
 echo "configure-base-system $*" >>"$STUB_LOG"
+if [[ -e /dev/fd/8 ]]; then
+  read -r p <&8
+  echo "configure-base-system fd8: $p" >>"$STUB_LOG"
+fi
 EOF
   chmod +x "$bin/autarchy-configure-stub"
   export AUTARCHY_CONFIGURE_SCRIPT="$bin/autarchy-configure-stub"
@@ -205,6 +214,17 @@ run_confirmed_with_passphrase() {
   local count
   count=$(grep -c '^cryptsetup stdin: testpass123$' <<<"$output")
   assert_equal "$count" "2"
+}
+
+@test "passes fd 8 through to configure-base-system untouched, alongside consuming fd 9 itself (Phase 15/D-0066)" {
+  # fd 8 is the user account password -- not this script's concern (see
+  # configure-base-system) -- but it's easy to imagine a change here that
+  # accidentally closes or reads it while handling fd 9. Confirms it
+  # survives, unread by this script, all the way to the hand-off.
+  run bash -c "echo /dev/vda | \"$SCRIPT\" \"$VARS\" \"$TARGET\" 8<<<'userpass456' 9<<<'testpass123'"
+  assert_success
+  run calls
+  assert_line "configure-base-system fd8: userpass456"
 }
 
 @test "formats the ESP with restrictive permissions" {

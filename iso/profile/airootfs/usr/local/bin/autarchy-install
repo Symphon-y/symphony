@@ -4,8 +4,9 @@
 # the collector of last resort, not replaced). The repo is already baked
 # into the live environment at build time (Phase 14) -- no clone, no
 # GitHub access needed. Shows ground truth, asks a handful of plain
-# questions in a fixed order (including the LUKS passphrase, typed twice
-# -- Phase 15/D-0066), shows a review screen, then hands off to
+# questions in a fixed order (including the account password and the
+# LUKS passphrase, each typed twice -- Phase 15/D-0066), shows a review
+# screen, then hands off to
 # install/run-guided-install, the shared runner both this script and the
 # future GUI use, so neither has to reimplement "run the install, then
 # offer to reboot." No install logic lives here -- see Phase 12's plan
@@ -137,7 +138,7 @@ main() {
 
   echo
   log "A few questions, then this runs unattended."
-  local disk host username tzone locale keymap swap_size passphrase
+  local disk host username tzone locale keymap swap_size user_password passphrase
   disk=$(ask_disk)
   host=$(ask "Hostname")
   username=$(ask "Username")
@@ -145,6 +146,7 @@ main() {
   locale=$(ask "Locale" "en_US.UTF-8")
   keymap=$(ask "Console keymap" "us")
   swap_size=$(ask "Hibernation swap size (blank to skip, e.g. 16G -- see Memory above)")
+  user_password=$(ask_password "Password for $username")
   passphrase=$(ask_password "Disk encryption passphrase")
 
   echo
@@ -157,6 +159,7 @@ main() {
     Locale:      $locale
     Keymap:      $keymap
     Hibernation: ${swap_size:-none}
+    Password:    set
     Encryption:  passphrase set
 SUMMARY
   echo
@@ -177,7 +180,7 @@ KEYMAP=$keymap
 SWAP_SIZE=$swap_size
 EOF
 
-  install/run-guided-install "$VARS_FILE" 9<<<"$passphrase"
+  install/run-guided-install "$VARS_FILE" 8<<<"$user_password" 9<<<"$passphrase"
 }
 
 main "$@"

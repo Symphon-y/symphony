@@ -15,9 +15,12 @@
 # interactive moment -- optional because it can instead be supplied by the
 # caller via file descriptor 9 (the typed-and-confirmed passphrase from
 # whichever collector is running, terminal or GUI), in which case
-# encryption runs unattended too. Collect-once-then-run-unattended, the
-# same shape Windows/macOS installers use (Phase 10), built our own way:
-# no archinstall, no TUI, no Omarchy code.
+# encryption runs unattended too. fd 8, if open, is never read here --
+# it's simply inherited through to configure-base-system, which uses it
+# the same way for the user account password (see that script's own
+# header). Collect-once-then-run-unattended, the same shape Windows/
+# macOS installers use (Phase 10), built our own way: no archinstall,
+# no TUI, no Omarchy code.
 set -Eeuo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
