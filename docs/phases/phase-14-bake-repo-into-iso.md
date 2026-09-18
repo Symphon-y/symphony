@@ -319,6 +319,26 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   needs" test to cover the same set (`gptfdisk`, `parted`, `cryptsetup`,
   `btrfs-progs`, `dosfstools`, `arch-install-scripts`), closing the gap
   systematically instead of one real-hardware failure at a time.
+- `2026.09.17-test11` succeeded and, on the real hardware boot test, got
+  further still: past LUKS format/open (the passphrase prompts are
+  `cryptsetup`'s own -- chosen live at the terminal, not anything this
+  repo sets), Btrfs subvolumes created, then failed formatting the ESP:
+  `mount --mkdir -o fmask=0077,dmask=0077 ...` -> `unknown parameter
+  'fmask'`. Researched rather than guessed: this is a known class of
+  issue with modern util-linux's newer mount API (fsopen/fsconfig) --
+  without an explicit `-t`, `mount` auto-detects the filesystem type via
+  probing first, and the new API can fail to correctly route FAT-
+  specific options (`fmask`/`dmask`, well-established, standard vfat
+  options) to the vfat driver when the type isn't given upfront. Fixed
+  by adding `-t vfat` explicitly -- safe and lossless here since the ESP
+  was just formatted as FAT32 one line earlier (`mkfs.fat -F 32`), so
+  there's no ambiguity about the type. Same fix applied to
+  `base-install.md`'s manual-path runbook, which has the identical
+  command. Nothing destructive: the LUKS volume, Btrfs subvolumes, and
+  ESP formatting from this attempt are all still fine on disk; a full
+  re-run (`sgdisk --zap-all` at the top of `partition_disk`) safely
+  redoes everything from scratch either way, same as every prior retry
+  this phase.
 
 ## VM → physical hardware notes
 

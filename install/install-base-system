@@ -123,7 +123,12 @@ encrypt_and_format() {
 
   log "Formatting the ESP"
   mkfs.fat -F 32 -n ESP "$esp_dev"
-  mount --mkdir -o fmask=0077,dmask=0077 "$esp_dev" "$TARGET$ESP_MOUNT"
+  # -t vfat explicit, not auto-detected: a real hardware install hit
+  # "unknown parameter 'fmask'" without it -- modern util-linux's newer
+  # mount API can fail to route FAT-specific options correctly when the
+  # filesystem type isn't given upfront, even though fmask/dmask are
+  # standard, well-supported vfat options.
+  mount --mkdir -t vfat -o fmask=0077,dmask=0077 "$esp_dev" "$TARGET$ESP_MOUNT"
 }
 
 install_packages_and_fstab() {

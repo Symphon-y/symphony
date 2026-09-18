@@ -194,7 +194,7 @@ The ESP. `fmask`/`dmask` keep the boot loader's random seed unreadable to non-ro
 
 ```sh
 mkfs.fat -F 32 -n ESP "$ESP_DEV"
-mount --mkdir -o fmask=0077,dmask=0077 "$ESP_DEV" "/mnt$ESP_MOUNT"
+mount --mkdir -t vfat -o fmask=0077,dmask=0077 "$ESP_DEV" "/mnt$ESP_MOUNT"
 
 findmnt -R /mnt                        # check: 5 btrfs subvolumes + vfat at /mnt/efi
 ```
