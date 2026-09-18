@@ -33,6 +33,27 @@ setup() {
   assert_success
 }
 
+@test "release workflow: re-stamps executable bits on the baked-in repo copy, from git, after the bake-in and before the build" {
+  # A real hardware boot test hit "install/install-base-system: Permission
+  # denied" -- the executable bit was lost somewhere in the checkout ->
+  # rsync -> mkarchiso pipeline for a script git's own index confirms is
+  # 100755. Re-stamped from git (the one place the bit is guaranteed
+  # correct) right before mkarchiso reads the tree.
+  local wf="$REPO_ROOT/.github/workflows/release-iso.yml"
+  run grep -q "git ls-files -s" "$wf"
+  assert_success
+  run grep -q '100755' "$wf"
+  assert_success
+
+  local bake_line chmod_line build_line
+  bake_line=$(grep -n 'rsync' "$wf" | head -1 | cut -d: -f1)
+  chmod_line=$(grep -n 'git ls-files -s' "$wf" | head -1 | cut -d: -f1)
+  build_line=$(grep -n '/workspace/iso/build-offline-repo' "$wf" | head -1 | cut -d: -f1)
+  assert [ -n "$chmod_line" ]
+  assert [ "$bake_line" -lt "$chmod_line" ]
+  assert [ "$chmod_line" -lt "$build_line" ]
+}
+
 @test "autarchy-bootstrap is fully retired -- no trace outside historical records" {
   assert [ ! -e "$REPO_ROOT/iso/profile/airootfs/usr/local/bin/autarchy-bootstrap" ]
   # docs/phases/ is allowed to still mention the retired name: phase-10 and
