@@ -18,29 +18,48 @@ setup() {
   assert_failure
 }
 
-@test "iso: the live-environment pacman.conf ranks the local repo above core/extra" {
-  local conf="$REPO_ROOT/iso/profile/airootfs/etc/pacman.conf"
-  local local_line core_line
-  local_line=$(grep -n '^\[localrepo\]' "$conf" | cut -d: -f1)
-  core_line=$(grep -n '^\[core\]' "$conf" | cut -d: -f1)
-  assert [ -n "$local_line" ]
-  assert [ -n "$core_line" ]
-  assert [ "$local_line" -lt "$core_line" ]
-}
-
 @test "iso: the local repo trusts unsigned locally-built packages, and points at a real baked-in path" {
   local conf="$REPO_ROOT/iso/profile/airootfs/etc/pacman.conf"
-  run awk '/^\[localrepo\]/,/^\[core\]/' "$conf"
+  run awk '/^\[localrepo\]/,/^#\[core\]/' "$conf"
   assert_success
   assert_output --partial "SigLevel = Optional TrustAll"
   assert_output --regexp 'Server = file://'
 }
 
-@test "iso: core and extra stay enabled as a network fallback" {
+@test "iso: core and extra are commented out -- a serverless repo aborts the whole pacstrap sync" {
+  # Real hardware failure: "error: no servers configured for repository" /
+  # "failed to synchronize all databases" -- pacstrap's implicit `pacman
+  # -Sy` refreshes every ENABLED repo up front, and pacman aborts the
+  # whole sync (including the correctly-configured [localrepo]) the
+  # instant any enabled repo has zero servers (confirmed from pacman's
+  # own source, lib/libalpm/be_sync.c). This ISO ships no
+  # /etc/pacman.d/mirrorlist, so core/extra always have zero servers --
+  # "kept as a network fallback" (D-0063's original claim) is not
+  # possible; see D-0064. Matches the Arch Wiki's own documented practice
+  # ("Offline installation": comment out core and extra).
   local conf="$REPO_ROOT/iso/profile/airootfs/etc/pacman.conf"
-  run grep -q '^\[core\]' "$conf"
+  run grep -q '^#\[core\]' "$conf"
   assert_success
+  run grep -q '^#\[extra\]' "$conf"
+  assert_success
+  # Not just commented -- never active anywhere in the file.
+  run grep -q '^\[core\]' "$conf"
+  assert_failure
   run grep -q '^\[extra\]' "$conf"
+  assert_failure
+}
+
+@test "iso: [localrepo]'s pacman.conf section name matches build-offline-repo's repo-add database name" {
+  # The exact second bug found alongside the core/extra one: pacman
+  # derives the expected database filename from the section name for a
+  # bare `Server = file://` URL, not from the repo directory's own name
+  # -- a real mismatch here (localrepo vs autarchy.db) would silently
+  # break the sync even with core/extra correctly disabled.
+  local conf="$REPO_ROOT/iso/profile/airootfs/etc/pacman.conf"
+  local script="$REPO_ROOT/iso/build-offline-repo"
+  run grep -q '^\[localrepo\]' "$conf"
+  assert_success
+  run grep -q 'repo-add localrepo\.db' "$script"
   assert_success
 }
 

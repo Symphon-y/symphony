@@ -1484,3 +1484,64 @@ and the old entry is marked `Superseded by D-XXXX`.
   as a real risk (72 GB total, peaked at 33 GB used, well under the
   guaranteed-14GB floor's worst case) — worth knowing for any future,
   heavier build, but not something this phase needed to work around.
+
+## D-0064 — core/extra disabled, not "kept as a fallback": corrects D-0063
+
+- **Status:** Accepted (2026-09-18, Phase 14)
+- **Decision:** `iso/profile/airootfs/etc/pacman.conf`'s `[core]` and
+  `[extra]` sections are commented out (`#[core]`, not deleted), not left
+  enabled as D-0063 originally stated. `iso/build-offline-repo`'s
+  `repo-add` output is renamed `localrepo.db.tar.zst`, matching the
+  `[localrepo]` pacman.conf section name exactly (was `autarchy.db.tar.zst`
+  — a mismatch pacman doesn't tolerate for a bare `Server = file://` URL,
+  since it derives the expected database filename from the section name).
+  `install/install-base-system`'s `pacstrap` call gets `-M`, so the
+  installed system doesn't inherit the live ISO's own blank mirrorlist.
+- **Alternatives considered:** leave `[core]`/`[extra]` enabled and ship a
+  placeholder `/etc/pacman.d/mirrorlist` with something syntactically
+  valid but unreachable — doesn't help; pacman's `-Sy` fails identically
+  on a configured-but-unreachable server as on a missing one, so this
+  only trades one error message for another. Scope `pacstrap` to sync only
+  `[localrepo]` — no such flag exists in pacman or `pacstrap.in`; `-Sy` is
+  hardcoded and always refreshes every enabled repo. `Usage = Install`
+  (keeps the sections active but exempts them from `-Sy`) — real,
+  source-confirmed working option, but not the well-trodden path (the Arch
+  Wiki's own "Offline installation" article and the one comparable real
+  project checked, `Torxed/archoffline`, both just comment out or omit
+  core/extra entirely); kept as a known escape hatch, not used here.
+- **Reasoning:** D-0063's original claim — "core/extra stay enabled as a
+  network fallback, never removed, so nothing is worse off than today if
+  a network happens to be available" — was never validated against a real
+  `pacstrap` run. It's wrong, confirmed directly against pacman's own
+  source (`lib/libalpm/be_sync.c`, `alpm_db_update()`): every sync-enabled
+  repo is asserted to have `servers != NULL` in a loop that aborts the
+  **entire** sync call on the first repo that fails that assertion — not
+  just that one repo. Since this ISO ships no `/etc/pacman.d/mirrorlist`,
+  `[core]`/`[extra]` always have zero configured servers here, and left
+  enabled they don't degrade gracefully to "just use `[localrepo]`" — they
+  take the whole install down before `[localrepo]`, correctly configured
+  and ranked first, is ever reached. A real hardware boot test hit exactly
+  this: `error: no servers configured for repository` / `failed to
+  synchronize all databases` / `ERROR: failed to install packages to new
+  root`, at `pacstrap` inside `install-base-system`. Diagnosed via two
+  parallel research passes (one reading every relevant file in this repo,
+  one researching and locally reproducing — via `unshare -r` and a
+  throwaway pacman sandbox, no sudo, no system state touched — both the
+  failure and the fix against upstream pacman/`pacstrap.in`/`mkarchiso`
+  source and the Arch Wiki), independently converging on the same root
+  cause and citing `pacman.conf(5)`'s own documented section-name-to-
+  database-filename convention for the second, latent `autarchy.db` vs
+  `[localrepo]` mismatch bug found alongside it.
+- **Consequences:** `core`/`extra` are now genuinely inert on this ISO —
+  correctly reflecting that a real, working network-fallback install path
+  was never actually built or tested, not a regression. If a future phase
+  wants a real "install with network if available, offline otherwise"
+  mode, `Usage = Install` (the escape hatch identified above) is the
+  documented way to re-enable them without the current fatal interaction,
+  not simply uncommenting the sections back in. Verified locally before
+  the next real hardware attempt: reproduced both the original failure and
+  the fix in an isolated `unshare -r` pacman sandbox against this repo's
+  actual `iso/build-offline-repo` naming and the corrected `pacman.conf`
+  shape, byte-for-byte matching the error text seen on real hardware for
+  the broken shape and a clean `exit 0` + correct package resolution for
+  the fixed one.

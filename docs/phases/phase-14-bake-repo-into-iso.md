@@ -339,6 +339,69 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   re-run (`sgdisk --zap-all` at the top of `partition_disk`) safely
   redoes everything from scratch either way, same as every prior retry
   this phase.
+- `2026.09.17-test12` succeeded and got further still on real hardware:
+  disk selection, LUKS format/open, Btrfs subvolumes, ESP mount all
+  succeeded, then `pacstrap` died: `error: failed to synchronize all
+  databases (no servers configured for repository)` / `ERROR: failed to
+  install packages to new root`. Given how many real bugs this pipeline
+  had already surfaced, the user asked for a deep investigation instead
+  of another single-point guess -- ran two research passes in parallel:
+  an Explore agent read every relevant file in this repo
+  (`iso/profile/pacman.conf`, `iso/profile/airootfs/etc/pacman.conf`,
+  `iso/build-offline-repo`, `install/install-base-system`'s `pacstrap`
+  call, D-0063/phase-12/phase-13 docs); a research agent used
+  WebSearch/WebFetch **and empirically reproduced the failure and the
+  fix locally** on this dev VM, via `unshare -r` + a throwaway
+  `--config`/`--dbpath`/`--root` pacman sandbox (no sudo, no system
+  state touched), against upstream pacman C source, `pacstrap.in`,
+  `mkarchiso`, and the Arch Wiki's "Offline installation" article. Both
+  converged on the same root cause independently. Two real bugs found:
+  (1) `[core]`/`[extra]` reference `/etc/pacman.d/mirrorlist`, which this
+  ISO never ships -- falls back to the stock, fully-commented
+  `pacman-mirrorlist` template, zero servers. `pacstrap`'s implicit
+  `pacman -Sy` refreshes every enabled repo up front, and pacman's own
+  sync code (`lib/libalpm/be_sync.c`, `alpm_db_update()`) asserts
+  `db->servers != NULL` per repo in a loop that aborts the *entire* call
+  on the first failure -- confirmed by reading pacman's actual source,
+  independently reproduced locally (after the failure, the sync dir was
+  completely empty, not even the correctly-configured `[localrepo]` got
+  synced). This directly contradicted D-0063's "core/extra stay enabled
+  as a network fallback" claim, which was never validated against a real
+  `pacstrap` run -- corrected in a new decision entry (D-0064) rather
+  than edited in place, per this repo's own established practice of
+  keeping past decisions as accurate history. (2) Latent, would have
+  surfaced next: `iso/build-offline-repo` built the repo as
+  `autarchy.db.tar.zst` but the pacman.conf section is `[localrepo]`; for
+  a bare `Server = file://` URL, pacman derives the expected database
+  filename from the *section name*, not the containing directory's name
+  -- a real mismatch, confirmed against `pacman.conf(5)`'s own example
+  and reproduced locally.
+
+  Fix: commented out (not deleted) `[core]`/`[extra]` in the live
+  pacman.conf, matching the Arch Wiki's own documented practice for
+  exactly this scenario; renamed `repo-add`'s output to
+  `localrepo.db.tar.zst` (chose renaming the database over renaming the
+  pacman.conf section + touching the `autarchy-repo` directory name,
+  `.gitignore`, and every existing `phase-13.bats` test referencing
+  `[localrepo]` -- confirmed via grep that the old db name was referenced
+  in exactly one place, the smaller and lower-risk diff, after two
+  earlier fixes this phase went wrong from changing more than
+  necessary in one pass); added `-M` to the `pacstrap` call so the
+  installed system doesn't inherit the live ISO's own blank mirrorlist
+  (secondary, not the cause of the reported failure). Caught and fixed a
+  real regression in `tests/unit/install-base-system.bats`'s `pacstrap`
+  stub along the way: it hardcoded `$2` as the target directory
+  position, which broke once `-M` shifted it to `$3`.
+
+  Verified the exact fix locally before spending another CI + real
+  destructive-hardware round trip: built a throwaway local repo
+  (`repo-add localrepo.db.tar.zst`) and a candidate pacman.conf matching
+  exactly what ships, ran `unshare -r pacman -Sy --config ... --dbpath
+  ... --root ...` -- clean `exit 0`, package resolved correctly from
+  `[localrepo]`. For comparison, reproduced the *original* broken shape
+  (core/extra enabled, empty mirrorlist) in the same sandbox and got the
+  byte-for-byte identical error text seen on real hardware, confirming
+  both the diagnosis and the fix before pushing `2026.09.17-test13`.
 
 ## VM → physical hardware notes
 

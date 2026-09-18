@@ -59,7 +59,10 @@ main() {
 
   log "Building the local repo database"
   cp "$WORK_DIR"/*.pkg.tar.zst "$REPO_DIR/"
-  (cd "$REPO_DIR" && repo-add autarchy.db.tar.zst ./*.pkg.tar.zst)
+  # localrepo.db, matching the [localrepo] pacman.conf section name --
+  # pacman derives the expected database filename from the section name
+  # for a bare `Server = file://` URL, not from this directory's own name.
+  (cd "$REPO_DIR" && repo-add localrepo.db.tar.zst ./*.pkg.tar.zst)
 
   log "Local repo built: $(find "$REPO_DIR" -name '*.pkg.tar.zst' | wc -l) packages"
 }

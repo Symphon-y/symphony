@@ -66,7 +66,7 @@ EOF
   stub "$bin/btrfs" 'echo "btrfs $*" >>"$STUB_LOG"'
   stub "$bin/mount" 'echo "mount $*" >>"$STUB_LOG"'
   stub "$bin/umount" 'echo "umount $*" >>"$STUB_LOG"'
-  stub "$bin/pacstrap" 'echo "pacstrap $*" >>"$STUB_LOG"; mkdir -p "$2/etc"'
+  stub "$bin/pacstrap" 'echo "pacstrap $*" >>"$STUB_LOG"; mkdir -p "$3/etc"'
   stub "$bin/genfstab" 'echo "UUID=x / btrfs subvolid=256,subvol=/@ 0 0"'
   stub "$bin/blkid" 'echo "blkid $*" >>"$STUB_LOG"; echo "3333-4444"'
   stub "$bin/mkswap" 'echo "mkswap $*" >>"$STUB_LOG"'
@@ -174,7 +174,7 @@ run_confirmed() {
   run_confirmed
   assert_success
   run calls
-  assert_line --partial "pacstrap -K $TARGET"
+  assert_line --partial "pacstrap -K -M $TARGET"
 
   run cat "$TARGET/etc/fstab"
   refute_output --partial "subvolid="

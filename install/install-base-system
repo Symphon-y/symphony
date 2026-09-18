@@ -135,7 +135,10 @@ install_packages_and_fstab() {
   log "Installing packages (pacstrap)"
   local packages=()
   mapfile -t packages < <("$REPO_ROOT/scripts/pkglist" "$REPO_ROOT"/packages/*.txt)
-  pacstrap -K "$TARGET" "${packages[@]}"
+  # -M: don't copy the live ISO's own (nonexistent/blank) mirrorlist into
+  # the installed system -- leaves the target to use its own freshly-
+  # pacstrap'd pacman-mirrorlist package's template instead.
+  pacstrap -K -M "$TARGET" "${packages[@]}"
 
   # `>` not `>>`: re-running this must not duplicate every fstab entry.
   genfstab -U "$TARGET" >"$TARGET/etc/fstab"
