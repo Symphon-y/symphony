@@ -29,7 +29,15 @@ setup() {
 
 @test "iso: packages.x86_64 includes what the live installer environment needs" {
   local pkg
-  for pkg in git github-cli bats bats-assert bats-support; do
+  # git/gh/bats: the repo-access and test-running tools this runbook step
+  # itself names. gptfdisk/parted/cryptsetup/btrfs-progs/dosfstools/
+  # arch-install-scripts: every external command install-base-system
+  # calls directly on the live medium (not through arch-chroot) during
+  # partition/LUKS/Btrfs/ESP/pacstrap -- parted (for partprobe) was
+  # missing here on a real hardware boot test ("partprobe: command not
+  # found"), unlike the stock Arch ISO, which carries it by default.
+  for pkg in git github-cli bats bats-assert bats-support \
+    gptfdisk parted cryptsetup btrfs-progs dosfstools arch-install-scripts; do
     run grep -qx "$pkg" "$REPO_ROOT/iso/profile/packages.x86_64"
     assert_success
   done

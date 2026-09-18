@@ -25,6 +25,10 @@ amd-ucode
 # Disk layout tools (base-install.md steps 4-5: partition, LUKS, Btrfs, ESP)
 # sgdisk
 gptfdisk
+# partprobe -- install-base-system calls it right after sgdisk; missing
+# here on a real hardware boot test ("partprobe: command not found"),
+# unlike the stock Arch ISO, which carries it by default
+parted
 cryptsetup
 btrfs-progs
 # mkfs.fat for the ESP

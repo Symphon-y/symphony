@@ -299,6 +299,26 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   scripts still present, no leftover `iso/profile/airootfs` entries, no
   gitconfig pollution. New acceptance test asserts no generated key ever
   contains that path.
+- `2026.09.17-test10` succeeded and, on the real hardware boot test, got
+  further than any prior attempt: `autarchy-install` accepted the review
+  screen and `install-base-system` actually started -- `sgdisk --zap-all`
+  ran to completion (its "Exact type match not found for type code DE00"
+  / "GPT data structures destroyed!" / "operation has completed
+  successfully" output is normal `sgdisk` chatter, not an error --
+  DE00 is the Dell diagnostic-partition type code, unsurprising on this
+  Alienware). Failed on the very next command: `partprobe: command not
+  found`. Checked systematically rather than fixing one command at a
+  time again: extracted every external command `install-base-system`/
+  `configure-base-system` invoke, cross-checked against
+  `iso/profile/packages.x86_64` -- `parted` (provides `partprobe`) was
+  the only genuine gap; every other command install-base-system calls
+  directly on the live medium (not through `arch-chroot`, which only
+  needs the *target's* own pacstrap'd packages) already has its
+  providing package listed. Added `parted`. Extended the existing
+  `phase-10.bats` "packages.x86_64 includes what the live installer
+  needs" test to cover the same set (`gptfdisk`, `parted`, `cryptsetup`,
+  `btrfs-progs`, `dosfstools`, `arch-install-scripts`), closing the gap
+  systematically instead of one real-hardware failure at a time.
 
 ## VM → physical hardware notes
 
