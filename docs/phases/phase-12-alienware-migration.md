@@ -146,9 +146,14 @@ to check by device name instead)
       branch, stress-tested 30x locally, merged separately (unrelated to
       the ISO/hardware work).
 - [ ] User: ground truth on real hardware, BIOS steps
-- [ ] User: boot the offline ISO, `autarchy-bootstrap`, `install-base-system`
-      with real `SWAP_SIZE` -- **zero git operations needed beyond
-      `autarchy-bootstrap` itself**, now that everything is on `main`
+- [x] User: boot the offline ISO, `autarchy-install`, `install-base-system`
+      with real `SWAP_SIZE` -- done via Phase 14's real-hardware
+      verification loop (`autarchy-bootstrap` itself was retired by that
+      phase; the guided `autarchy-install` flow replaced it, needing zero
+      git operations at all). `2026.09.17-test14` confirmed a real,
+      zero-network install completing to a rebootable, logged-in base
+      system with hibernation-capable `SWAP_SIZE` wired up (D-0064,
+      D-0065) -- see that phase's tracking doc for the full chain.
 - [ ] `packages/alienware-14.txt`; verify base system boots + networks
 - [ ] Install Claude Code locally; hand off driving to a local session
 - [ ] `docs/runbooks/rebuild.md` for the full stack

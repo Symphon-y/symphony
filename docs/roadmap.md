@@ -18,9 +18,9 @@ outlines; their scope is finalized in their own plan mode.
 | 9 | [Personal automation](phases/phase-09-personal-automation.md) | 6 | Claude | Scripts, systemd user services/timers, integrations | Complete (2026-09-16) |
 | 10 | [Installable release ISO](phases/phase-10-installable-release-iso.md) | 1, cross-cutting | Claude + user | A tag on `main` produces a bootable installer ISO via GitHub Actions, published as a GitHub Release; `scripts/update` gives already-installed machines a snapshotted update path | Complete (2026-09-16) |
 | 11 | [Default browser and web-app launching](phases/phase-11-default-browser.md) | 3 | Claude + user | A real default browser installed and declared; Phase 5's dormant web-app-launcher mechanism actually works | Complete (2026-09-16) |
-| 12 | [Offline release ISO + physical hardware migration (Alienware 14 / P39G)](phases/phase-12-alienware-migration.md) | 1, cross-cutting, 1–4 | Both | The release ISO installs the full `packages/*.txt` closure with zero network needed; boots and installs on real hardware; microcode, power management, Secure Boot/TPM revisited with a real machine; NVIDIA/nouveau attempted as an explicit bonus, not a requirement | In progress (offline ISO + hibernation code merged; real hardware install pending) |
+| 12 | [Offline release ISO + physical hardware migration (Alienware 14 / P39G)](phases/phase-12-alienware-migration.md) | 1, cross-cutting, 1–4 | Both | The release ISO installs the full `packages/*.txt` closure with zero network needed; boots and installs on real hardware; microcode, power management, Secure Boot/TPM revisited with a real machine; NVIDIA/nouveau attempted as an explicit bonus, not a requirement | In progress (Phase 14 confirmed the real-hardware install pipeline itself works — a from-scratch, zero-network install now boots to a logged-in base system; ground truth docs, `packages/alienware-14.txt`, Claude Code local handoff, `rebuild.md`, actual hibernate/resume verification, and GPU/AlienFX bonuses still open) |
 | 13 | [Offline-capable release ISO](phases/phase-13-offline-release-iso.md) | 1, cross-cutting | Claude + user | The release ISO installs the full `packages/*.txt` closure with zero network needed, matching a purchased-OS-key install experience | Folded into Phase 12 (2026-09-17) — see that phase's restructuring note. This doc stays as an accurate record of what it built. |
-| 14 | Bake the repo itself into the ISO | 1 | Claude | Live environment has `install/`/`system/`/`packages/*.txt` with zero GitHub access needed for the core install | Not started |
+| 14 | [Bake the repo itself into the ISO](phases/phase-14-bake-repo-into-iso.md) | 1 | Claude | Live environment has `install/`/`system/`/`packages/*.txt` with zero GitHub access needed for the core install | Complete (2026-09-18) |
 | 15 | A real, polished guided installer | 1 | Claude | `dialog`/`whiptail`/`gum`-based TUI, auto-started on boot, replacing the raw sequential prompts | Not started |
 | 16 | Fully automated desktop bring-up | 1, 6 | Claude | Reboot after install lands in a working Hyprland desktop with zero manual steps (`rebuild.md`'s scope, automated) | Not started |
 
@@ -115,6 +115,38 @@ outlines; their scope is finalized in their own plan mode.
   what it built (the offline local-repo mechanism, hitting and handling
   GitHub's real 2 GiB Release limit); see D-0063 and Phase 12's own
   restructuring note for the full story of the fold-back.
+- **Phase 14:** resolved; see D-0064, D-0065. Phase 13's offline ISO baked
+  in the *package* closure but never the *repo itself* driving the
+  install -- `autarchy-bootstrap`/`autarchy-install` still needed a
+  GitHub clone at boot time, defeating the whole point of an offline
+  installer. This phase bakes the checked-out repo straight into the
+  live environment at CI build time and retires `autarchy-bootstrap`
+  entirely. The real work turned out to be a long real-hardware
+  debugging chain (14 build-and-boot cycles on the Alienware), each
+  surfacing a genuine bug no static test or VM could have caught: a
+  disk-selection prompt that silently accepted a blank disk; the
+  executable bit archiso's own `mkarchiso` strips from every baked-in
+  file unless explicitly restored via `profiledef.sh`'s
+  `file_permissions`; `parted` missing from the live ISO's own package
+  list; an explicit `mount -t vfat` needed for modern util-linux's
+  stricter FAT-option handling; `pacstrap` hard-failing because
+  `[core]`/`[extra]` were left enabled with no reachable mirrorlist,
+  which pacman treats as fatal to the *entire* sync, not just those two
+  repos (D-0064, correcting D-0063's untested "kept as a fallback"
+  claim); and a genuine boot-time deadlock in Phase 12's hibernation
+  feature, root-caused directly from `systemd`'s own generator source
+  rather than guessed at (D-0065). The last two were diagnosed via
+  paired research agents -- one reading this repo's own code, one
+  reading upstream source/docs and, where possible, empirically
+  reproducing the failure and the fix in an isolated local sandbox
+  before ever spending another CI-plus-real-hardware round trip.
+  Real verification (`2026.09.17-test14`) confirmed a from-scratch,
+  zero-network install completing end-to-end to a rebootable, logged-in
+  base system on the actual Alienware -- Phase 1's own original
+  acceptance criterion, delivered via a fully automated offline
+  installer for the first time. No GUI/Hyprland at that TTY login is
+  expected, not a gap: session auto-start is Phase 16's explicit,
+  not-yet-started scope.
 
 ## Cross-cutting concerns (checked in every phase)
 

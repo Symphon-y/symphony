@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Status** | In progress |
+| **Status** | Complete |
 | **Driver** | Claude + user |
 | **Branch** | `phase/14-bake-repo-into-iso` |
 | **Started** | 2026-09-17 |
-| **Completed** | |
+| **Completed** | 2026-09-18 |
 
 ## Goal
 
@@ -67,7 +67,7 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
 - [x] Green: static checks
 - [x] Green: real test tag (fresh name, not reusing `2026.09.17`), real
       verification of zero-network install
-- [ ] Close: `DECISIONS.md`, `docs/roadmap.md`, merge to `main`
+- [x] Close: `DECISIONS.md`, `docs/roadmap.md`, merge to `main`
 
 ## Implementation log
 
@@ -461,6 +461,37 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   "manual: ..."` stub since it was written and stays that way until
   that real cycle actually runs.
 
+### 2026-09-18 — Close
+
+- `2026.09.17-test14` succeeded, and the user confirmed it on real
+  hardware: the fully offline, zero-network installer now completes
+  end-to-end (disk selection -> LUKS/Btrfs/ESP -> `pacstrap` -> full
+  `configure-base-system`) and the freshly installed system boots and
+  logs in at a TTY with no hang. This is the goal the whole 14-test
+  real-hardware chain was chasing: `autarchy-install` -> `install-
+  base-system` completing to a rebootable, network-free base system.
+- The user asked whether the lack of a GUI (no Hyprland) at that TTY
+  login was expected. Confirmed against the repo, not assumed:
+  `hyprland` lives in `packages/desktop.txt`, which the `pacstrap`
+  glob (`packages/*.txt`) already installs, but `configure-base-
+  system`'s `enable_services()` only enables base system services
+  (NetworkManager, resolved, timesyncd, nftables, boot-update,
+  fstrim, paccache) -- nothing starts a display manager or session.
+  This is by design: Phase 1's own original acceptance criterion
+  (`docs/roadmap.md`) is exactly "Boots to TTY; user login; network +
+  pacman work" -- precisely what was just delivered, via a fully
+  automated offline installer, for the first time. Session auto-start
+  is explicitly Phase 16's ("Fully automated desktop bring-up")
+  not-yet-started scope, not a gap in this phase.
+- No `docs/omarchy-influences.md` entry this phase -- confirmed via
+  grep that Phase 10's existing entry already covers the relevant
+  Omarchy-ISO-approach comparison; nothing this phase's work (CI
+  wiring, archiso/systemd/pacman internals) touched maps to a new
+  Omarchy comparison point (same "confirmed none of these topics were
+  ever covered" precedent Phase 9 set).
+- Closed: `DECISIONS.md` (D-0064, D-0065), `docs/roadmap.md`, merged
+  to `main`.
+
 ## VM → physical hardware notes
 
 - The CI/static half is fully verifiable without hardware. The actual
@@ -469,12 +500,16 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   release build on the Alienware as attempts landed. `test3` was the
   first to get far enough to reach `autarchy-install` with no network
   connection at all and surfaced the disk-selection bug fixed above;
-  `test4` verifies that fix specifically.
+  `test4` verifies that fix specifically. `test14` is the one that
+  finally closed the loop: a real, from-scratch, zero-network install
+  completing to a rebootable, logged-in base system on the actual
+  Alienware -- the goal this entire real-hardware verification chain
+  (test1 through test14, 14 real build-and-boot cycles) was chasing.
 
 ## Exit criteria
 
-- [ ] All acceptance tests pass
-- [ ] Static checks pass
-- [ ] `DECISIONS.md` updated
+- [x] All acceptance tests pass
+- [x] Static checks pass
+- [x] `DECISIONS.md` updated
 - [ ] `docs/roadmap.md` status updated
 - [ ] Branch merged to `main`
