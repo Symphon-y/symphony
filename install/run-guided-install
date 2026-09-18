@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# run-guided-install: the shared runner both the terminal collector
+# (autarchy-install) and the future GTK4 GUI (Phase 15) hand off to, so
+# neither has to reimplement "run the install, then offer to reboot."
+#
+# Usage: install/run-guided-install VARS_FILE
+#   VARS_FILE  per-install values, already written by whichever collector
+#              is running (docs/runbooks/base-install.vars.example)
+#
+# No install logic here -- see install/install-base-system, the real,
+# already-tested, unattended installer this just execs. If fd 9 is open
+# on this process (the typed-and-confirmed LUKS passphrase from the
+# collector), it's inherited automatically; this script doesn't need to
+# touch it itself -- see install-base-system's own header for the fd-9
+# contract.
+set -euo pipefail
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+readonly REPO_ROOT
+
+usage() {
+  echo "usage: run-guided-install VARS_FILE" >&2
+  exit 2
+}
+
+main() {
+  (($# == 1)) || usage
+  local vars_file=$1
+
+  "$REPO_ROOT/install/install-base-system" "$vars_file"
+
+  echo
+  echo "==> Base install done."
+  local next
+  read -rp "Reboot now? [Y/n] " next
+  if [[ ! $next =~ ^[Nn]$ ]]; then
+    echo "==> Unmounting and closing the encrypted volume..."
+    umount -R /mnt
+    # shellcheck source-path=SCRIPTDIR source=../system/storage/layout.conf
+    source "$REPO_ROOT/system/storage/layout.conf"
+    cryptsetup close "$LUKS_MAPPER"
+    echo "==> Rebooting -- remove the USB drive now."
+    sleep 3
+    reboot
+  else
+    echo "Staying at the shell. When ready: umount -R /mnt; cryptsetup close root; poweroff"
+  fi
+}
+
+main "$@"

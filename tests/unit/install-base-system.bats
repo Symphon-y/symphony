@@ -60,7 +60,17 @@ EOF
   stub "$bin/sgdisk" 'echo "sgdisk $*" >>"$STUB_LOG"'
   stub "$bin/partprobe" 'echo "partprobe $*" >>"$STUB_LOG"'
   stub "$bin/udevadm" 'echo "udevadm $*" >>"$STUB_LOG"'
-  stub "$bin/cryptsetup" 'echo "cryptsetup $*" >>"$STUB_LOG"'
+  # Logs its stdin too, but only when --key-file - is present: that's the
+  # one case a test needs to see what actually flowed through (the
+  # passphrase read from fd 9). Every other call has no meaningful stdin.
+  cat >"$bin/cryptsetup" <<'EOF'
+#!/usr/bin/env bash
+echo "cryptsetup $*" >>"$STUB_LOG"
+if [[ "$*" == *"--key-file -"* ]]; then
+  echo "cryptsetup stdin: $(cat)" >>"$STUB_LOG"
+fi
+EOF
+  chmod +x "$bin/cryptsetup"
   stub "$bin/mkfs.btrfs" 'echo "mkfs.btrfs $*" >>"$STUB_LOG"'
   stub "$bin/mkfs.fat" 'echo "mkfs.fat $*" >>"$STUB_LOG"'
   stub "$bin/btrfs" 'echo "btrfs $*" >>"$STUB_LOG"'
@@ -88,6 +98,12 @@ calls() {
 
 run_confirmed() {
   run bash -c "echo /dev/vda | \"$SCRIPT\" \"$VARS\" \"$TARGET\""
+}
+
+# Same disk-path confirmation on stdin (fd 0), plus a passphrase on fd 9 --
+# the contract the terminal collector and the future GUI both use.
+run_confirmed_with_passphrase() {
+  run bash -c "echo /dev/vda | \"$SCRIPT\" \"$VARS\" \"$TARGET\" 9<<<'testpass123'"
 }
 
 @test "fails and names the variable when a required value is missing" {
@@ -141,6 +157,14 @@ run_confirmed() {
   refute_output --partial "sgdisk"
 }
 
+@test "aborts on a disk-path mismatch even with a passphrase fd open (fd 0/fd 9 don't collide)" {
+  run bash -c "echo /dev/sdb | \"$SCRIPT\" \"$VARS\" \"$TARGET\" 9<<<'testpass123'"
+  assert_failure
+  assert_output --partial "aborting"
+  run calls
+  refute_output --partial "sgdisk"
+}
+
 @test "partitions the disk with the ESP and cryptroot labels from layout.conf" {
   run_confirmed
   assert_success
@@ -149,7 +173,11 @@ run_confirmed() {
   assert_line --regexp 'sgdisk -n 1:0:\+2G -t 1:ef00 -c 1:ESP -n 2:0:0 -t 2:8309 -c 2:cryptroot /dev/vda'
 }
 
-@test "encrypts the LUKS partition and creates every declared subvolume" {
+@test "encrypts the LUKS partition interactively when no passphrase fd is given, and creates every declared subvolume" {
+  # No fd 9 here (run_confirmed, not run_confirmed_with_passphrase): the
+  # documented manual/recovery runbook path calls this script directly,
+  # with no collector at all, and must keep working exactly like today --
+  # cryptsetup's own interactive prompt, no --key-file.
   run_confirmed
   assert_success
   run calls
@@ -160,6 +188,23 @@ run_confirmed() {
   assert_line "btrfs subvolume create /mnt/@log"
   assert_line "btrfs subvolume create /mnt/@pkg"
   assert_line "btrfs subvolume create /mnt/@snapshots"
+}
+
+@test "encrypts the LUKS partition unattended when a passphrase fd is given (Phase 15/D-0066)" {
+  run_confirmed_with_passphrase
+  assert_success
+  run calls
+  assert_line "cryptsetup luksFormat --type luks2 --key-file - /dev/disk/by-partlabel/cryptroot"
+  assert_line "cryptsetup open --allow-discards --persistent --key-file - /dev/disk/by-partlabel/cryptroot root"
+  # Confirms the actual passphrase content flowed through via stdin, not
+  # just that --key-file - was passed -- and that it's read once and
+  # reused for both calls, not lost after the first (a real, checked-for
+  # bug: cryptsetup runs twice here, and a second read from the same fd
+  # would just get EOF since the file offset is shared once inherited).
+  assert_line "cryptsetup stdin: testpass123"
+  local count
+  count=$(grep -c '^cryptsetup stdin: testpass123$' <<<"$output")
+  assert_equal "$count" "2"
 }
 
 @test "formats the ESP with restrictive permissions" {

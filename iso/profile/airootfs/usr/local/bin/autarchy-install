@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
-# autarchy-install: the one guided command the release ISO points you at.
-# The repo is already baked into the live environment at build time
-# (Phase 14) -- no clone, no GitHub access needed. Shows ground truth,
-# asks a handful of plain questions in a fixed order, shows a review
-# screen, then hands off to the existing, already-tested install pipeline
-# (install/install-base-system) to run unattended. No install logic lives
-# here -- see Phase 12's plan (docs/phases/phase-12-alienware-migration.md)
-# for why: a linear sequential flow ending in one review screen, not a
-# free-navigation menu, researched against archinstall/Calamares/Windows
-# Setup precedent before being designed. The destructive-action
-# confirmation stays entirely in install-base-system's own
-# typed-disk-path gate -- this script's review screen is a separate,
-# lighter "did I answer these right" checkpoint, not a replacement for it.
+# autarchy-install: the terminal collector -- the boot fallback / manual-
+# recovery path (Phase 15's GTK4 GUI is the primary one; this stays as
+# the collector of last resort, not replaced). The repo is already baked
+# into the live environment at build time (Phase 14) -- no clone, no
+# GitHub access needed. Shows ground truth, asks a handful of plain
+# questions in a fixed order (including the LUKS passphrase, typed twice
+# -- Phase 15/D-0066), shows a review screen, then hands off to
+# install/run-guided-install, the shared runner both this script and the
+# future GUI use, so neither has to reimplement "run the install, then
+# offer to reboot." No install logic lives here -- see Phase 12's plan
+# (docs/phases/phase-12-alienware-migration.md) for why: a linear
+# sequential flow ending in one review screen, not a free-navigation
+# menu, researched against archinstall/Calamares/Windows Setup precedent
+# before being designed. The destructive-action confirmation stays
+# entirely in install-base-system's own typed-disk-path gate -- this
+# script's review screen is a separate, lighter "did I answer these
+# right" checkpoint, not a replacement for it.
 set -euo pipefail
 
 readonly CLONE_DIR=/root/autarchy
@@ -32,6 +36,31 @@ ask() {
     read -rp "$prompt: " reply
     printf '%s' "$reply"
   fi
+}
+
+# ask_password PROMPT -> the entered value on stdout, after typing it
+# twice (silently, no echo -- read -rs) and confirming they match. Used
+# for the LUKS passphrase so the whole install stays unattended after
+# the review-screen confirm, instead of cryptsetup prompting mid-run
+# (Phase 15/D-0066).
+ask_password() {
+  local prompt=$1 first second
+  while true; do
+    read -rsp "$prompt: " first
+    echo >&2
+    if [[ -z $first ]]; then
+      echo "Enter a password." >&2
+      continue
+    fi
+    read -rsp "Confirm $prompt: " second
+    echo >&2
+    if [[ $first != "$second" ]]; then
+      echo "Didn't match -- try again." >&2
+      continue
+    fi
+    printf '%s' "$first"
+    return
+  done
 }
 
 # boot_disk -> the whole disk the live medium itself is booted from, if it
@@ -108,7 +137,7 @@ main() {
 
   echo
   log "A few questions, then this runs unattended."
-  local disk host username tzone locale keymap swap_size
+  local disk host username tzone locale keymap swap_size passphrase
   disk=$(ask_disk)
   host=$(ask "Hostname")
   username=$(ask "Username")
@@ -116,6 +145,7 @@ main() {
   locale=$(ask "Locale" "en_US.UTF-8")
   keymap=$(ask "Console keymap" "us")
   swap_size=$(ask "Hibernation swap size (blank to skip, e.g. 16G -- see Memory above)")
+  passphrase=$(ask_password "Disk encryption passphrase")
 
   echo
   log "Review:"
@@ -127,6 +157,7 @@ main() {
     Locale:      $locale
     Keymap:      $keymap
     Hibernation: ${swap_size:-none}
+    Encryption:  passphrase set
 SUMMARY
   echo
   local confirm
@@ -146,24 +177,7 @@ KEYMAP=$keymap
 SWAP_SIZE=$swap_size
 EOF
 
-  install/install-base-system "$VARS_FILE"
-
-  echo
-  log "Base install done."
-  local next
-  read -rp "Reboot now? [Y/n] " next
-  if [[ ! $next =~ ^[Nn]$ ]]; then
-    log "Unmounting and closing the encrypted volume..."
-    umount -R /mnt
-    # shellcheck source-path=SCRIPTDIR source=../../../../../../system/storage/layout.conf
-    source system/storage/layout.conf
-    cryptsetup close "$LUKS_MAPPER"
-    log "Rebooting -- remove the USB drive now."
-    sleep 3
-    reboot
-  else
-    echo "Staying at the shell. When ready: umount -R /mnt; cryptsetup close root; poweroff"
-  fi
+  install/run-guided-install "$VARS_FILE" 9<<<"$passphrase"
 }
 
 main "$@"

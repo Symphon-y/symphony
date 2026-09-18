@@ -81,20 +81,21 @@ setup() {
   assert [ -x "$script" ]
 
   # No new install logic here -- only orchestration of what already exists
-  # and is already tested elsewhere (install-base-system). The repo itself
-  # is baked into the live environment at build time (Phase 14), so there
-  # is no bootstrap/clone step to orchestrate here any more.
+  # and is already tested elsewhere (install-base-system, via the shared
+  # run-guided-install runner -- Phase 15/D-0066). The repo itself is
+  # baked into the live environment at build time (Phase 14), so there is
+  # no bootstrap/clone step to orchestrate here any more.
   run grep -q 'scripts/system-report' "$script"
   assert_success
-  run grep -q 'install/install-base-system' "$script"
+  run grep -q 'install/run-guided-install' "$script"
   assert_success
 
   # The review screen (a plain proceed? gate) must come before
-  # install-base-system runs -- its own typed-disk-path gate is a second,
-  # separate checkpoint, not a replacement.
+  # run-guided-install runs -- install-base-system's own typed-disk-path
+  # gate is a second, separate checkpoint, not a replacement.
   local review_line install_line
   review_line=$(grep -n 'Proceed with these values' "$script" | head -1 | cut -d: -f1)
-  install_line=$(grep -n '^  install/install-base-system' "$script" | head -1 | cut -d: -f1)
+  install_line=$(grep -n '^  install/run-guided-install' "$script" | head -1 | cut -d: -f1)
   assert [ -n "$review_line" ]
   assert [ -n "$install_line" ]
   assert [ "$review_line" -lt "$install_line" ]

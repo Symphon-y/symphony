@@ -86,10 +86,10 @@ Red confirmed: · Green confirmed:
 ## Tasks
 
 - [x] Branch, tracking doc
-- [ ] Red: passphrase-fd contract tests
-- [ ] Milestone A: passphrase-fd plumbing, shared runner extraction,
+- [x] Red: passphrase-fd contract tests
+- [x] Milestone A: passphrase-fd plumbing, shared runner extraction,
       terminal fallback passphrase prompt -- zero hardware boots needed
-- [ ] Milestone A: Green, `scripts/check`
+- [x] Milestone A: Green, `scripts/check`
 - [ ] Milestone B: GTK4/libadwaita app against a `--dry-run` fake
       backend, iterated in this dev VM's own Hyprland session
 - [ ] Milestone C: `cage` + real boot wiring, `GSK_RENDERER` pinned,
@@ -157,6 +157,41 @@ Red confirmed: · Green confirmed:
   ISO-build cost per iteration. Only Milestone C (`cage` + real boot
   wiring + the `GSK_RENDERER` question) needs a real ISO build and a
   real destructive hardware boot, same loop as every fix in Phase 14.
+- **Milestone A implemented.** Designed and built the fd-9 passphrase
+  contract, not fd 3 as planned in plan mode: confirmed live in bats
+  that `bats-core` itself holds fds 3, 4, and 5 open internally for its
+  own output capture, so `[[ -e /dev/fd/3 ]]` was true even when no
+  test provided one -- a real bug caught by actually running the tests,
+  not assumed. fd 9 is the standard "app-specific, unlikely to
+  collide" choice for exactly this reason; confirmed clear in this
+  bats environment before committing to it. `install/
+  install-base-system`'s `encrypt_and_format()` reads the passphrase
+  from fd 9 **once** into a variable, then pipes it into each
+  `cryptsetup --key-file -` call via stdin, rather than pointing
+  `--key-file` at `/dev/fd/9` directly -- verified locally (a small
+  standalone script first) that a second read from the same fd after
+  the first gets EOF, since the file offset is shared once a fd is
+  inherited, not reset per process; `cryptsetup` runs twice here
+  (format, then open), so this would have silently broken the second
+  call. Falls back to today's exact interactive-prompt behavior when
+  fd 9 isn't open, keeping `base-install.md`'s documented manual/
+  recovery path (calls `install-base-system` directly, no collector at
+  all) unaffected. Extracted `install/run-guided-install` (new) from
+  `autarchy-install`'s own tail-end (the `install-base-system` call +
+  reboot prompt) -- the shared runner both the terminal collector and
+  the future GTK4 app will call. `autarchy-install` gains
+  `ask_password()` (type-twice-confirm, silent input) and now collects
+  the passphrase alongside every other field, passing it via
+  `9<<<"$passphrase"` -- the whole terminal flow is genuinely
+  unattended after the review screen now too. Verified fd-9
+  inheritance survives **two** levels of subprocess calls
+  (`autarchy-install` -> `run-guided-install` -> `install-base-system`),
+  not just one, with a standalone smoke test before trusting the real
+  chain. Updated `tests/acceptance/phase-12.bats`'s `autarchy-install`
+  structure test and `base-install.md`'s guided-flow description to
+  match. Confirmed Phase 14's dynamic `file_permissions` derivation in
+  `profiledef.sh` picks up the new script automatically (32 entries,
+  was 31) -- no manual edit needed. `scripts/check` green throughout.
 
 ## VM → physical hardware notes
 

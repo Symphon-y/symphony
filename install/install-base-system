@@ -8,11 +8,16 @@
 #
 # Covers base-install.md steps 4-5 (partition/LUKS/Btrfs/ESP/pacstrap/fstab),
 # then runs configure-base-system (step 6) as its last step. Driven entirely
-# by the vars file and system/storage/{layout.conf,subvolumes.txt} -- the
-# only interactive moment is one destructive-action confirmation before
-# $DISK is touched. Collect-once-then-run-unattended, the same shape
-# Windows/macOS installers use (Phase 10), built our own way: no
-# archinstall, no TUI, no Omarchy code.
+# by the vars file and system/storage/{layout.conf,subvolumes.txt}. The one
+# interactive moment that's always present is a destructive-action
+# confirmation before $DISK is touched (typing the disk path back, not
+# just y/n). The root LUKS passphrase (Phase 15) is a second, optional
+# interactive moment -- optional because it can instead be supplied by the
+# caller via file descriptor 9 (the typed-and-confirmed passphrase from
+# whichever collector is running, terminal or GUI), in which case
+# encryption runs unattended too. Collect-once-then-run-unattended, the
+# same shape Windows/macOS installers use (Phase 10), built our own way:
+# no archinstall, no TUI, no Omarchy code.
 set -Eeuo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -108,11 +113,32 @@ subvolumes() {
 encrypt_and_format() {
   local esp_dev="/dev/disk/by-partlabel/$ESP_PARTLABEL"
   local luks_dev="/dev/disk/by-partlabel/$LUKS_PARTLABEL"
-  local subvol mountpoint
+  local subvol mountpoint passphrase
 
   log "Encrypting $luks_dev"
-  cryptsetup luksFormat --type luks2 "$luks_dev"
-  cryptsetup open --allow-discards --persistent "$luks_dev" "$LUKS_MAPPER"
+  # fd 9, when open, carries the typed-and-confirmed root passphrase from
+  # whichever collector is running (the terminal fallback or the future
+  # GUI) -- never the vars file, never disk (Phase 15/D-0066). Not fd 3:
+  # bats-core itself holds fd 3 (and 4, 5) open internally for its own
+  # output capture, so `[[ -e /dev/fd/3 ]]` is true even when no test
+  # provides one -- confirmed live, not assumed. fd 9 is the standard
+  # "app-specific, unlikely to collide" choice for exactly this reason.
+  # Read once into a variable, not `--key-file /dev/fd/9` directly:
+  # cryptsetup runs twice here (format, then open), and a second read
+  # from the same fd would just get EOF -- the underlying file offset is
+  # shared once a fd is inherited, it isn't reset per process. Falls back
+  # to cryptsetup's own interactive prompt (today's exact behavior) when
+  # fd 9 isn't open, so the documented manual/recovery runbook path
+  # (base-install.md), which calls this script directly with no
+  # collector at all, stays unaffected.
+  if [[ -e /dev/fd/9 ]]; then
+    read -r passphrase <&9
+    printf '%s' "$passphrase" | cryptsetup luksFormat --type luks2 --key-file - "$luks_dev"
+    printf '%s' "$passphrase" | cryptsetup open --allow-discards --persistent --key-file - "$luks_dev" "$LUKS_MAPPER"
+  else
+    cryptsetup luksFormat --type luks2 "$luks_dev"
+    cryptsetup open --allow-discards --persistent "$luks_dev" "$LUKS_MAPPER"
+  fi
 
   log "Creating Btrfs subvolumes"
   mkfs.btrfs -L "$BTRFS_LABEL" "/dev/mapper/$LUKS_MAPPER"

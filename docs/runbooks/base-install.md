@@ -32,13 +32,15 @@ VM), and again for the rebuild test (Phase 8) and physical hardware (Phase 12).
   It shows a ground-truth report of the
   machine (CPU/memory/GPU/storage/network), asks a handful of plain
   questions in order (disk, hostname, username, timezone, locale, keymap,
-  optional hibernation size), shows a review screen, then hands off to
-  `install/install-base-system` -- which prints exactly what it's about to
-  do to the disk, requires typing the disk path back to confirm before
-  anything destructive happens (a second, stronger checkpoint, not a
-  duplicate of the review screen), then runs unattended through to a
-  rebootable system and offers to reboot. No steps below need typing by
-  hand on this path.
+  optional hibernation size, disk encryption passphrase -- typed twice
+  to confirm), shows a review screen, then hands off to
+  `install/run-guided-install` -- which runs `install/install-base-system`
+  (prints exactly what it's about to do to the disk, requires typing the
+  disk path back to confirm before anything destructive happens -- a
+  second, stronger checkpoint, not a duplicate of the review screen, and
+  now runs the LUKS encryption itself unattended too, using the
+  passphrase already collected above) through to a rebootable system,
+  then offers to reboot. No steps below need typing by hand on this path.
 - **Stock Arch ISO (manual path, kept as the documented fallback).** Every
   step below, typed by hand -- still the recovery path from the "Recovery"
   section at the end, and still how this runbook stays understandable step
