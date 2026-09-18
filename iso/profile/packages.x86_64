@@ -56,3 +56,16 @@ bats-support
 vim
 tmux
 sudo
+
+# The real guided installer (Phase 15): a hand-written GTK4/libadwaita
+# app, kiosk-launched via cage on tty1 (.bash_profile). No vulkan-intel
+# here -- GSK_RENDERER is pinned to the GL renderer (.bash_profile),
+# deliberately not the Vulkan one GTK defaults to, so the live
+# environment doesn't need a Vulkan driver at all.
+cage
+gtk4
+libadwaita
+python-gobject
+mesa
+adwaita-icon-theme
+cantarell-fonts
