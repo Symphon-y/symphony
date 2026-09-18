@@ -278,6 +278,27 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   `scripts/check` green, and confirmed `git config --global --get-all
   safe.directory` on this dev machine is empty before and after running
   the suite.
+- `2026.09.17-test9` got much further -- past `build-offline-repo`, into
+  `mkarchiso` itself, into `_make_custom_airootfs`'s airootfs copy (the
+  exact function researched from source) -- confirming both the
+  dynamically-populated `file_permissions` and the `safe.directory` fix
+  worked. Hit a new, real error there: `ERROR: Failed to set permissions
+  on '.../root/autarchy/iso/profile/airootfs/usr/local/bin/autarchy-
+  install'. Outside of valid path.` `git ls-files -s` also tracks files
+  *under* `iso/profile/airootfs/` itself (the live `autarchy-install`
+  script's own source file) -- excluded from the bake-in rsync copy
+  (same reasoning as `profiledef.sh`'s own header comment on that
+  exclude), so it never exists under `/root/autarchy`. This is a
+  genuinely different failure mode than assumed: mkarchiso's `realpath`
+  check on a listed-but-nonexistent path fails *closed*, aborting the
+  whole build, not the harmless "doesn't exist" warning its separate
+  plain-existence check gives for every other legitimately-missing
+  entry. Fixed by filtering `iso/profile/airootfs/` out of the generated
+  list (`grep -v '^iso/profile/airootfs/'`). Verified locally: 31 entries
+  now (was 32), the excluded path is gone, both previously-broken
+  scripts still present, no leftover `iso/profile/airootfs` entries, no
+  gitconfig pollution. New acceptance test asserts no generated key ever
+  contains that path.
 
 ## VM → physical hardware notes
 

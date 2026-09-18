@@ -48,4 +48,13 @@ repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 git config --global --add safe.directory "$repo_root"
 while IFS= read -r rel_path; do
   file_permissions["/root/autarchy/$rel_path"]="0:0:755"
-done < <(git -C "$repo_root" ls-files -s | awk '$1 == "100755" {print $4}')
+done < <(git -C "$repo_root" ls-files -s |
+  awk '$1 == "100755" {print $4}' |
+  # iso/profile/airootfs/ is excluded from the bake-in copy (the CI
+  # rsync step, same reasoning as this file's own exclude) -- these
+  # paths never exist under /root/autarchy, and mkarchiso's realpath
+  # check on a nonexistent path fails closed as "outside of valid path"
+  # (a hard build error, not a warning, confirmed by a real build
+  # failure), not the harmless "doesn't exist" warning its plain
+  # existence check gives for every other genuinely-missing entry.
+  grep -v '^iso/profile/airootfs/')

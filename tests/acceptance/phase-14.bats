@@ -68,6 +68,24 @@ setup() {
   assert_output "$(printf '0:0:755\n0:0:755')"
 }
 
+@test "profiledef.sh: excludes iso/profile/airootfs/ from the generated file_permissions entries" {
+  # A real build failure: git ls-files -s also tracks files under
+  # iso/profile/airootfs/ itself (e.g. the live autarchy-install script's
+  # own source) -- excluded from the bake-in rsync copy, so they never
+  # exist under /root/autarchy. mkarchiso's realpath check on a listed-
+  # but-nonexistent path fails *closed* ("outside of valid path", a hard
+  # build error), not with the harmless "doesn't exist" warning its
+  # plain existence check gives everywhere else.
+  local pd="$REPO_ROOT/iso/profile/profiledef.sh"
+  run grep -q "grep -v '\^iso/profile/airootfs/'" "$pd"
+  assert_success
+
+  # shellcheck disable=SC2016 # single-quoted on purpose -- $PD/$k expand in the subshell, not here
+  run env PD="$pd" HOME="$BATS_TEST_TMPDIR" bash -c 'declare -A file_permissions; source "$PD"; for k in "${!file_permissions[@]}"; do [[ $k == *iso/profile/airootfs* ]] && echo "$k"; done; true'
+  assert_success
+  assert_output ""
+}
+
 @test "autarchy-bootstrap is fully retired -- no trace outside historical records" {
   assert [ ! -e "$REPO_ROOT/iso/profile/airootfs/usr/local/bin/autarchy-bootstrap" ]
   # docs/phases/ is allowed to still mention the retired name: phase-10 and
