@@ -511,5 +511,5 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
 - [x] All acceptance tests pass
 - [x] Static checks pass
 - [x] `DECISIONS.md` updated
-- [ ] `docs/roadmap.md` status updated
-- [ ] Branch merged to `main`
+- [x] `docs/roadmap.md` status updated
+- [x] Branch merged to `main`
