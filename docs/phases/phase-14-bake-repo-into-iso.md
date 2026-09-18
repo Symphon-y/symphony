@@ -197,6 +197,24 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   regardless of which downstream step was actually stripping it. New
   acceptance coverage in `phase-14.bats` (ordering: after the rsync
   bake-in, before the mkarchiso build).
+- `2026.09.17-test6` failed fast (under 2 minutes -- never reached the
+  actual ISO build), in the new chmod step itself: `git ls-files -s`
+  lists every tracked file in the whole repo, including files under
+  `iso/profile/airootfs/` itself -- deliberately excluded from the
+  bake-in copy (avoids nesting the tree inside itself) and so never
+  present at the destination path, causing a real `chmod: cannot access
+  ...: No such file or directory`. Guarding with `[[ -e $path ]] &&
+  chmod ...` alone wasn't enough either -- reproduced locally under
+  `bash -e` before pushing again: a `while` loop's own exit status is
+  whatever its *last* iteration's last command returned, so a loop whose
+  final iteration skips a missing file still counts as "failed" and
+  trips `set -e`, even though skipping is the correct, intended
+  behavior. Fixed with `if [[ -e $path ]]; then chmod 755 "$path"; fi`
+  instead -- an `if` with no `else` always exits 0 when its condition is
+  false. Verified locally against this real repo (empty destination:
+  loop completes; one file present with its bit deliberately stripped:
+  loop completes and the bit is restored) before pushing `test6`'s
+  replacement.
 
 ## VM → physical hardware notes
 
