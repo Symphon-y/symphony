@@ -95,8 +95,8 @@ Red confirmed: · Green confirmed:
 - [x] Milestone A: Green, `scripts/check`
 - [x] Milestone B: GTK4/libadwaita app against a `--dry-run` fake
       backend, iterated in this dev VM's own Hyprland session
-- [ ] Milestone C: `cage` + real boot wiring, `GSK_RENDERER` pinned,
-      real ISO build + real hardware boot verification
+- [x] Milestone C: `cage` + real boot wiring, `GSK_RENDERER` pinned
+- [ ] Milestone C: real ISO build + real hardware boot verification
 - [ ] Close: `DECISIONS.md`, `docs/omarchy-influences.md`,
       `docs/roadmap.md`, merge to `main`
 
@@ -257,6 +257,37 @@ Red confirmed: · Green confirmed:
   unittest discover` over `gui/tests`. `gui/fake-backend` (bash) added
   to the existing shellcheck/shfmt file list. `scripts/check` green
   throughout, including the two new steps.
+- **Milestone C wired (static half).** `iso/profile/airootfs/root/.
+  bash_profile` now execs `cage -- /root/autarchy/gui/autarchy-installer`
+  when the login shell is on `/dev/tty1` specifically, with
+  `GSK_RENDERER=gl` exported first -- pinned, not left to GTK's own
+  Vulkan-by-default behavior, per the Haswell/HD 4600 blank-window risk
+  found during planning. `exec` (not a plain call) is deliberate: it
+  replaces the login shell itself, so a crash or exit just ends the tty1
+  session and `agetty --autologin` respawns the same flow, rather than
+  dropping to a stray shell an attacker or an accidental keypress could
+  reach. `tty2`+ still fall through to the existing banner + bash prompt
+  (the terminal-fallback escape hatch, unchanged). Added the GUI's
+  package stack to `iso/profile/packages.x86_64` (`cage`, `gtk4`,
+  `libadwaita`, `python-gobject`, `mesa`, `adwaita-icon-theme` -- the
+  Welcome page's `computer-symbolic` icon needs a real icon theme
+  installed, not just libadwaita's own bundled resources -- and
+  `cantarell-fonts`, GNOME's own default UI font, so libadwaita's
+  widgets render with their intended font rather than a generic
+  fallback). Deliberately did **not** add `vulkan-intel`: since
+  `GSK_RENDERER=gl` bypasses Vulkan detection entirely, the live
+  environment doesn't need a Vulkan driver at all, keeping the
+  Phase 10 "deliberately thin" live package list thin. New `tests/
+  acceptance/phase-15.bats` (4 tests) covers what's staticly provable
+  from the repo alone -- the package list, the tty1 wiring, the
+  tty2+ fallback, `gui/autarchy-installer`'s executable bit and its
+  real-runner-by-default behavior -- consistent with Phase 14's own
+  acceptance-test precedent that CI-generated/real-hardware-only
+  content gets a real verification pass, not a static test standing in
+  for one. What remains, and cannot be done from this dev VM (virtio-gpu,
+  not the Alienware's real Intel path): an actual ISO build and a real
+  hardware boot, confirming the GUI renders (not a blank window) and a
+  full install completes through it end-to-end.
 
 ## VM → physical hardware notes
 
