@@ -64,9 +64,12 @@ flow the user originally asked for.
   collectors feeding the same contract.
 
 **Open**
-- [ ] Exact GTK4 screen-by-screen layout/copy -- designed during
-      Milestone B, iterated live in the dev VM, not fully speced up
-      front.
+- [ ] `GSK_RENDERER` value to pin at boot -- Milestone B's dev-VM
+      testing found the renderer name itself has changed between GTK
+      versions (`ngl` -> `gl` as of GTK 4.22, discovered live via a GTK
+      warning); the actual value needed on the Alienware's GTK version
+      is a Milestone C question, verified on real hardware, not decided
+      here.
 
 ## Acceptance tests (written before implementation)
 
@@ -90,7 +93,7 @@ Red confirmed: · Green confirmed:
 - [x] Milestone A: passphrase-fd plumbing, shared runner extraction,
       terminal fallback passphrase prompt -- zero hardware boots needed
 - [x] Milestone A: Green, `scripts/check`
-- [ ] Milestone B: GTK4/libadwaita app against a `--dry-run` fake
+- [x] Milestone B: GTK4/libadwaita app against a `--dry-run` fake
       backend, iterated in this dev VM's own Hyprland session
 - [ ] Milestone C: `cage` + real boot wiring, `GSK_RENDERER` pinned,
       real ISO build + real hardware boot verification
@@ -192,6 +195,68 @@ Red confirmed: · Green confirmed:
   match. Confirmed Phase 14's dynamic `file_permissions` derivation in
   `profiledef.sh` picks up the new script automatically (32 entries,
   was 31) -- no manual edit needed. `scripts/check` green throughout.
+- **Milestone B implemented.** Built `gui/installer/` (an `Adw.
+  ApplicationWindow` navigation frame -- `Adw.ToolbarView` + header bar
+  + `Gtk.Stack` in an `Adw.Clamp(maximum_size=560)` + Back/Next nav bar
+  -- around 8 `Page` subclasses: Welcome, Language & Region (keymap/
+  locale/timezone, each an `Adw.ComboRow` with `set_enable_search(True)`
+  for type-ahead over ~400 timezones), Account (hostname/username/
+  password via `Adw.PasswordEntryRow`), Disk (target disk + optional
+  hibernation swap size), Encryption (LUKS passphrase, type-twice-
+  confirm), Developer Identity (optional git name/email, genuinely
+  skippable), Review (populates from `Answers` in `on_shown`), and
+  Progress (streams the runner's output live, then shows Reboot Now/
+  Stay at the Shell). `system_info.py` queries the live system for
+  every list (keymaps via `localectl`, locales by parsing `/etc/
+  locale.gen` in the exact format `configure-base-system` already
+  parses, timezones via `timedatectl`, disks by mirroring
+  `autarchy-install`'s own `lsblk`/`findmnt` logic) rather than hand-
+  maintaining a second data table -- this project's established DRY
+  convention. `runner.py` hands off to `install/run-guided-install`
+  (real) or `gui/fake-backend` (`--dry-run`) exactly like every other
+  collector in this repo, never containing install logic itself.
+  Two real bugs found and fixed empirically, both via a minimal
+  standalone repro before touching the real code: (1) Python's
+  `subprocess.Popen(preexec_fn=...)` alone does not survive --
+  `close_fds=True` (the default) runs independently of `preexec_fn` and
+  silently closes right back out whatever it `dup2`'d in; fixed by also
+  passing `pass_fds=(8, 9)`. (2) GTK widget updates from the background
+  I/O thread must go through `GLib.idle_add`, not called directly, or
+  they silently corrupt/crash the main loop.
+  Verified visually, not just by import: launched the real app as a
+  normal window in this dev VM's existing Hyprland session
+  (`WAYLAND_DISPLAY=wayland-1`) against `--dry-run`, and used `grim` to
+  screenshot every one of the 8 pages (a small throwaway debug harness
+  drove `Gtk.Stack` directly, page by page, on a timer, since no input-
+  simulation tool -- `wtype`/`ydotool`/`wlrctl` -- turned out to be
+  installed on this dev VM). Every page renders correctly and matches
+  the "clean macOS Setup Assistant" look the user asked for; the
+  Progress page's live log confirmed fd 8/fd 9 actually arrive at the
+  fake backend ("fd 8 (user password): received", "fd 9 (LUKS
+  passphrase): received"), proving the whole GUI -> runner -> backend fd
+  chain works, not just the bash-level chain Milestone A already proved.
+  Along the way, hit (and noted, not yet acted on) a real GTK version
+  landmine for Milestone C: GTK >=4.16 defaults to a Vulkan (GSK)
+  renderer on Wayland, and this dev VM's GTK 4.22 warned live that the
+  documented software-fallback renderer name itself changed from `ngl`
+  to plain `gl` -- the exact value to pin on the Alienware's real GTK
+  version is now an explicit open decision (above), not an assumption.
+  Added test coverage for the pure-logic pieces, stdlib `unittest` (no
+  `pytest` installed, and stdlib is enough here): `gui/tests/
+  test_state.py` (the vars-file contract, including the actual invariant
+  that mattered most -- neither password ever appears in it) and `gui/
+  tests/test_runner.py` (`_secret_pipe_fd`'s read-once-then-EOF
+  behavior, the same property `install-base-system`'s `read -r <&9`
+  depends on). `system_info.py` stayed untested by design -- every
+  function in it queries live system state (subprocess calls, `/etc/
+  locale.gen`), the same "manual/acceptance, not unit tests" bucket this
+  project already applies to other live-system code. Wired into
+  `scripts/check`: `python3 -m py_compile` over every `gui/*.py` (syntax
+  only -- the page modules `import gi` at module level, which needs a
+  real GTK install `py_compile` doesn't require) plus `python3 -m
+  unittest discover` over `gui/tests`. `gui/fake-backend` (bash) added
+  to the existing shellcheck/shfmt file list. `scripts/check` green
+  throughout, including the two new steps.
 
 ## VM → physical hardware notes
 

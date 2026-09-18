@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# fake-backend: simulates install/run-guided-install's real output shape
+# (with delays, so the progress screen's streaming can actually be
+# watched) for safe Milestone B GUI development -- never touches a real
+# disk. Reads fd 8/fd 9 exactly like the real chain would, to prove the
+# GUI's fd plumbing actually works end to end, without doing anything
+# with the secrets beyond confirming they arrived.
+set -euo pipefail
+
+vars_file=${1:-}
+echo "==> [dry-run] vars file: $vars_file"
+if [[ -e $vars_file ]]; then
+  echo "==> [dry-run] vars file contents:"
+  sed 's/^/    /' "$vars_file"
+fi
+if [[ -e /dev/fd/8 ]]; then
+  read -r _ <&8
+  echo "==> [dry-run] fd 8 (user password): received"
+fi
+if [[ -e /dev/fd/9 ]]; then
+  read -r _ <&9
+  echo "==> [dry-run] fd 9 (LUKS passphrase): received"
+fi
+
+steps=(
+  "Partitioning /dev/vda"
+  "Encrypting /dev/disk/by-partlabel/cryptroot"
+  "Creating Btrfs subvolumes"
+  "Formatting the ESP"
+  "Installing packages (pacstrap)"
+  "Setting timezone, locale, keymap, and hostname"
+  "Building unified kernel images and installing systemd-boot"
+  "Creating the user account and locking root"
+  "Enabling base services"
+)
+for step in "${steps[@]}"; do
+  echo "==> $step"
+  sleep 0.5
+done
+echo
+echo "==> Base install done."

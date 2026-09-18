@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+"""autarchy-installer: the primary guided installer (Phase 15) -- a real
+graphical wizard, cage-launched on tty1 (Milestone C). Collects every
+field once, including both passwords (Phase 15/D-0066), then hands off
+to install/run-guided-install to run unattended -- no install logic
+lives here, same principle autarchy-install's own terminal flow already
+follows.
+
+--dry-run: for developing/testing this app safely, e.g. in a normal
+Hyprland session on a dev machine -- never touches a real disk, runs
+gui/fake-backend instead of the real installer chain.
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+
+from installer.app import InstallerApp  # noqa: E402
+from installer.pages import PAGES  # noqa: E402
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Never touch a real disk -- run gui/fake-backend instead of the real installer.",
+    )
+    args = parser.parse_args()
+
+    app = InstallerApp([p() for p in PAGES], dry_run=args.dry_run)
+    return app.run(None)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

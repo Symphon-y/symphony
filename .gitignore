@@ -26,3 +26,7 @@ secrets/
 *~
 .idea/
 .vscode/
+
+# Python bytecode cache (gui/, Phase 15)
+__pycache__/
+*.pyc

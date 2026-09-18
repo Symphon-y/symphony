@@ -15,6 +15,7 @@ done < <(
   printf '%s\n' iso/build-offline-repo iso/profile/airootfs/root/.bash_profile
   printf '%s\n' system/*/*.sh tests/helpers/*.bash tests/unit/*.bats tests/acceptance/*.bats
   printf '%s\n' home/bash/dot-bashrc
+  printf '%s\n' gui/fake-backend
 )
 
 echo "==> shellcheck"
@@ -35,6 +36,12 @@ done < <(find .github/workflows -name '*.yml' 2>/dev/null)
 
 echo "==> identifiers"
 scripts/check-identifiers
+
+echo "==> gui: python syntax"
+find gui -name '*.py' -print0 | xargs -0 python3 -m py_compile
+
+echo "==> gui: unit tests"
+python3 -m unittest discover -s gui/tests -t gui
 
 echo "==> unit tests"
 bats tests/unit
