@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
 # run-guided-install: the shared runner both the terminal collector
-# (autarchy-install) and the future GTK4 GUI (Phase 15) hand off to, so
-# neither has to reimplement "run the install, then offer to reboot."
+# (autarchy-install) and the GTK4 GUI (Phase 15) hand off to, so neither
+# has to reimplement "run the install, then offer to reboot."
 #
-# Usage: install/run-guided-install VARS_FILE
+# Usage: install/run-guided-install [--no-reboot-prompt] VARS_FILE
+#   --no-reboot-prompt  skip the interactive "Reboot now? [Y/n]" prompt
+#                        and just return after a successful install. For
+#                        the GUI, which has no terminal a user is
+#                        watching -- read -rp would hang, or worse,
+#                        silently take the EOF-default branch. The GUI
+#                        shows its own Reboot/Stay UI instead, calling
+#                        install/finish-install itself on "Reboot."
 #   VARS_FILE  per-install values, already written by whichever collector
 #              is running (docs/runbooks/base-install.vars.example)
 #
@@ -17,31 +24,35 @@ set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO_ROOT
+readonly INSTALL_SCRIPT="${AUTARCHY_INSTALL_SCRIPT:-$REPO_ROOT/install/install-base-system}"
+readonly FINISH_SCRIPT="${AUTARCHY_FINISH_SCRIPT:-$REPO_ROOT/install/finish-install}"
 
 usage() {
-  echo "usage: run-guided-install VARS_FILE" >&2
+  echo "usage: run-guided-install [--no-reboot-prompt] VARS_FILE" >&2
   exit 2
 }
 
 main() {
+  local no_reboot_prompt=0
+  if [[ ${1:-} == --no-reboot-prompt ]]; then
+    no_reboot_prompt=1
+    shift
+  fi
   (($# == 1)) || usage
   local vars_file=$1
 
-  "$REPO_ROOT/install/install-base-system" "$vars_file"
+  "$INSTALL_SCRIPT" "$vars_file"
 
   echo
   echo "==> Base install done."
+  if ((no_reboot_prompt)); then
+    return 0
+  fi
+
   local next
   read -rp "Reboot now? [Y/n] " next
   if [[ ! $next =~ ^[Nn]$ ]]; then
-    echo "==> Unmounting and closing the encrypted volume..."
-    umount -R /mnt
-    # shellcheck source-path=SCRIPTDIR source=../system/storage/layout.conf
-    source "$REPO_ROOT/system/storage/layout.conf"
-    cryptsetup close "$LUKS_MAPPER"
-    echo "==> Rebooting -- remove the USB drive now."
-    sleep 3
-    reboot
+    "$FINISH_SCRIPT"
   else
     echo "Staying at the shell. When ready: umount -R /mnt; cryptsetup close root; poweroff"
   fi
