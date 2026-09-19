@@ -290,6 +290,31 @@ calls() {
   assert_line "arch-chroot $TARGET runuser -u alice -- bash -c cd /home/alice/Projects/autarchy && install/link-home apply"
 }
 
+@test "clears skel-provided dotfiles before link-home apply, so stow doesn't abort on them" {
+  # useradd -m populates a fresh account from /etc/skel, which ships
+  # .bash_logout/.bash_profile/.bashrc. home/bash/dot-bashrc stows over
+  # exactly .bashrc, and GNU stow aborts its entire combined call (every
+  # package, not just bash) on a single conflict like this -- reproduced
+  # live against this repo's own stow packages, exit 1. Since
+  # configure-base-system runs under set -Eeuo pipefail, that would have
+  # killed the whole script before it ever reached enable_services()
+  # (sddm.service), matching a real hardware install that booted fine
+  # but never got a graphical session.
+  mkdir -p "$TARGET/home/alice"
+  touch "$TARGET/home/alice/.bash_logout" \
+    "$TARGET/home/alice/.bash_profile" \
+    "$TARGET/home/alice/.bashrc"
+
+  run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+
+  assert [ ! -e "$TARGET/home/alice/.bash_logout" ]
+  assert [ ! -e "$TARGET/home/alice/.bash_profile" ]
+  assert [ ! -e "$TARGET/home/alice/.bashrc" ]
+  run calls
+  assert_line "arch-chroot $TARGET runuser -u alice -- bash -c cd /home/alice/Projects/autarchy && install/link-home apply"
+}
+
 @test "writes ~/.gitconfig.local when both GIT_NAME and GIT_EMAIL are provided (Phase 16)" {
   {
     echo 'GIT_NAME="Alice Example"'

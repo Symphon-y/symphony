@@ -165,6 +165,29 @@ Red confirmed: 2026-09-18 · Green confirmed: 2026-09-18
   quoting it.)
   `scripts/check` green throughout (149 bats tests, up from 142; 5 GUI
   unit tests, up from 4).
+- **Real hardware find: `2026.09.18-test3` installed and booted fine
+  but never reached a graphical session.** Root cause: `link_home()`
+  runs `install/link-home apply`, which stows `home/bash/dot-bashrc`
+  onto `~/.bashrc` -- but `useradd -m` already populates a fresh
+  account's home from `/etc/skel`, which ships its own `.bashrc`. GNU
+  stow refuses the conflict and aborts its entire combined call
+  (reproduced live). Under `set -Eeuo pipefail`, that killed
+  `configure-base-system` right there, before `enable_services()`
+  (`sddm.service`) ever ran -- everything earlier (partition, LUKS,
+  pacstrap, user, boot loader) had already succeeded, so the machine
+  still booted, just to a bare TTY. Fixed by removing the stock skel
+  files in `link_home()` right before calling `install/link-home apply`
+  -- scoped there, not inside `install/link-home` itself, since that
+  script also runs by hand against already-customized machines
+  (`rebuild.md`), where the same removal would be destructive. Two
+  other theories were investigated and ruled out: a missing `systemctl
+  set-default graphical.target` (checked directly -- Arch's `systemd`
+  package already ships `default.target -> graphical.target`, no
+  override needed) and SDDM's Wayland-mode greeter failing (it does
+  fail -- confirmed via `journalctl -u sddm` on this dev VM, 34/34
+  boots -- but SDDM's own automatic X11 fallback succeeds every time
+  and is exactly how this dev VM's Hyprland session has always
+  started; not a blocker, left as-is).
 
 ## VM → physical hardware notes
 

@@ -217,8 +217,25 @@ copy_repo() {
 
 # stow needs no live session, just a writable $HOME -- safe to run here,
 # unlike enable_user_services below (see install/first-login).
+#
+# useradd -m (create_user, above) populates the new home from /etc/skel,
+# which ships .bash_logout/.bash_profile/.bashrc -- home/bash/dot-bashrc
+# stows over exactly .bashrc, and GNU stow aborts its entire combined
+# call (every package, not just bash) on a single conflict like that
+# (reproduced live: a real hardware install got this far, crashed here
+# under set -Eeuo pipefail, and never reached enable_services() below --
+# the disk/boot loader/user account were already done, so it still
+# booted, just straight to a bare TTY, no SDDM). Removing the skel files
+# first is safe only here: the account was created one step ago and is
+# certain to hold nothing but stock skel content. install/link-home
+# itself stays untouched -- it's also run by hand against already-
+# customized machines (rebuild.md), where this same removal would be
+# destructive.
 link_home() {
   log "Linking dotfiles for $USERNAME"
+  rm -f "$TARGET/home/$USERNAME"/.bash_logout \
+    "$TARGET/home/$USERNAME"/.bash_profile \
+    "$TARGET/home/$USERNAME"/.bashrc
   in_target runuser -u "$USERNAME" -- bash -c "cd /home/$USERNAME/Projects/autarchy && install/link-home apply"
 }
 
