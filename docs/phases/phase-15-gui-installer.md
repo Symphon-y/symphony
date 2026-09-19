@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Status** | In progress |
+| **Status** | Complete |
 | **Driver** | Claude + user |
 | **Branch** | `phase/15-gui-installer` |
 | **Started** | 2026-09-18 |
-| **Completed** | |
+| **Completed** | 2026-09-18 |
 
 ## Goal
 
@@ -74,14 +74,18 @@ phase's close.
 - `install/install-base-system` stays the single source of truth for
   install logic; the GUI and the terminal fallback are both just
   collectors feeding the same contract.
+- `GSK_RENDERER=gl`, not `ngl` (the older name) or GTK's own Vulkan
+  default -- confirmed correct on the Alienware's real GTK version by
+  an actual real-hardware boot (`2026.09.18-test2`), not just the dev
+  VM's GTK 4.22 warning that first found the rename.
+- The destructive-action confirmation stays a real, typed confirmation
+  for the GUI too, not a silent pass-through -- the Review page has its
+  own required "type the disk path to confirm" field, forwarded over
+  the install process's stdin (found necessary only after a real
+  hardware boot showed the prompt was otherwise unanswerable; see the
+  implementation log).
 
-**Open**
-- [ ] `GSK_RENDERER` value to pin at boot -- Milestone B's dev-VM
-      testing found the renderer name itself has changed between GTK
-      versions (`ngl` -> `gl` as of GTK 4.22, discovered live via a GTK
-      warning); the actual value needed on the Alienware's GTK version
-      is a Milestone C question, verified on real hardware, not decided
-      here.
+No open decisions remain for this phase.
 
 ## Acceptance tests (written before implementation)
 
@@ -91,12 +95,16 @@ phase-15.bats` for anything Milestone C's real ISO/boot wiring needs.
 
 | Test | What it proves |
 |---|---|
-| `install-base-system` reads the LUKS passphrase from fd 3, not stdin/interactively | The passphrase-fd contract is real, not just documented |
-| `confirm_destructive()`'s typed-disk-path prompt still reads from stdin correctly with fd 3 also open | fd 3 and fd 0 don't collide |
-| Terminal fallback collects and forwards the passphrase via fd 3 | The terminal path satisfies the same contract as the future GUI |
-| (Milestone C) `cage`/GTK4 packages present in `iso/profile/packages.x86_64`; `GSK_RENDERER` set in the boot wiring | Static, CI-checkable half of the real hardware verification |
+| `install-base-system` reads the LUKS passphrase from fd 9, not stdin/interactively (planned as fd 3; switched after bats itself was found holding fds 3-5 open -- see the implementation log) | The passphrase-fd contract is real, not just documented |
+| `confirm_destructive()`'s typed-disk-path prompt still reads from stdin correctly with fd 9 also open | fd 9 and fd 0 don't collide |
+| Terminal fallback collects and forwards the passphrase via fd 9 | The terminal path satisfies the same contract as the GUI |
+| `cage`/GTK4 packages present in `iso/profile/packages.x86_64`; `GSK_RENDERER` set in the boot wiring | Static, CI-checkable half of the real hardware verification |
+| `runner.py` sets `stdin=subprocess.PIPE` and writes to it | Regression guard for the disk-confirmation fix (D-0066) |
 
-Red confirmed: · Green confirmed:
+Red confirmed: 2026-09-18 (`tests/unit/install-base-system.bats`,
+`tests/unit/configure-base-system.bats`, extended before the Milestone A
+implementation) · Green confirmed: 2026-09-18 (`scripts/check`, and a
+real hardware install completed end-to-end via `2026.09.18-test2`)
 
 ## Tasks
 
@@ -108,8 +116,8 @@ Red confirmed: · Green confirmed:
 - [x] Milestone B: GTK4/libadwaita app against a `--dry-run` fake
       backend, iterated in this dev VM's own Hyprland session
 - [x] Milestone C: `cage` + real boot wiring, `GSK_RENDERER` pinned
-- [ ] Milestone C: real ISO build + real hardware boot verification
-- [ ] Close: `DECISIONS.md`, `docs/omarchy-influences.md`,
+- [x] Milestone C: real ISO build + real hardware boot verification
+- [x] Close: `DECISIONS.md`, `docs/omarchy-influences.md`,
       `docs/roadmap.md`, merge to `main`
 
 ## Implementation log
@@ -354,21 +362,49 @@ Red confirmed: · Green confirmed:
   confirmed via grep that it's the only bare (fd 0) `read` anywhere in
   either `install-base-system` or `configure-base-system` reachable from
   the GUI's flow.
+- **`2026.09.18-test2` succeeded on real hardware -- phase done.** The
+  user booted the fixed ISO on the Alienware: the Review page's new
+  "type the disk path to confirm" field worked as designed, the install
+  ran to completion through the GUI end to end (partition, LUKS, Btrfs,
+  ESP, pacstrap, configure-base-system), and the installed system boots
+  and logs in at a TTY -- matching Phase 1's original acceptance
+  criterion, now delivered through a real graphical installer instead of
+  a manual runbook or a terminal prompt. Confirmed with the user: no
+  Hyprland/desktop session at that TTY login is expected, not a bug --
+  automated desktop bring-up after install is explicitly Phase 16 scope
+  (this phase's own "Out of scope" section already said so), the same
+  clarification Phase 14 needed for its own TTY-login result.
+  `GSK_RENDERER=gl` rendered correctly on the real Haswell/HD 4600 iGPU
+  -- no blank-window bug, resolving the one Milestone C question that
+  could only be answered on real hardware. User separately asked for a
+  debug-terminal-access idea to be noted for a future story (recorded
+  above, under "Deferred idea") rather than designed now.
 
 ## VM → physical hardware notes
 
 - Milestones A and B are fully verifiable in this dev VM (bats tests
   for A; a normal windowed GTK4 app against a dry-run backend for B).
   Milestone C's `GSK_RENDERER`/Vulkan-vs-Haswell question specifically
-  cannot be verified in this VM -- its GPU is virtio-gpu, not the real
-  target's Intel HD 4600/Haswell path -- so that part is real-hardware-
-  only, same as every GPU-adjacent question this project has hit.
+  could not be verified in this VM -- its GPU is virtio-gpu, not the
+  real target's Intel HD 4600/Haswell path -- and needed two real
+  hardware boots to close out: `2026.09.18-test1` found the disk-wipe
+  confirmation was unanswerable from the GUI (safe -- nothing was
+  written before the hang) and that `cage` has no VT-switching at all,
+  contradicting this phase's own tty2+-escape-hatch assumption;
+  `2026.09.18-test2`, with both findings fixed and re-verified in this
+  dev VM's dry-run loop first, completed a full real install end to end
+  with `GSK_RENDERER=gl` rendering correctly. Confidence from a dry-run/
+  fake-backend loop and dev-VM screenshots caught real, load-bearing
+  bugs (the fd/threading issues in Milestone B) but could not catch
+  either Milestone C finding -- both were specific to real console/input
+  hardware behavior (`cage` taking over the physical keyboard, VT
+  switching) that a virtio-gpu dev VM session cannot reproduce.
 
 ## Exit criteria
 
-- [ ] All acceptance tests pass
-- [ ] Static checks pass
-- [ ] `DECISIONS.md` updated
-- [ ] `docs/omarchy-influences.md` updated
-- [ ] `docs/roadmap.md` status updated
-- [ ] Branch merged to `main`
+- [x] All acceptance tests pass
+- [x] Static checks pass
+- [x] `DECISIONS.md` updated
+- [x] `docs/omarchy-influences.md` updated
+- [x] `docs/roadmap.md` status updated
+- [x] Branch merged to `main`

@@ -21,7 +21,7 @@ outlines; their scope is finalized in their own plan mode.
 | 12 | [Offline release ISO + physical hardware migration (Alienware 14 / P39G)](phases/phase-12-alienware-migration.md) | 1, cross-cutting, 1–4 | Both | The release ISO installs the full `packages/*.txt` closure with zero network needed; boots and installs on real hardware; microcode, power management, Secure Boot/TPM revisited with a real machine; NVIDIA/nouveau attempted as an explicit bonus, not a requirement | In progress (Phase 14 confirmed the real-hardware install pipeline itself works — a from-scratch, zero-network install now boots to a logged-in base system; ground truth docs, `packages/alienware-14.txt`, Claude Code local handoff, `rebuild.md`, actual hibernate/resume verification, and GPU/AlienFX bonuses still open) |
 | 13 | [Offline-capable release ISO](phases/phase-13-offline-release-iso.md) | 1, cross-cutting | Claude + user | The release ISO installs the full `packages/*.txt` closure with zero network needed, matching a purchased-OS-key install experience | Folded into Phase 12 (2026-09-17) — see that phase's restructuring note. This doc stays as an accurate record of what it built. |
 | 14 | [Bake the repo itself into the ISO](phases/phase-14-bake-repo-into-iso.md) | 1 | Claude | Live environment has `install/`/`system/`/`packages/*.txt` with zero GitHub access needed for the core install | Complete (2026-09-18) |
-| 15 | A real, polished guided installer | 1 | Claude | `dialog`/`whiptail`/`gum`-based TUI, auto-started on boot, replacing the raw sequential prompts | Not started |
+| 15 | [Real GUI guided installer](phases/phase-15-gui-installer.md) | 1 | Claude + user | A real graphical wizard (`cage` + hand-written GTK4/libadwaita, not a TUI), auto-started on `tty1`, collects every field once (including both passwords, via file descriptor) and runs the install fully unattended | Complete (2026-09-18) |
 | 16 | Fully automated desktop bring-up | 1, 6 | Claude | Reboot after install lands in a working Hyprland desktop with zero manual steps (`rebuild.md`'s scope, automated) | Not started |
 
 ## Decisions deferred to their phase's plan mode
@@ -147,6 +147,38 @@ outlines; their scope is finalized in their own plan mode.
   installer for the first time. No GUI/Hyprland at that TTY login is
   expected, not a gap: session auto-start is Phase 16's explicit,
   not-yet-started scope.
+- **Phase 15:** resolved; see D-0066. Originally planned as a nicer TUI
+  (`dialog`/`whiptail`/`gum`); the user pushed back on that framing
+  directly, asking for something genuinely comparable to Windows Setup
+  / macOS Setup Assistant. Researched real alternatives rather than
+  picking the most impressive-looking one: Calamares (the standard
+  "real GUI installer" other Arch-based distros use) was a poor fit
+  specifically for this project (AUR-only on Arch, no UKI support, its
+  biggest win unusable since this project `pacstrap`s from a baked-in
+  local repo), landing on `cage` (a minimal wlroots kiosk compositor)
+  kiosk-launching a hand-written GTK4/libadwaita app instead, sized
+  after a real precedent (Crystal Linux's `jade_gui`). Closed a real,
+  pre-existing gap along the way, not just built the new frontend:
+  `install-base-system`'s `cryptsetup` calls had never taken a
+  `--key-file`, prompting interactively on the TTY even after a
+  collector's own review screen already confirmed everything --
+  fixed by passing both the account password and the LUKS passphrase
+  through dedicated file descriptors, never the vars file or disk.
+  Two more real bugs surfaced only by an actual hardware boot, the
+  same pattern Phase 14 hit repeatedly: the GUI's install subprocess
+  inherited an unusable stdin (under `cage`, the physical keyboard
+  never reaches the tty's line discipline), leaving the disk-wipe
+  confirmation permanently unanswerable -- confirmed safe (nothing had
+  been written yet) and fixed with a real typed-confirmation field on
+  the Review page, not a silent pass-through; and `cage` was found to
+  implement no keybindings at all, meaning this phase's own "tty2+ is
+  the escape hatch" assumption was never actually reachable while the
+  GUI has the console. `2026.09.18-test2` confirmed a full real install
+  completing end-to-end through the GUI, with `GSK_RENDERER=gl`
+  rendering correctly on the Alienware's Haswell/HD 4600 iGPU -- the one
+  question only real hardware could answer. A "quick terminal access for
+  debugging" feature was explicitly deferred to its own future story,
+  not squeezed into this phase's close.
 
 ## Cross-cutting concerns (checked in every phase)
 

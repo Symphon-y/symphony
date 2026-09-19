@@ -41,7 +41,7 @@ assumed.
 
 | Component | Our layer | Phase | Decision |
 |---|---|---|---|
-| Installer / bootstrap flow | 1 | 1, 8, 10 | REJECT Omarchy's mechanism; own bootable media built independently (D-0009, D-0061) |
+| Installer / bootstrap flow | 1 | 1, 8, 10, 15 | REJECT Omarchy's mechanism; own bootable media built independently (D-0009, D-0061); own GUI, not Omarchy's gum TUI (D-0066) |
 | Disk layout, encryption, snapshots, bootloader | 1 | 1 | ADAPT (D-0010–D-0012) |
 | Firewall | 1 | 1 | ADAPT (D-0015) |
 | Base services | 1 | 1 | ADAPT (D-0014) |
@@ -107,6 +107,23 @@ profile of our own, no Omarchy code, no archinstall, no TUI, no custom
 mirror, was built independently on that basis: see D-0061. The REJECT verdict
 above is unchanged; this addendum records why building our own installer
 media doesn't reopen it.
+
+**Phase 15 addendum (researched 2026-09-18):** revisited when the user asked
+for a genuinely graphical guided installer — "how Windows/macOS does it
+with a real UI" — rather than a nicer terminal prompt. This moves further
+from Omarchy's own approach, not closer to it: Omarchy's configurator is a
+`gum` TUI feeding a Python orchestrator built on `archinstall`; autarchy's
+is a hand-written GTK4/libadwaita app (`gui/`), kiosk-launched via `cage`,
+still handing off to this project's own `install/install-base-system` — no
+`archinstall`, no TUI toolkit, no Omarchy code, same as every prior
+addendum here. Evaluated and rejected a real third-party option along the
+way (Calamares, the standard "real GUI installer" framework other
+Arch-based distros use) for reasons specific to this project, not
+Omarchy-related: AUR-only on Arch (no path into this project's `mkarchiso`
+build), its biggest win (`unpackfs`, copying a prebuilt image) unusable
+since this project `pacstrap`s from a baked-in local repo, and zero UKI
+support in its bootloader module. The REJECT verdict above is unchanged;
+D-0066 records the GUI design itself.
 
 ### Disk layout, encryption, snapshots, bootloader
 - Omarchy approach: GPT with a 2 GiB EFI partition and root; LUKS on by default

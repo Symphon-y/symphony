@@ -1627,3 +1627,86 @@ and the old entry is marked `Superseded by D-XXXX`.
   brittle full-string match, so a future regression here is more likely
   to be caught even though the deeper boot-ordering behavior itself
   still can't be.
+
+## D-0066 — A real GUI guided installer: `cage` + hand-written GTK4/libadwaita, secrets via file descriptor
+
+- **Status:** Accepted (2026-09-18, Phase 15)
+- **Decision:** The release ISO's primary guided installer is a
+  hand-written GTK4/libadwaita Python app (`gui/`), kiosk-launched via
+  `cage` (a 66 KiB wlroots compositor, "run one fullscreen app, exit
+  when it exits") auto-started on `tty1` login, with `GSK_RENDERER=gl`
+  pinned explicitly. The terminal flow (`autarchy-install`) stays as the
+  boot fallback / manual-recovery path on `tty2`+, not replaced. Both
+  frontends are pure collectors: they gather every field once (including
+  both the account password and the LUKS root passphrase, typed and
+  confirmed) and hand off to `install/run-guided-install` /
+  `install-base-system`, the single unattended runner. Neither password
+  ever touches the vars file or disk — each is passed through a
+  dedicated file descriptor (fd 8: account password, fd 9: LUKS
+  passphrase) read once into a shell variable and piped to each
+  consumer via stdin, since a fd's read offset is shared once inherited
+  across processes and `cryptsetup` needs the passphrase twice (format,
+  then open). `install-base-system`'s own destructive-action
+  confirmation (typing the disk path back, not just clicking a button)
+  is kept as a second, independent layer for both frontends — the GUI's
+  Review page has its own required "type the disk path to confirm"
+  field, and its answer is forwarded over the install process's stdin.
+- **Alternatives considered:** Calamares, the standard "real GUI
+  installer framework" other Arch-based distros use — AUR-only on Arch
+  (this project's `mkarchiso` pipeline has no AUR path), its biggest win
+  (`unpackfs`, copying a prebuilt image) is useless since this project
+  `pacstrap`s from a baked-in local repo, zero UKI support in its
+  bootloader module (this project's whole boot design is UKIs —
+  EndeavourOS had to fork Calamares itself to make Arch work at all),
+  heaviest option measured (+876 MiB) for the least usable logic, and
+  philosophically the same shape D-0009 already REJECTed (a config
+  wrapper around someone else's orchestrator). A webview-based UI —
+  rejected without deep investigation; adds a whole browser-engine
+  dependency for no benefit over a native toolkit already available in
+  `extra`. Passing secrets via `--key-file`/environment variables
+  instead of a dedicated fd — rejected: a key-file path means a plaintext
+  secret briefly exists on disk; environment variables are visible to
+  any process that can read `/proc/<pid>/environ` on the same system,
+  a real local-attacker surface a fd (only inherited by the exact
+  processes it's explicitly passed to) doesn't have. A silent,
+  programmatic answer to `confirm_destructive()`'s typed-disk-path
+  prompt (the GUI writing `$DISK` back to itself) — considered when a
+  real hardware boot found the prompt unanswerable and the machine
+  hung; rejected by the user in favor of keeping it a genuine
+  confirmation, since a value compared to itself provides no real
+  protection against confirming the wrong disk.
+- **Reasoning:** the user explicitly asked for something comparable to
+  Windows Setup / macOS Setup Assistant, not a prettier terminal prompt.
+  Researched a real, right-sized precedent (Crystal Linux's
+  `jade`/`jade_gui` — a hand-written Rust backend + GTK4/libadwaita
+  Python frontend, ~160 KB total, forked and reused as-is by blendOS)
+  rather than picking the option that merely looked most impressive.
+  `install-base-system`'s `cryptsetup luksFormat`/`open` calls had never
+  taken a `--key-file` before this phase — they prompted interactively
+  on the TTY, *after* whichever collector's own review/confirmation
+  screen already ran, breaking the "fully unattended after confirm"
+  promise `autarchy-install`'s own header already claimed; this is a
+  real, pre-existing gap this phase closed for both frontends, not just
+  the new GUI. A real hardware boot of the first Milestone C build found
+  the destructive-confirmation gate genuinely unanswerable: with no
+  `stdin=` set on the install subprocess, it inherited the GUI's own
+  stdin, which under `cage` is a tty whose keyboard input `libinput`
+  takes over directly — the prompt blocked forever, though confirmed
+  safe (that prompt is the very first thing that touches the disk, so
+  nothing was written). The same boot also found `cage` implements no
+  keybindings at all, including no VT-switching, so this phase's
+  original assumption that `tty2`+ was always reachable as an escape
+  hatch while the GUI has the console was wrong and is corrected here,
+  not repeated.
+- **Consequences:** a future "quick access to a terminal for debugging
+  from inside the GUI" feature is a real, deferred idea (noted in
+  `docs/phases/phase-15-gui-installer.md`), not yet designed — `cage`'s
+  lack of any keybindings means it needs its own mechanism, not a
+  keyboard shortcut assumed to already work. `GSK_RENDERER=gl` is
+  pinned because GTK ≥4.16 defaults to a Vulkan renderer on Wayland and
+  the Alienware's Haswell/HD 4600 iGPU has documented blank-window bugs
+  on exactly this GPU generation; the live ISO deliberately carries no
+  Vulkan driver at all as a result, keeping Phase 10's "deliberately
+  thin" live package list thin. Automated desktop/Hyprland session
+  bring-up after the installed system first boots to a TTY is explicitly
+  out of scope here — that is Phase 16's job, not this one.
