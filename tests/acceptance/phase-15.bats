@@ -53,3 +53,16 @@ setup() {
   run grep -q 'dry_run=args.dry_run' "$entry"
   assert_success
 }
+
+@test "runner.py gives the install process a real stdin, not an inherited unusable one" {
+  # A real hardware boot found install-base-system's confirm_destructive()
+  # blocked forever: with no stdin= on the Popen call, the child inherited
+  # this app's own stdin, which under cage is a tty the physical keyboard
+  # never actually reaches (libinput takes it directly). Regression guard,
+  # not a full behavioral test -- the dry-run/fake-backend loop covers that.
+  local runner="$REPO_ROOT/gui/installer/runner.py"
+  run grep -q 'stdin=subprocess.PIPE' "$runner"
+  assert_success
+  run grep -q 'proc.stdin.write' "$runner"
+  assert_success
+}

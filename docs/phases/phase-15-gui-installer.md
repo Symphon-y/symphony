@@ -288,6 +288,60 @@ Red confirmed: · Green confirmed:
   not the Alienware's real Intel path): an actual ISO build and a real
   hardware boot, confirming the GUI renders (not a blank window) and a
   full install completes through it end-to-end.
+- **Milestone C, real-hardware find: the GUI never answered the
+  disk-wipe confirmation, and had no way to.** `2026.09.18-test1` booted,
+  rendered, and reached the Progress page -- but hung there permanently,
+  showing only `install-base-system`'s own `confirm_destructive()`
+  warning ("This will ERASE EVERYTHING on $DISK..."). Confirmed the
+  mechanism, not just the symptom: that function's `read -rp "Type the
+  disk path ($DISK) to continue: " reply` blocks on stdin, and `gui/
+  installer/runner.py`'s `start_install()` never set `stdin=` on its
+  `Popen(...)` call, so the child inherited the GTK app's own stdin --
+  which under `cage` is the tty1 console device, but `cage`'s DRM
+  backend takes the physical keyboard over directly via libinput, so
+  nothing typed is ever delivered through the tty's line discipline to
+  that `read`. Also confirmed, and a real correction to this milestone's
+  own design: `cage` implements no keybindings at all, including no
+  Ctrl+Alt+F&lt;n&gt; VT-switch handling, so the "tty2+ is the escape
+  hatch" plan was never actually reachable while the GUI has the
+  console -- moot once the real fix removes the need to reach it, but a
+  wrong assumption worth recording so it isn't repeated. Confirmed safe
+  throughout: `confirm_destructive()` is the very first thing that
+  touches `$DISK`, so the hang meant nothing had been partitioned,
+  formatted, or written -- fully recoverable by power-cycling.
+  Root design gap: this phase's own plan deliberately kept this stdin
+  gate as "a second, independent layer, not bypassed for the GUI," but
+  never specified how a graphical frontend with no real stdin available
+  would actually satisfy it -- and Milestone B's dry-run testing never
+  caught it because `gui/fake-backend` never called the real
+  `confirm_destructive()` at all. Fixed by keeping this a real
+  confirmation rather than a silent pass-through (user's call, asked
+  directly rather than assumed): the Review page gained its own required
+  "type the disk path to confirm" field (`gui/installer/pages/
+  review.py`), mirroring the terminal flow's own reasoning ("a reflexive
+  Enter can't confirm the wrong disk"); `runner.py` now sets
+  `stdin=subprocess.PIPE` and writes that typed value to the child's
+  stdin before it's ever needed. Reset on every visit to Review
+  (`on_shown`), not just built once, so going Back to change the disk
+  can't leave a stale confirmation for the old one silently valid.
+  Extended `gui/fake-backend` to read and echo that stdin line (mirroring
+  the existing fd 8/9 "prove it arrived" pattern, positioned before the
+  fd 8/9 block to match the real script's actual order), then
+  re-verified the whole fix in this dev VM before spending another real
+  hardware cycle: the mismatch case shows "Doesn't match -- type it
+  exactly." and blocks Install (same `validate()`/error-label pattern
+  every other page already uses), and the correct value flows through
+  to the Progress log as `==> [dry-run] stdin (disk confirmation):
+  /dev/vda`, appearing before the fd 8/9 lines, confirmed via the same
+  grim-screenshot method Milestone B established. New `tests/
+  acceptance/phase-15.bats` test is a narrow regression guard (asserts
+  `stdin=subprocess.PIPE` and `proc.stdin.write` are present in
+  `runner.py`) rather than a full behavioral test, since the dry-run/
+  fake-backend loop already covers the actual behavior. No change needed
+  on the bash side at all -- `confirm_destructive()` itself is untouched;
+  confirmed via grep that it's the only bare (fd 0) `read` anywhere in
+  either `install-base-system` or `configure-base-system` reachable from
+  the GUI's flow.
 
 ## VM → physical hardware notes
 

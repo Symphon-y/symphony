@@ -19,6 +19,7 @@ class Answers:
     username: str = ""
     user_password: str = ""
     disk: str = ""
+    disk_confirmation: str = ""
     luks_passphrase: str = ""
     git_name: str = ""
     git_email: str = ""

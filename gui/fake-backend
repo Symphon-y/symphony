@@ -13,6 +13,15 @@ if [[ -e $vars_file ]]; then
   echo "==> [dry-run] vars file contents:"
   sed 's/^/    /' "$vars_file"
 fi
+
+# Mirrors install-base-system's confirm_destructive(), which runs before
+# encryption -- proves runner.py's stdin write actually arrives, the
+# exact plumbing a real hardware boot found missing (Phase 15 Milestone
+# C: the GUI never answered this prompt, and the child inherited a tty
+# whose keyboard input cage had already taken over, so it hung forever).
+read -r disk_confirmation
+echo "==> [dry-run] stdin (disk confirmation): $disk_confirmation"
+
 if [[ -e /dev/fd/8 ]]; then
   read -r _ <&8
   echo "==> [dry-run] fd 8 (user password): received"

@@ -75,6 +75,7 @@ def start_install(
     def worker() -> None:
         proc = subprocess.Popen(
             argv,
+            stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -82,6 +83,17 @@ def start_install(
             preexec_fn=preexec,
             pass_fds=(8, 9),
         )
+        # install-base-system's confirm_destructive() still expects the
+        # disk path typed back on stdin ("a reflexive Enter can't confirm
+        # the wrong disk") -- with no stdin= here, the child would
+        # otherwise inherit this app's own stdin, which under `cage` is
+        # a tty the physical keyboard never actually reaches (libinput
+        # takes it directly), so that read blocks forever. The Review
+        # page's own typed-confirmation field is what answers it here.
+        assert proc.stdin is not None
+        proc.stdin.write(answers.disk_confirmation + "\n")
+        proc.stdin.close()
+
         assert proc.stdout is not None
         for line in proc.stdout:
             GLib.idle_add(on_line, line.rstrip("\n"))
