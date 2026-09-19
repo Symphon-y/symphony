@@ -5,7 +5,7 @@
 | **Status** | In progress |
 | **Driver** | Claude + user |
 | **Branch** | `phase/16-desktop-bring-up` |
-| **Started** | 2026-09-19 |
+| **Started** | 2026-09-18 |
 | **Completed** | |
 
 ## Goal
@@ -74,7 +74,7 @@ File: `tests/unit/configure-base-system.bats` (extended),
 | `configure-base-system` writes `~/.gitconfig.local` only when both `GIT_NAME`/`GIT_EMAIL` are non-empty, with the right content, never otherwise | The half-built GUI feature is completed correctly and stays opt-in |
 | `install/first-login` runs `enable-user-services apply` once and marks a completion marker; a second run is a no-op | The session-dependent step actually happens, exactly once |
 
-Red confirmed: 2026-09-19 · Green confirmed: 2026-09-19
+Red confirmed: 2026-09-18 · Green confirmed: 2026-09-18
 
 ## Tasks
 
@@ -92,7 +92,7 @@ Red confirmed: 2026-09-19 · Green confirmed: 2026-09-19
 
 ## Implementation log
 
-### 2026-09-19
+### 2026-09-18
 - Plan mode: three parallel research passes (this repo's own install/
   config pipeline and `rebuild.md`; D-0026's session-start history;
   Omarchy's actual post-install personalization mechanism, read live
