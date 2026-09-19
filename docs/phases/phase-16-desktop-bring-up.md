@@ -154,12 +154,15 @@ Red confirmed: 2026-09-18 · Green confirmed: 2026-09-18
   the vars file (`source`d as bash) at the space. `tests/acceptance/
   phase-14.bats`'s "excludes .git" test updated to match (`.git` is now
   deliberately included; commented as a Phase 16 change, not silently
-  dropped). Also caught by `scripts/check`'s own `identifiers` step:
-  `alice@example.com` in two new test fixtures matched the email
-  scanner -- fixed by switching to `alice@users.noreply.github.com`,
-  already on the allowlist (`scripts/lib/identifiers.bash`), the same
-  convention `tests/unit/identifiers.bats` itself already uses for fake
-  test emails, rather than expanding the allowlist for this test.
+  dropped). Also caught by `scripts/check`'s own `identifiers` step: an
+  `example.com`-domain fake email in two new test fixtures matched the
+  email scanner -- fixed by switching to the `users.noreply.github.com`
+  domain, already on the allowlist (`scripts/lib/identifiers.bash`), the
+  same convention `tests/unit/identifiers.bats` itself already uses for
+  fake test emails, rather than expanding the allowlist for this test.
+  (This exact log entry hit the same scanner once already, by literally
+  quoting the flagged string -- fixed the same way, described without
+  quoting it.)
   `scripts/check` green throughout (149 bats tests, up from 142; 5 GUI
   unit tests, up from 4).
 
