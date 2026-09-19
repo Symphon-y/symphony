@@ -65,7 +65,10 @@ jobs:
       - name: Bake the repo into the live environment
         run: |
           mkdir -p iso/profile/airootfs/root/autarchy
-          rsync -a --exclude='.git' --exclude='iso/profile/airootfs' \
+          # .git is included (Phase 16): the installed target gets a real,
+          # permanent, git-backed checkout copied from this, not just a
+          # plain file tree -- 2.7 MB measured, no meaningful ISO-size cost.
+          rsync -a --exclude='iso/profile/airootfs' \
             ./ iso/profile/airootfs/root/autarchy/
 
       - name: Disk space before the build

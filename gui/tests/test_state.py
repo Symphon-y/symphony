@@ -33,8 +33,18 @@ class VarsFileContentTest(unittest.TestCase):
             "TZONE=America/Chicago\n"
             "LOCALE=en_US.UTF-8 UTF-8\n"
             "KEYMAP=us\n"
-            "SWAP_SIZE=16G\n",
+            "SWAP_SIZE=16G\n"
+            "GIT_NAME=''\n"
+            "GIT_EMAIL=''\n",
         )
+
+    def test_shell_quotes_a_git_name_with_a_space(self):
+        # The vars file is `source`d as bash -- an unquoted value with a
+        # space breaks it (Phase 16).
+        answers = Answers(git_name="Alice Example", git_email="alice@users.noreply.github.com")
+        content = answers.vars_file_content()
+        self.assertIn("GIT_NAME='Alice Example'\n", content)
+        self.assertIn("GIT_EMAIL=alice@users.noreply.github.com\n", content)
 
 
 if __name__ == "__main__":

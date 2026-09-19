@@ -258,11 +258,60 @@ calls() {
   assert_line "arch-chroot $TARGET passwd -l root"
 }
 
-@test "enables the base services in the target" {
+@test "enables the base services, including sddm, in the target" {
   run "$SCRIPT" "$VARS" "$TARGET"
   assert_success
   run calls
-  assert_line "systemctl --root=$TARGET enable NetworkManager.service systemd-resolved.service systemd-timesyncd.service nftables.service systemd-boot-update.service fstrim.timer paccache.timer"
+  assert_line "systemctl --root=$TARGET enable NetworkManager.service systemd-resolved.service systemd-timesyncd.service nftables.service systemd-boot-update.service fstrim.timer paccache.timer sddm.service"
+}
+
+@test "configures SDDM autologin for the new user (Phase 16)" {
+  run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  assert_equal "$(cat "$TARGET/etc/sddm.conf.d/20-autologin.conf")" \
+    "$(printf '[Autologin]\nUser=alice\nSession=hyprland-uwsm')"
+}
+
+@test "copies the baked-in repo to the new user's home as a real checkout, and chowns it (Phase 16)" {
+  run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+
+  local dest="$TARGET/home/alice/Projects/autarchy"
+  assert [ -d "$dest/.git" ]
+  assert [ -e "$dest/install/configure-base-system" ]
+  run calls
+  assert_line "arch-chroot $TARGET chown -R alice:alice /home/alice/Projects/autarchy"
+}
+
+@test "runs link-home apply as the new user against the copied repo (Phase 16)" {
+  run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  run calls
+  assert_line "arch-chroot $TARGET runuser -u alice -- bash -c cd /home/alice/Projects/autarchy && install/link-home apply"
+}
+
+@test "writes ~/.gitconfig.local when both GIT_NAME and GIT_EMAIL are provided (Phase 16)" {
+  {
+    echo 'GIT_NAME="Alice Example"'
+    echo "GIT_EMAIL=alice@users.noreply.github.com"
+  } >>"$VARS"
+  run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+
+  local gitconfig="$TARGET/home/alice/.gitconfig.local"
+  assert [ -e "$gitconfig" ]
+  run cat "$gitconfig"
+  assert_line "[user]"
+  assert_line --partial "name = Alice Example"
+  assert_line --partial "email = alice@users.noreply.github.com"
+  run calls
+  assert_line "arch-chroot $TARGET chown alice:alice /home/alice/.gitconfig.local"
+}
+
+@test "never writes ~/.gitconfig.local when git identity was skipped (Phase 16)" {
+  run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  assert [ ! -e "$TARGET/home/alice/.gitconfig.local" ]
 }
 
 @test "points resolv.conf at the systemd-resolved stub after the last chroot call" {

@@ -18,3 +18,10 @@
 -- caught because "waybar is running" failed in the live session):
 --   systemctl --user enable waybar.service
 --   systemctl --user enable cliphist.service   (runs `wl-paste --watch cliphist store`)
+
+-- Phase 16: install/configure-base-system can't enable any of the above
+-- itself -- systemctl --user needs a real session, which its install-time
+-- chroot doesn't have. install/first-login does it here instead, gated by
+-- its own marker file, so this is a genuine one-time action even though it
+-- runs on every Hyprland start.
+hl.exec_cmd("~/Projects/autarchy/install/first-login")

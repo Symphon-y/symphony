@@ -18,6 +18,15 @@
 # user account password -- same contract as install-base-system's own
 # fd 9 for the LUKS passphrase (Phase 15/D-0066). Falls back to
 # `passwd`'s own interactive prompt when fd 8 isn't open.
+#
+# Phase 16 (fully automated desktop bring-up): also gives the new user a
+# real, permanent git checkout of this repo, links their dotfiles against
+# it, enables+autologins SDDM, and writes ~/.gitconfig.local when the
+# collector gathered a git identity (GIT_NAME/GIT_EMAIL, both optional).
+# Enabling *user*-level services (notifications, idle/lock, wallpaper,
+# polkit agent, bar, clipboard) can't happen here -- systemctl --user
+# needs a live session this chroot doesn't have -- see install/first-login,
+# triggered once from the desktop's own Hyprland config instead.
 set -Eeuo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -33,6 +42,7 @@ readonly SERVICES=(
   systemd-boot-update.service
   fstrim.timer
   paccache.timer
+  sddm.service
 )
 
 trap 'printf "configure-base-system: failed at line %s: %s\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
@@ -189,6 +199,62 @@ create_user() {
   in_target passwd -l root
 }
 
+# Gives the new user a real, permanent git checkout of this repo (not a
+# plain file copy): $REPO_ROOT here is the live ISO's own baked-in copy
+# (Phase 14), which now includes .git (release-iso.yml no longer excludes
+# it -- 2.7 MB, measured). Without this, install/link-home's stow symlinks
+# would point into the live ISO's ephemeral squashfs, broken the instant
+# the real system boots without it. scripts/update already has a test for
+# exactly this shape (a detached-HEAD checkout it moves onto main), so
+# this completes something already anticipated, not a new coupling.
+copy_repo() {
+  log "Copying the repo to ~$USERNAME/Projects/autarchy"
+  local dest="$TARGET/home/$USERNAME/Projects/autarchy"
+  mkdir -p "$(dirname "$dest")"
+  cp -a "$REPO_ROOT" "$dest"
+  in_target chown -R "$USERNAME:$USERNAME" "/home/$USERNAME/Projects/autarchy"
+}
+
+# stow needs no live session, just a writable $HOME -- safe to run here,
+# unlike enable_user_services below (see install/first-login).
+link_home() {
+  log "Linking dotfiles for $USERNAME"
+  in_target runuser -u "$USERNAME" -- bash -c "cd /home/$USERNAME/Projects/autarchy && install/link-home apply"
+}
+
+# D-0026 adopted SDDM but deliberately left autologin unconfigured; Phase
+# 16 reverses that part of the choice (user confirmed) -- LUKS is already
+# the real gate at boot. hyprland-uwsm is the exact session name Hyprland's
+# own package ships (confirmed by reading
+# /usr/share/wayland-sessions/hyprland-uwsm.desktop directly, not guessed).
+configure_autologin() {
+  log "Configuring SDDM autologin for $USERNAME"
+  mkdir -p "$TARGET/etc/sddm.conf.d"
+  cat >"$TARGET/etc/sddm.conf.d/20-autologin.conf" <<EOF
+[Autologin]
+User=$USERNAME
+Session=hyprland-uwsm
+EOF
+}
+
+# Completes a real, previously half-built feature: the GUI installer's
+# Developer Identity page has collected git_name/git_email since Phase 15,
+# but nothing ever wrote them anywhere until now. Both optional (GIT_NAME/
+# GIT_EMAIL unset when skipped) -- only write the file when both are given.
+# ~/.gitconfig.local is the untracked, machine-local half of D-0048's split
+# (home/git/dot-gitconfig includes it); never a tracked file, so this never
+# touches D-0022's no-identifiers rule.
+write_git_identity() {
+  [[ -n ${GIT_NAME:-} && -n ${GIT_EMAIL:-} ]] || return 0
+  log "Writing git identity for $USERNAME"
+  cat >"$TARGET/home/$USERNAME/.gitconfig.local" <<EOF
+[user]
+	name = $GIT_NAME
+	email = $GIT_EMAIL
+EOF
+  in_target chown "$USERNAME:$USERNAME" "/home/$USERNAME/.gitconfig.local"
+}
+
 enable_services() {
   log "Enabling base services"
   systemctl --root="$TARGET" enable "${SERVICES[@]}"
@@ -212,6 +278,10 @@ main() {
   configure_identity
   configure_boot
   create_user
+  copy_repo
+  link_home
+  configure_autologin
+  write_git_identity
   enable_services
   link_resolv_conf
 

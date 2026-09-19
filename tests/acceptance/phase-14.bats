@@ -25,10 +25,12 @@ setup() {
   assert [ "$bake_line" -lt "$build_line" ]
 }
 
-@test "release workflow: excludes .git and the airootfs it's copying into (avoids self-nesting and doubling the package cache)" {
+@test "release workflow: excludes the airootfs it's copying into (avoids self-nesting and doubling the package cache)" {
+  # .git was excluded here at Phase 14; Phase 16 deliberately includes it
+  # instead, so the installed target gets a real, permanent git checkout
+  # (2.7 MB measured, no meaningful ISO-size cost) -- see
+  # install/configure-base-system's copy_repo() and D-0026/D-0067.
   local wf="$REPO_ROOT/.github/workflows/release-iso.yml"
-  run grep -q -- "--exclude='.git'" "$wf"
-  assert_success
   run grep -q -- "--exclude='iso/profile/airootfs'" "$wf"
   assert_success
 }

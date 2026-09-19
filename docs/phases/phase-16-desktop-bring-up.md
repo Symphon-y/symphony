@@ -74,17 +74,17 @@ File: `tests/unit/configure-base-system.bats` (extended),
 | `configure-base-system` writes `~/.gitconfig.local` only when both `GIT_NAME`/`GIT_EMAIL` are non-empty, with the right content, never otherwise | The half-built GUI feature is completed correctly and stays opt-in |
 | `install/first-login` runs `enable-user-services apply` once and marks a completion marker; a second run is a no-op | The session-dependent step actually happens, exactly once |
 
-Red confirmed: · Green confirmed:
+Red confirmed: 2026-09-19 · Green confirmed: 2026-09-19
 
 ## Tasks
 
-- [ ] Branch, tracking doc
-- [ ] Red: unit tests for every new/changed behavior
-- [ ] Implement: repo bake-in (`.git` included), `configure-base-system`
+- [x] Branch, tracking doc
+- [x] Red: unit tests for every new/changed behavior
+- [x] Implement: repo bake-in (`.git` included), `configure-base-system`
       changes (repo copy, link-home, sddm service+autologin,
       gitconfig.local), GUI vars-file field, `install/first-login`,
       `autostart.lua` hook
-- [ ] Green: `scripts/check`
+- [x] Green: `scripts/check`
 - [ ] Real hardware verification: full loop, install through to a
       working desktop with zero manual steps
 - [ ] Close: `DECISIONS.md`, `docs/omarchy-influences.md`,
@@ -118,10 +118,63 @@ Red confirmed: · Green confirmed:
   decisions via AskUserQuestion: SDDM autologin (yes), first-login
   mechanism (dedicated script, not a repurposed migration), and git
   identity (complete it).
+- **Implemented.** `install/configure-base-system` gained four new
+  steps between `create_user()` and `enable_services()`: `copy_repo()`
+  (`cp -a "$REPO_ROOT" "$TARGET/home/$USERNAME/Projects/autarchy"` +
+  chown -- `$REPO_ROOT` is the live ISO's own baked-in copy, now
+  including `.git` since `.github/workflows/release-iso.yml`'s rsync no
+  longer excludes it), `link_home()` (`arch-chroot ... runuser -u
+  $USERNAME -- bash -c 'cd ~/Projects/autarchy && install/link-home
+  apply'`), `configure_autologin()` (writes `/etc/sddm.conf.d/
+  20-autologin.conf` with `User=$USERNAME`/`Session=hyprland-uwsm` --
+  the exact session name confirmed by reading `/usr/share/
+  wayland-sessions/hyprland-uwsm.desktop` directly on this dev VM, not
+  guessed), and `write_git_identity()` (writes `~/.gitconfig.local`
+  only when both `GIT_NAME`/`GIT_EMAIL` are non-empty). `sddm.service`
+  added to the existing `SERVICES` array. New `install/first-login`:
+  marker-gated (`~/.local/state/autarchy/first-login-done`, matching
+  D-0051's marker-family convention), calls `install/enable-user-
+  services apply` -- its target script swappable via
+  `AUTARCHY_ENABLE_USER_SERVICES_SCRIPT`, matching this repo's
+  established `AUTARCHY_*_SCRIPT` override pattern
+  (`install-base-system`/`run-guided-install` already do the same).
+  `home/hypr/dot-config/hypr/autostart.lua` gained one line,
+  `hl.exec_cmd("~/Projects/autarchy/install/first-login")` -- verified
+  for real, not just by syntax, by running `Hyprland --verify-config`
+  against this dev VM's actual Hyprland install: it parsed clean *and*
+  actually executed `first-login`, which created a real
+  `~/.local/state/autarchy/first-login-done` marker on this dev VM
+  (harmless -- `enable-user-services apply` is a no-op on
+  already-enabled units -- and genuine, useful end-to-end proof the
+  whole chain works beyond the bats stubs). `gui/installer/state.py`'s
+  `vars_file_content()` gained `GIT_NAME=`/`GIT_EMAIL=`, shell-quoted
+  via stdlib `shlex.quote()` (not hand-rolled escaping) -- caught, via
+  my own first attempt at a test fixture, the exact real bug this
+  quoting exists to prevent: an unquoted `GIT_NAME=Alice Example` broke
+  the vars file (`source`d as bash) at the space. `tests/acceptance/
+  phase-14.bats`'s "excludes .git" test updated to match (`.git` is now
+  deliberately included; commented as a Phase 16 change, not silently
+  dropped). Also caught by `scripts/check`'s own `identifiers` step:
+  `alice@example.com` in two new test fixtures matched the email
+  scanner -- fixed by switching to `alice@users.noreply.github.com`,
+  already on the allowlist (`scripts/lib/identifiers.bash`), the same
+  convention `tests/unit/identifiers.bats` itself already uses for fake
+  test emails, rather than expanding the allowlist for this test.
+  `scripts/check` green throughout (149 bats tests, up from 142; 5 GUI
+  unit tests, up from 4).
 
 ## VM → physical hardware notes
 
--
+- Every script-level behavior is bats-verified against stubs (no real
+  disk/chroot needed), and the `autostart.lua`/`first-login` chain was
+  additionally verified for real on this dev VM's own live Hyprland
+  install (`Hyprland --verify-config` actually executed `first-login`
+  and produced a real marker file). What can't be verified here: SDDM
+  actually rendering and autologging in on real hardware, the full
+  install-to-desktop boot sequence end to end, and whether the
+  Alienware's real disk/permissions behave identically to the bats
+  stubs' assumptions. Real hardware verification is still the standard
+  this project has held to since Phase 13.
 
 ## Exit criteria
 

@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# first-login: the one piece of desktop bring-up that needs a real,
+# running user session -- enabling user-level systemd units (systemctl
+# --user needs a live D-Bus/systemd session, which install/configure-
+# base-system's arch-chroot doesn't have -- Phase 16). Triggered once
+# from home/hypr/dot-config/hypr/autostart.lua on every Hyprland start;
+# idempotent via a marker file (D-0051's migration-marker idea, applied
+# to a single one-shot task instead of many versioned ones), so it's a
+# no-op after the first successful run.
+#
+# Deliberately its own small mechanism, not a repurposed scripts/migrate
+# entry: migrations stay a manually-run, one-time-upgrade concept; this
+# is a different one (first-boot bring-up), asked and confirmed
+# directly rather than assumed.
+set -euo pipefail
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+readonly REPO_ROOT
+readonly ENABLE_USER_SERVICES="${AUTARCHY_ENABLE_USER_SERVICES_SCRIPT:-$REPO_ROOT/install/enable-user-services}"
+readonly MARKER="${AUTARCHY_FIRST_LOGIN_MARKER:-$HOME/.local/state/autarchy/first-login-done}"
+
+main() {
+  [[ -e $MARKER ]] && exit 0
+
+  "$ENABLE_USER_SERVICES" apply
+
+  mkdir -p "$(dirname "$MARKER")"
+  touch "$MARKER"
+}
+
+main "$@"

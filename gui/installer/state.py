@@ -7,6 +7,7 @@ the optional git identity. Nothing here is written to disk until the
 review page's "Install" action -- see runner.py.
 """
 
+import shlex
 from dataclasses import dataclass, field
 
 
@@ -26,9 +27,12 @@ class Answers:
     swap_size: str = ""
 
     def vars_file_content(self) -> str:
-        """The KEY=VALUE content install-base-system expects -- never
-        includes either password; those go through fd 9, not the vars
-        file (D-0066)."""
+        """The KEY=VALUE content install-base-system/configure-base-system
+        expect -- never includes either password; those go through fd 9,
+        not the vars file (D-0066). GIT_NAME/GIT_EMAIL are optional (empty
+        when skipped) and shell-quoted since, unlike every other field, a
+        real name routinely contains a space -- the vars file is `source`d
+        as bash, so an unquoted value with a space breaks (Phase 16)."""
         return (
             f"DISK={self.disk}\n"
             f"HOST={self.hostname}\n"
@@ -37,4 +41,6 @@ class Answers:
             f"LOCALE={self.locale}\n"
             f"KEYMAP={self.keymap}\n"
             f"SWAP_SIZE={self.swap_size}\n"
+            f"GIT_NAME={shlex.quote(self.git_name)}\n"
+            f"GIT_EMAIL={shlex.quote(self.git_email)}\n"
         )
