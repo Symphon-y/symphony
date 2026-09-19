@@ -48,6 +48,18 @@ flow the user originally asked for.
   `install/install-base-system`'s install logic is unchanged except for
   the passphrase-fd plumbing.
 
+**Deferred idea (user, 2026-09-18)**: quick access back to a terminal
+from inside the GUI, for debugging -- a real gap this milestone's own
+real-hardware test exposed (`cage` implements no keybindings at all,
+not even Ctrl+Alt+F&lt;n&gt; VT-switching, so once it owns the console
+there is currently no way back to a shell short of power-cycling). Not
+built now -- would need its own design pass (a keybinding cage doesn't
+support natively, a button in the GUI that execs a shell and how it
+hands control back to cage afterward, whether it's tty1-only or also
+needs to fix the tty2+ escape hatch this phase assumed but never
+verified). Worth its own small future story, not squeezed into this
+phase's close.
+
 ## Decisions
 
 **Resolved**
