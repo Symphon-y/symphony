@@ -181,6 +181,15 @@ bar_json() {
   assert_success
 }
 
+@test "menu: fuzzel does not quit on an empty dmenu list (it would close the Wi-Fi password prompt)" {
+  # networkmanager-dmenu gives fuzzel an empty stdin for the passphrase prompt. With
+  # exit-immediately-if-empty=yes fuzzel quits at once, the passphrase is empty, and a
+  # profile is saved that never connects (found on the Alienware, D-0075).
+  run grep -E '^[[:space:]]*exit-immediately-if-empty' \
+    "$REPO_ROOT/home/matugen/dot-config/matugen/templates/fuzzel.ini"
+  assert_failure
+}
+
 @test "packages: the network picker and the settings window are in the inventory" {
   run "$REPO_ROOT/scripts/pkglist" "$REPO_ROOT"/packages/*.txt
   assert_success
