@@ -15,6 +15,14 @@ same appliers `rebuild.md` already documents (`install/install-packages`,
 config-only update is exactly as recoverable as a package update already is
 via `snap-pac` (D-0011).
 
+**Known gap (Phase 16 -> 17):** this runbook and `scripts/update` are git-based --
+they need a checkout of this repo (a dev machine has one). A machine installed
+from the release ISO since Phase 16 has none by design: its OS content is a
+root-owned payload at `/usr/local/share/autarchy/current` with a `VERSION` file.
+Updating such a machine (fetch the latest release, verify, swap the payload,
+re-run the appliers below) is Phase 17's scope; until then, reinstall from a
+newer ISO.
+
 **Conventions**
 - Runs **as your user** from `~/Projects/autarchy` (or wherever the repo is
   cloned). `scripts/update apply` calls `sudo` itself for the one step that
