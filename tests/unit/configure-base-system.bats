@@ -21,7 +21,15 @@ setup() {
 make_target() {
   mkdir -p "$TARGET/etc" "$TARGET/boot" "$TARGET/efi" "$TARGET/usr/share/zoneinfo/America"
   echo "UUID=x / btrfs subvol=/@ 0 0" >"$TARGET/etc/fstab"
-  touch "$TARGET/usr/share/zoneinfo/America/Chicago"
+  touch "$TARGET/usr/share/zoneinfo/America/Chicago" "$TARGET/usr/share/zoneinfo/UTC"
+  # tzdata's zone.tab (tab-separated: country, coordinates, zone, comment -- one
+  # country per zone, and no entry for UTC) and wireless-regdb's conf file, which
+  # ships every country commented out.
+  printf 'US\t+415100-0873900\tAmerica/Chicago\tCentral (most areas)\nGB\t+513030-0000731\tEurope/London\n' \
+    >"$TARGET/usr/share/zoneinfo/zone.tab"
+  mkdir -p "$TARGET/etc/conf.d"
+  printf '%s\n' '# Uncomment your country' '#WIRELESS_REGDOM="GB"' '#WIRELESS_REGDOM="US"' \
+    >"$TARGET/etc/conf.d/wireless-regdom"
   printf '%s\n' \
     '#     en_US.UTF-8 UTF-8' \
     '#de_DE.UTF-8 UTF-8' \
@@ -156,6 +164,7 @@ calls() {
     "system/resolved/10-autarchy.conf:etc/systemd/resolved.conf.d/10-autarchy.conf" \
     "system/nftables/nftables.conf:etc/nftables.conf" \
     "system/sudo/10-wheel:etc/sudoers.d/10-wheel" \
+    "system/networkmanager/20-connectivity.conf:etc/NetworkManager/conf.d/20-connectivity.conf" \
     "system/boot/loader.conf:efi/loader/loader.conf"; do
     run cmp "$REPO_ROOT/${pair%%:*}" "$TARGET/${pair#*:}"
     assert_success
@@ -277,6 +286,114 @@ calls() {
   assert_success
   run calls
   assert_line "systemctl --root=$TARGET enable NetworkManager.service systemd-resolved.service systemd-timesyncd.service nftables.service systemd-boot-update.service fstrim.timer paccache.timer snapper-cleanup.timer sddm.service"
+}
+
+@test "masks NetworkManager-wait-online after enabling NetworkManager, so boot isn't held for a network (Phase 17)" {
+  # Enabling NetworkManager links its wait-online service into network-online.target
+  # (checked against the real package): anything ordered after the network would
+  # then wait up to ~60s at boot when there is none -- a laptop off Wi-Fi.
+  run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  run calls
+  assert_line "systemctl --root=$TARGET mask NetworkManager-wait-online.service"
+  local enable_line mask_line
+  enable_line=$(grep -n 'systemctl --root=.* enable NetworkManager.service' "$STUB_LOG" | head -1 | cut -d: -f1)
+  mask_line=$(grep -n 'mask NetworkManager-wait-online.service' "$STUB_LOG" | head -1 | cut -d: -f1)
+  assert [ "$enable_line" -lt "$mask_line" ]
+}
+
+@test "carries the live session's saved Wi-Fi connections to the target, private and byte-identical (Phase 17)" {
+  # Whatever the live session saved (the installer's Wi-Fi page, or nmtui from a
+  # shell) is a NetworkManager connection file; copying it is all the hand-off is,
+  # so this knows nothing about the format. 0600: NetworkManager ignores any
+  # connection file others can read.
+  local live="$BATS_TEST_TMPDIR/live-nm"
+  mkdir -p "$live"
+  printf '[connection]\nid=HomeNet\npsk=not-a-real-secret\n' >"$live/autarchy-wifi.nmconnection"
+  chmod 600 "$live/autarchy-wifi.nmconnection"
+  printf 'unrelated\n' >"$live/notes.txt"
+
+  AUTARCHY_LIVE_NM_DIR="$live" run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+
+  local dest="$TARGET/etc/NetworkManager/system-connections"
+  run cmp "$live/autarchy-wifi.nmconnection" "$dest/autarchy-wifi.nmconnection"
+  assert_success
+  run find "$dest/autarchy-wifi.nmconnection" -perm 0600
+  assert_output "$dest/autarchy-wifi.nmconnection"
+  run find "$dest" -maxdepth 0 -perm 0700
+  assert_output "$dest"
+  # Only connection files are carried.
+  assert [ ! -e "$dest/notes.txt" ]
+  run calls
+  assert_line "arch-chroot $TARGET chown -R root:root /etc/NetworkManager/system-connections"
+}
+
+@test "carries a private file even when the live copy is looser (Phase 17)" {
+  local live="$BATS_TEST_TMPDIR/live-nm"
+  mkdir -p "$live"
+  printf '[connection]\nid=Loose\n' >"$live/loose.nmconnection"
+  chmod 644 "$live/loose.nmconnection"
+  AUTARCHY_LIVE_NM_DIR="$live" run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  run find "$TARGET/etc/NetworkManager/system-connections/loose.nmconnection" -perm 0600
+  assert_output "$TARGET/etc/NetworkManager/system-connections/loose.nmconnection"
+}
+
+@test "carries nothing, and does not fail, when the live session saved no connection (Phase 17)" {
+  # The install is offline and Wi-Fi is optional: the common case is no profile.
+  AUTARCHY_LIVE_NM_DIR="$BATS_TEST_TMPDIR/no-such-dir" run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  # (The profiles directory isn't even created; the connectivity drop-in is what
+  # makes /etc/NetworkManager exist.)
+  assert [ -z "$(find "$TARGET/etc/NetworkManager" -name '*.nmconnection')" ]
+}
+
+@test "sets the regulatory domain from the timezone, in wireless-regdb's own file (Phase 17)" {
+  # wireless-regdb's udev rule runs set-wireless-regdom when cfg80211 loads; that
+  # script sources this file and calls `iw reg set`. The kernel command line is
+  # left alone (the cmdline tests above assert it unchanged).
+  run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  run grep -Fx 'WIRELESS_REGDOM="US"' "$TARGET/etc/conf.d/wireless-regdom"
+  assert_success
+  run grep -c '^WIRELESS_REGDOM=' "$TARGET/etc/conf.d/wireless-regdom"
+  assert_output "1"
+  # The shipped, commented list is left intact.
+  run grep -Fx '#WIRELESS_REGDOM="GB"' "$TARGET/etc/conf.d/wireless-regdom"
+  assert_success
+}
+
+@test "re-running does not duplicate the regulatory domain, and follows a changed timezone (Phase 17)" {
+  run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  run grep -c '^WIRELESS_REGDOM=' "$TARGET/etc/conf.d/wireless-regdom"
+  assert_output "1"
+
+  mkdir -p "$TARGET/usr/share/zoneinfo/Europe"
+  touch "$TARGET/usr/share/zoneinfo/Europe/London"
+  echo "TZONE=Europe/London" >>"$VARS"
+  run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  run grep '^WIRELESS_REGDOM=' "$TARGET/etc/conf.d/wireless-regdom"
+  assert_output 'WIRELESS_REGDOM="GB"'
+}
+
+@test "sets no regulatory domain for a timezone with no country, like UTC (Phase 17)" {
+  echo "TZONE=UTC" >>"$VARS"
+  run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  run grep -c '^WIRELESS_REGDOM=' "$TARGET/etc/conf.d/wireless-regdom"
+  assert_output "0"
+}
+
+@test "skips the regulatory domain quietly when wireless-regdb's file isn't there (Phase 17)" {
+  rm "$TARGET/etc/conf.d/wireless-regdom"
+  run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  assert [ ! -e "$TARGET/etc/conf.d/wireless-regdom" ]
 }
 
 @test "enables the root-scope maintenance timers from services-root.txt inside the target (Phase 16)" {

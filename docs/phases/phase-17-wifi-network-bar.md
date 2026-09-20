@@ -160,7 +160,7 @@ Red confirmed: | Green confirmed: |
 - [x] Step 1 -- live ISO to NetworkManager (red, green)
 - [x] Step 2 -- `gui/installer/wifi.py` and `gui/tests/test_wifi.py` (red, green)
 - [x] Step 3 -- `Answers`, Wi-Fi page, Review row, demo backend (red, green)
-- [ ] Step 4 -- target side: profile copy, connectivity drop-in, regdom (if spiked in), packages (red, green)
+- [x] Step 4 -- target side: profile copy, connectivity drop-in, regdom, wait-online mask, wireless-regdb (red, green)
 - [ ] Step 5 -- Waybar `network`/`battery`, `network-menu`, keybinding, matugen `error` colour (red, green)
 - [ ] Step 6 -- `phase-17.bats`, runbooks, influences entry, decisions D-0068 to D-0072, roadmap
 - [ ] Build an ISO locally (`scripts/build-iso`), boot in a VM: guided install with Skip, no regression
@@ -244,6 +244,22 @@ Red confirmed: | Green confirmed: |
   connection, so a *failed* second attempt deletes the first, yet the page went on saying
   "Connected to HomeNet" while nothing was saved. Fixed (a failure clears the recorded
   network) and the smoke test now covers it.
+- **Step 4 -- the installed system (green).** `configure-base-system` gains three small
+  steps and one line: `copy_network_profiles` (a plain copy of whatever `*.nmconnection`
+  files the live session saved, 0600 root, into the target -- it knows nothing about the
+  format, and "nothing saved", the common case, is not an error); `configure_regdom`
+  (country from the target's `zone.tab`, written to wireless-regdb's own
+  `/etc/conf.d/wireless-regdom`, replacing any earlier line so a re-run or a changed
+  timezone never leaves two; skipped if the package's file is absent; `configure_boot`
+  and the kernel command line are untouched); and `systemctl mask
+  NetworkManager-wait-online.service` *after* the enable (enabling a masked unit fails).
+  `system/networkmanager/20-connectivity.conf` is the one source for the connectivity
+  override, installed by `sync-system`, with the live ISO's copy kept byte-identical by an
+  acceptance test. `wireless-regdb` joins `packages/network.txt`. Beyond the stubs: the
+  real function bodies were run on the real package-shipped file and wireless-regdb's own
+  `set-wireless-regdom` turned the result into `iw reg set US` (and UTC wrote nothing).
+  One of my own tests was wrong, not the code (it `find`ed a directory the implementation
+  deliberately does not create when nothing is saved) and was corrected.
 - **Deviation from the plan:** Next is held with "Still connecting" while a join is in
   flight, rather than never blocked -- a result landing after the install has started
   could delete the file being copied. Skipping with nothing joined is unaffected. A

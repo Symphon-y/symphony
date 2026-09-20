@@ -32,3 +32,4 @@
 0644  reflector/reflector.conf      /etc/xdg/reflector/reflector.conf
 0644  journald/10-autarchy.conf     /etc/systemd/journald.conf.d/10-autarchy.conf
 0644  xdg/user-dirs.defaults        /etc/xdg/user-dirs.defaults
+0644  networkmanager/20-connectivity.conf  /etc/NetworkManager/conf.d/20-connectivity.conf

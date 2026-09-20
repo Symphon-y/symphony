@@ -44,6 +44,9 @@ readonly ENABLE_ROOT_SERVICES="${AUTARCHY_ENABLE_ROOT_SERVICES_SCRIPT:-$REPO_ROO
 # The live ISO's own release marker (baked in by release-iso.yml) -- absent on a
 # plain stock-ISO manual install, which is recorded as "unreleased".
 readonly LIVE_RELEASE_FILE="${AUTARCHY_LIVE_RELEASE_FILE:-/etc/autarchy-release}"
+# Where the live session's NetworkManager saves connections (Phase 17): the
+# installer's Wi-Fi page, or nmtui from a shell, leaves one file per network.
+readonly LIVE_NM_DIR="${AUTARCHY_LIVE_NM_DIR:-/etc/NetworkManager/system-connections}"
 
 # What an installed machine needs from this repo. Not tests/, iso/, gui/ or
 # docs/ (build-time or dev-time only), and never .git or the GUI's vars file
@@ -220,6 +223,61 @@ create_user() {
   in_target passwd -l root
 }
 
+# Carries whatever Wi-Fi the live session saved (the installer's Wi-Fi page, or
+# nmtui from a shell) to the new system, so the laptop is already connected on
+# first boot. The live ISO runs NetworkManager like the installed system does
+# (D-0014), so each saved network is already a connection file the new system
+# understands: this is a plain copy that knows nothing about the format (that lives
+# in gui/installer/wifi.py). Nothing saved is the common case -- the install is
+# offline and Wi-Fi is optional -- and is not an error.
+#
+# 0600 root: NetworkManager silently ignores any connection file other users can
+# read (checked against the real daemon).
+copy_network_profiles() {
+  local profiles=()
+  shopt -s nullglob
+  profiles=("$LIVE_NM_DIR"/*.nmconnection)
+  shopt -u nullglob
+  ((${#profiles[@]} > 0)) || return 0
+
+  log "Carrying ${#profiles[@]} saved Wi-Fi connection(s) to the new system"
+  local dest="$TARGET/etc/NetworkManager/system-connections" file
+  install -d -m 0700 "$dest"
+  for file in "${profiles[@]}"; do
+    install -m 0600 "$file" "$dest/"
+  done
+  in_target chown -R root:root /etc/NetworkManager/system-connections
+}
+
+# The country for the chosen timezone, from tzdata's zone.tab: tab-separated
+# country, coordinates, zone, comment -- one country per zone (zone1970.tab has
+# comma lists, so it is not used). Zones with no country, like UTC, have no entry.
+regdom_country() {
+  awk -F'\t' -v tz="$TZONE" '!/^#/ && $3 == tz { print $1; exit }' \
+    "$TARGET/usr/share/zoneinfo/zone.tab" 2>/dev/null || true
+}
+
+# Without a regulatory domain the kernel stays in the restrictive "world" domain
+# (passive-only scanning on many 5 GHz channels, so networks vanish from the
+# list). wireless-regdb ships a udev rule that runs set-wireless-regdom when
+# cfg80211 loads; that script sources /etc/conf.d/wireless-regdom and calls
+# `iw reg set` -- so the package's own file is the primitive to set, not the kernel
+# command line (checked against the real package). The file ships every country
+# commented out; any earlier uncommented line is dropped first so a re-run, or a
+# changed timezone, never leaves two. Skipped when wireless-regdb isn't there.
+configure_regdom() {
+  local conf="$TARGET/etc/conf.d/wireless-regdom" country
+  if [[ ! -e $conf ]]; then
+    log "wireless-regdb is not installed; leaving the regulatory domain unset"
+    return 0
+  fi
+  sed -i '/^WIRELESS_REGDOM=/d' "$conf"
+  country=$(regdom_country)
+  [[ -n $country ]] || return 0
+  log "Setting the wireless regulatory domain to $country"
+  echo "WIRELESS_REGDOM=\"$country\"" >>"$conf"
+}
+
 # Installs what this machine needs from the repo -- see the header for why it is
 # a plain root-owned tree at a fixed path and not a checkout. $REPO_ROOT here is
 # the live ISO's own baked-in copy (Phase 14). Without this, install/link-home's
@@ -345,6 +403,12 @@ gitconfig_escape() {
 enable_services() {
   log "Enabling base services"
   systemctl --root="$TARGET" enable "${SERVICES[@]}"
+  # Enabling NetworkManager also links its wait-online service into
+  # network-online.target (checked against the real package): anything ordered
+  # after the network would then hold boot for up to a minute on a laptop that is
+  # simply off Wi-Fi. Masked *after* the enable above -- enabling a masked unit
+  # fails.
+  systemctl --root="$TARGET" mask NetworkManager-wait-online.service
 }
 
 # Last on purpose: arch-chroot bind-mounts the host's resolv.conf over this path
@@ -363,6 +427,8 @@ main() {
 
   install_system_files
   configure_identity
+  configure_regdom
+  copy_network_profiles
   configure_boot
   create_user
   install_payload

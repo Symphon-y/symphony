@@ -1,4 +1,7 @@
 # Networking. DNS (systemd-resolved) and time sync (systemd-timesyncd) ship with systemd.
 
-networkmanager  # one network stack for wired, Wi-Fi, and VPNs, in the VM and on real hardware
+networkmanager  # one network stack for wired, Wi-Fi, and VPNs, in the VM, on real hardware, and on the live ISO
+wireless-regdb  # regulatory domain data: without it the kernel stays in the restrictive world domain (passive-only
+                # scanning on many 5 GHz channels), and networks vanish from the list. linux-firmware does not pull it in;
+                # install/configure-base-system sets the country from the timezone in its /etc/conf.d/wireless-regdom
 openssh         # sshd for on-demand admin sessions from a trusted jump host; never started at boot

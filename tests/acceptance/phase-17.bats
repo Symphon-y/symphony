@@ -82,3 +82,25 @@ setup() {
   run grep -E 'answers\.[a-z_]*(psk|pass)' "$page"
   assert_failure
 }
+
+# --- Step 4: the installed system -------------------------------------------------
+
+@test "system: the installed connectivity-check override is byte-identical to the live ISO's" {
+  # One source of truth: the ISO profile cannot symlink out of itself (it would
+  # dangle in the image), so the live copy is a copy -- this keeps them one file.
+  run cmp "$REPO_ROOT/system/networkmanager/20-connectivity.conf" \
+    "$ISO/airootfs/etc/NetworkManager/conf.d/20-connectivity.conf"
+  assert_success
+}
+
+@test "system: the connectivity override is installed root-owned at /etc/NetworkManager/conf.d" {
+  run grep -E '^0644[[:space:]]+networkmanager/20-connectivity\.conf[[:space:]]+/etc/NetworkManager/conf\.d/20-connectivity\.conf$' \
+    "$REPO_ROOT/system/files.txt"
+  assert_success
+}
+
+@test "packages: wireless-regdb is in the inventory (linux-firmware does not pull it in)" {
+  run "$REPO_ROOT/scripts/pkglist" "$REPO_ROOT"/packages/*.txt
+  assert_success
+  assert_line "wireless-regdb"
+}
