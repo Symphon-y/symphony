@@ -1,9 +1,10 @@
 # Packages baked into the live/install environment itself -- deliberately
-# thin. This is a network installer, not an offline/desktop-preloaded image
-# (Phase 10 scope): the desktop stack and everything else in packages/*.txt
-# still comes from pacstrap at install time, exactly as base-install.md
-# already does. No AUR packages here -- archiso can't build them, and this
-# project doesn't run a custom repo/mirror to work around that (D-0050).
+# thin: just what the installer needs to run. The install itself is fully
+# offline (D-0063/D-0064): the whole packages/*.txt closure is baked into a
+# local repo (iso/build-offline-repo) that pacstrap reads, and the repo itself
+# is baked in at /root/autarchy, so none of that is listed here. No AUR
+# packages here -- archiso can't build them, and this project doesn't run a
+# custom repo/mirror to work around that (D-0050).
 #
 # One bare package name per line: mkarchiso reads this file directly (not
 # through scripts/pkglist), and only understands whole-line '#' comments --
@@ -37,10 +38,13 @@ dosfstools
 arch-install-scripts
 efibootmgr
 
-# Network: wired and wireless, so the live environment can reach GitHub and
-# the pacman mirrors regardless of connection type.
-dhcpcd
-iwd
+# Network (Phase 17): NetworkManager, the same stack the installed system runs
+# (D-0014), for wired and wireless. Install needs no network at all, but a
+# Wi-Fi connection made here -- in the installer's Wi-Fi page, or with nmtui from
+# a shell -- is carried to the new system as a plain NetworkManager connection
+# file. It brings its own DHCP client and wpa_supplicant; iwd and dhcpcd are
+# deliberately absent, a second manager would fight it for the interface.
+networkmanager
 systemd-resolvconf
 
 # Repo access (replaces today's manual `pacman -Sy git github-cli` -- runbook

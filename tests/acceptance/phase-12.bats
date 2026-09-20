@@ -57,11 +57,14 @@ setup() {
   assert_success
 }
 
-@test "iso: dhcpcd, iwd, and systemd-resolved are enabled on the live medium" {
+@test "iso: NetworkManager and systemd-resolved are enabled on the live medium" {
+  # Was dhcpcd + iwd until Phase 17: the live ISO now runs the same network stack
+  # as the installed system (D-0014), so a Wi-Fi connection made in the live
+  # session can be carried to the new system as-is. See phase-17.bats.
   local wants="$REPO_ROOT/iso/profile/airootfs/etc/systemd/system/multi-user.target.wants"
   local svc
-  for svc in dhcpcd.service iwd.service systemd-resolved.service; do
-    assert [ -L "$wants/$svc" ]
+  for svc in NetworkManager.service systemd-resolved.service; do
+    assert is_symlink "$wants/$svc"
   done
 }
 

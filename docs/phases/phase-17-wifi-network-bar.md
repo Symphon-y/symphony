@@ -157,7 +157,7 @@ Red confirmed: | Green confirmed: |
 - [ ] Branch, tracking doc, roadmap row, backlog item (this commit)
 - [x] Spikes 1-3, results logged (containerised NetworkManager, packages, regdb)
 - [ ] Spikes 4-5 (need a compositor / a booted ISO) -- on the first ISO boot
-- [ ] Step 1 -- live ISO to NetworkManager (red, green)
+- [x] Step 1 -- live ISO to NetworkManager (red, green)
 - [ ] Step 2 -- `gui/installer/wifi.py` and `gui/tests/test_wifi.py` (red, green)
 - [ ] Step 3 -- `Answers`, Wi-Fi page, Review row, fake backend (red, green)
 - [ ] Step 4 -- target side: profile copy, connectivity drop-in, regdom (if spiked in), packages (red, green)

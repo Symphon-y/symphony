@@ -9,3 +9,10 @@ export BATS_LIB_PATH="${BATS_LIB_PATH:+$BATS_LIB_PATH:}/usr/lib/bats:/opt/homebr
 
 bats_load_library bats-support
 bats_load_library bats-assert
+
+# True if $1 is a symlink in the repo. Falls back to the git index (mode 120000)
+# because a Windows checkout flattens symlinks to plain files; on Linux, and in CI,
+# the -L test alone answers it.
+is_symlink() {
+  [[ -L $1 ]] || git -C "$REPO_ROOT" ls-files -s -- "$1" | grep -q '^120000'
+}

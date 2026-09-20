@@ -27,6 +27,10 @@ cat <<'EOF'
   ===================
   Run:  autarchy-install
 
+  Wi-Fi is optional (the install needs no network). To join a network first:
+        nmtui
+  A connection you save there is carried over to the installed system.
+
   (or see docs/runbooks/base-install.md in the baked-in repo at
   /root/autarchy for the manual step-by-step path)
 
