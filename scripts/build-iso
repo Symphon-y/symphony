@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# build-iso: build the release ISO on this machine instead of waiting for
+# GitHub Actions -- the same steps release-iso.yml runs (offline package repo,
+# repo bake-in, mkarchiso), inside the same kind of privileged Arch container,
+# minus the upload. For the build-boot-fix loop on real hardware, where the
+# CI round trip (20-40 minutes) is most of the cycle.
+#
+# Usage: scripts/build-iso [--ref REF] [--tag TAG] [--out DIR]
+#   --ref REF   commit to build (default: HEAD). Only committed work goes in:
+#               the ISO is built from the repo's git objects, never the working
+#               tree, so it can't pick up the host's line endings, flattened
+#               symlinks or file modes (a Windows checkout has all three).
+#   --tag TAG   release marker baked in as /etc/autarchy-release, and the ISO's
+#               name (default: local-<short sha>, so a booted build can be told
+#               apart from a published release)
+#   --out DIR   where the ISO and its .sha256 land (default: ./out)
+#
+# Needs only a container engine (docker by default; AUTARCHY_CONTAINER_ENGINE
+# overrides) and git -- it runs the same on Linux, macOS and Windows/Git Bash.
+# The repo reaches the container as a git bundle on stdin and the ISO comes back
+# through `cp`: no bind mounts, so no host path or permission translation.
+#
+# Not a release: nothing is tagged, pushed or published. The container half
+# is iso/build-in-container (see there); the real build is verified by running
+# it, not by unit tests -- tests/unit/build-iso.bats stubs the engine.
+set -euo pipefail
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+readonly REPO_ROOT
+readonly ENGINE="${AUTARCHY_CONTAINER_ENGINE:-docker}"
+readonly IMAGE=archlinux:latest
+readonly IN_CONTAINER_SCRIPT="$REPO_ROOT/iso/build-in-container"
+
+# Git Bash on Windows rewrites anything that looks like a POSIX path in a
+# native program's arguments (NAME:/out/. included). Nothing below wants that;
+# harmless elsewhere.
+export MSYS_NO_PATHCONV=1
+
+log() {
+  printf '==> %s\n' "$*"
+}
+
+die() {
+  printf 'build-iso: %s\n' "$*" >&2
+  exit 1
+}
+
+usage() {
+  echo "usage: build-iso [--ref REF] [--tag TAG] [--out DIR]" >&2
+  exit 2
+}
+
+container=""
+cleanup() {
+  [[ -n $container ]] && "$ENGINE" rm -f "$container" >/dev/null 2>&1
+  return 0
+}
+
+main() {
+  local ref=HEAD tag="" out="$REPO_ROOT/out"
+  while (($# > 0)); do
+    case $1 in
+      --ref | --tag | --out)
+        (($# >= 2)) || usage
+        case $1 in
+          --ref) ref=$2 ;;
+          --tag) tag=$2 ;;
+          --out) out=$2 ;;
+        esac
+        shift 2
+        ;;
+      *) usage ;;
+    esac
+  done
+
+  local sha short
+  sha=$(git -C "$REPO_ROOT" rev-parse --verify --quiet "$ref^{commit}") ||
+    die "no such commit or ref: $ref"
+  short=$(git -C "$REPO_ROOT" rev-parse --short "$sha")
+  [[ -n $tag ]] || tag="local-$short"
+  command -v "$ENGINE" >/dev/null ||
+    die "container engine '$ENGINE' not found (install it, or set AUTARCHY_CONTAINER_ENGINE)"
+
+  # A common surprise otherwise: edit, build, boot, and the fix isn't there.
+  if [[ -n $(git -C "$REPO_ROOT" status --porcelain --untracked-files=no) ]]; then
+    printf 'build-iso: warning: uncommitted changes are NOT in this ISO (building commit %s)\n' "$short" >&2
+  fi
+
+  out=$(mkdir -p "$out" && cd "$out" && pwd)
+
+  container="autarchy-iso-build-$$"
+  trap cleanup EXIT
+
+  log "Building $short as '$tag' in a privileged $IMAGE container"
+  "$ENGINE" create -i --privileged --name "$container" \
+    -e "AUTARCHY_SHA=$sha" -e "AUTARCHY_TAG=$tag" \
+    "$IMAGE" bash /build.sh >/dev/null
+  "$ENGINE" cp "$IN_CONTAINER_SCRIPT" "$container:/build.sh"
+
+  local started=$SECONDS
+  git -C "$REPO_ROOT" bundle create -q - --all | "$ENGINE" start -a -i "$container"
+
+  # cd + "." instead of an output path argument: no host path translation.
+  (cd "$out" && "$ENGINE" cp "$container:/out/." .)
+  local iso="$out/autarchy-$tag.iso"
+  [[ -e $iso ]] || die "the build finished but $iso was not produced"
+
+  log "Built in $(((SECONDS - started) / 60))m$(((SECONDS - started) % 60))s"
+  echo "ISO:    $iso"
+  echo "SHA256: $iso.sha256"
+}
+
+main "$@"

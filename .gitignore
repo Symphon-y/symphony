@@ -30,3 +30,6 @@ secrets/
 # Python bytecode cache (gui/, Phase 15)
 __pycache__/
 *.pyc
+
+# Local ISO builds (scripts/build-iso): multi-gigabyte, never committed
+/out/

@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# build-in-container: the container half of scripts/build-iso. Runs as root
+# inside a privileged archlinux:latest container and does what release-iso.yml's
+# steps do between checkout and upload: record the release tag, bake the repo
+# itself into the live environment (Phase 14), build the offline package repo
+# (iso/build-offline-repo, Phase 13), run mkarchiso, then name and checksum the
+# result.
+#
+# Reads the repo as a git bundle on stdin (scripts/build-iso streams it in) and
+# leaves autarchy-<tag>.iso and its .sha256 in /out. Takes AUTARCHY_SHA (the
+# commit to build) and AUTARCHY_TAG from the environment.
+#
+# Not unit-tested, for the same reason iso/build-offline-repo isn't: it is real
+# pacman, makepkg and mkarchiso against the network. Verified by running it.
+set -euo pipefail
+
+: "${AUTARCHY_SHA:?AUTARCHY_SHA is required}"
+: "${AUTARCHY_TAG:?AUTARCHY_TAG is required}"
+
+readonly WORKSPACE=/workspace
+readonly OUT_DIR=/out
+
+log() {
+  printf '==> %s\n' "$*"
+}
+
+main() {
+  # The stock Arch image has no git; CI gets it from its host runner instead.
+  log "Installing git"
+  pacman -Syu --noconfirm --needed git
+
+  log "Unpacking commit ${AUTARCHY_SHA:0:12}"
+  cat >/tmp/repo.bundle
+  git clone -q /tmp/repo.bundle "$WORKSPACE"
+  cd "$WORKSPACE"
+  git checkout -q --detach "$AUTARCHY_SHA"
+
+  # Same as release-iso.yml. The baked-in copy is tracked files only (a git
+  # archive: no .git, no build products) minus iso/profile/airootfs, the
+  # destination itself.
+  echo "$AUTARCHY_TAG" >iso/profile/airootfs/etc/autarchy-release
+  mkdir -p iso/profile/airootfs/root/autarchy
+  git archive "$AUTARCHY_SHA" -- . ':(exclude)iso/profile/airootfs' |
+    tar -x -C iso/profile/airootfs/root/autarchy
+
+  log "Building the offline package repo"
+  iso/build-offline-repo
+
+  log "Building the ISO"
+  mkarchiso -v -w /tmp/work -o "$OUT_DIR" iso/profile
+
+  cd "$OUT_DIR"
+  local built
+  built=$(ls -- *.iso)
+  mv -- "$built" "autarchy-$AUTARCHY_TAG.iso"
+  sha256sum "autarchy-$AUTARCHY_TAG.iso" >"autarchy-$AUTARCHY_TAG.iso.sha256"
+  log "Done: $(du -h "autarchy-$AUTARCHY_TAG.iso" | cut -f1) autarchy-$AUTARCHY_TAG.iso"
+}
+
+main "$@"
