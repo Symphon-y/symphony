@@ -43,11 +43,19 @@ check() {
   echo "enabled and active: $(units | wc -l) units"
 }
 
+# Keeps going past a failing unit instead of letting set -e abort the loop --
+# otherwise one unit that fails to start (say, waybar before the compositor is
+# fully up) silently leaves every later unit never enabled. Fails at the end.
 apply() {
-  local unit
+  local unit failed=()
   while IFS= read -r unit; do
-    systemctl --user enable --now "$unit"
+    systemctl --user enable --now "$unit" || failed+=("$unit")
   done < <(units)
+
+  if ((${#failed[@]} > 0)); then
+    echo "failed: ${failed[*]}" >&2
+    return 1
+  fi
   echo "enabled: $(units | tr '\n' ' ')"
 }
 

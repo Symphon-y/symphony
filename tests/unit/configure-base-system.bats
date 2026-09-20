@@ -30,6 +30,20 @@ make_target() {
   touch "$TARGET/boot/vmlinuz-linux" \
     "$TARGET/boot/initramfs-linux.img" \
     "$TARGET/boot/initramfs-linux-fallback.img"
+
+  # What useradd -m would have left (the stub doesn't run it), and the mounted
+  # @snapshots subvolume plus snapper's shipped config template that
+  # configure_snapper builds on (pacstrap installs snapper -- packages/storage.txt).
+  mkdir -p "$TARGET/home/alice" "$TARGET/.snapshots" \
+    "$TARGET/usr/share/snapper/config-templates" "$TARGET/etc/conf.d"
+  printf '%s\n' \
+    '# a template comment' \
+    'SUBVOLUME="/"' \
+    'FSTYPE="btrfs"' \
+    'NUMBER_LIMIT="50"' \
+    'NUMBER_LIMIT_IMPORTANT="10"' \
+    'TIMELINE_CREATE="yes"' >"$TARGET/usr/share/snapper/config-templates/default"
+  printf '%s\n' '# List of snapper configurations.' 'SNAPPER_CONFIGS=""' >"$TARGET/etc/conf.d/snapper"
 }
 
 make_vars() {
@@ -262,7 +276,50 @@ calls() {
   run "$SCRIPT" "$VARS" "$TARGET"
   assert_success
   run calls
-  assert_line "systemctl --root=$TARGET enable NetworkManager.service systemd-resolved.service systemd-timesyncd.service nftables.service systemd-boot-update.service fstrim.timer paccache.timer sddm.service"
+  assert_line "systemctl --root=$TARGET enable NetworkManager.service systemd-resolved.service systemd-timesyncd.service nftables.service systemd-boot-update.service fstrim.timer paccache.timer snapper-cleanup.timer sddm.service"
+}
+
+@test "enables the root-scope maintenance timers from services-root.txt inside the target (Phase 16)" {
+  # system/services-root.txt is the one home of that list (Phase 9); the
+  # installer reuses install/enable-root-services rather than restating it.
+  run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  run calls
+  assert_line "systemctl --root=$TARGET enable reflector.timer"
+  assert_line "systemctl --root=$TARGET enable btrfs-scrub@-.timer"
+  assert_line "systemctl --root=$TARGET enable pacman-filesdb-refresh.timer"
+}
+
+@test "creates snapper's root config from its shipped template, matching the runbook's settings (Phase 16)" {
+  # scripts/update takes a pre-update `snapper -c root create`, which fails on a
+  # machine with no root config -- and base-install.md's manual snapper steps
+  # never ran on an ISO install. The config is written directly (not via
+  # `snapper create-config`, which insists on creating its own /.snapshots
+  # subvolume) because @snapshots is already mounted there.
+  run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+
+  local cfg="$TARGET/etc/snapper/configs/root"
+  assert [ -e "$cfg" ]
+  run cat "$cfg"
+  assert_line 'SUBVOLUME="/"'
+  assert_line 'TIMELINE_CREATE="no"'
+  assert_line 'NUMBER_LIMIT="10"'
+  assert_line 'NUMBER_LIMIT_IMPORTANT="10"'
+  run grep -c 'NUMBER_LIMIT="50"\|TIMELINE_CREATE="yes"' "$cfg"
+  assert_output "0"
+
+  run cat "$TARGET/etc/conf.d/snapper"
+  assert_line 'SNAPPER_CONFIGS="root"'
+  run find "$TARGET/.snapshots" -maxdepth 0 -perm 0750
+  assert_output "$TARGET/.snapshots"
+}
+
+@test "fails clearly when snapper's config template is missing" {
+  rm "$TARGET/usr/share/snapper/config-templates/default"
+  run "$SCRIPT" "$VARS" "$TARGET"
+  assert_failure
+  assert_output --partial "snapper"
 }
 
 @test "configures SDDM autologin for the new user (Phase 16)" {
@@ -272,35 +329,88 @@ calls() {
     "$(printf '[Autologin]\nUser=alice\nSession=hyprland-uwsm')"
 }
 
-@test "copies the baked-in repo to the new user's home as a real checkout, and chowns it (Phase 16)" {
+@test "installs a self-contained payload at /usr/local/share/autarchy/current -- no repo checkout, no ~/Projects (Phase 16)" {
+  # The installed machine gets the OS content (what install/, scripts/, system/,
+  # home/, packages/ and migrations/ hold), root-owned, and nothing else: no
+  # .git (a machine isn't a dev checkout), no iso/ or tests/ (build-time
+  # only), and never the GUI's vars file. The path must stay physically
+  # stable across updates: stow records symlinks by resolved path and
+  # refuses to restow over links into a different directory.
   run "$SCRIPT" "$VARS" "$TARGET"
   assert_success
 
-  local dest="$TARGET/home/alice/Projects/autarchy"
-  assert [ -d "$dest/.git" ]
-  assert [ -e "$dest/install/configure-base-system" ]
+  local payload="$TARGET/usr/local/share/autarchy/current"
+  assert [ -e "$payload/install/configure-base-system" ]
+  assert [ -e "$payload/install/link-home" ]
+  assert [ -e "$payload/scripts/update" ]
+  assert [ -e "$payload/system/files.txt" ]
+  assert [ -e "$payload/home/bash/dot-bashrc" ]
+  assert [ -e "$payload/packages/desktop.txt" ]
+  assert [ -d "$payload/migrations" ]
+  assert [ ! -e "$payload/.git" ]
+  assert [ ! -e "$payload/iso" ]
+  assert [ ! -e "$payload/tests" ]
+  assert [ ! -e "$payload/gui" ]
+  assert [ ! -e "$TARGET/home/alice/Projects" ]
   run calls
-  assert_line "arch-chroot $TARGET chown -R alice:alice /home/alice/Projects/autarchy"
+  assert_line "arch-chroot $TARGET chown -R root:root /usr/local/share/autarchy"
 }
 
-@test "runs link-home apply as the new user against the copied repo (Phase 16)" {
+@test "records the installed release in the payload's VERSION file (Phase 16)" {
+  echo "2026.09.20" >"$BATS_TEST_TMPDIR/live-release"
+  AUTARCHY_LIVE_RELEASE_FILE="$BATS_TEST_TMPDIR/live-release" run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  assert_equal "$(cat "$TARGET/usr/local/share/autarchy/current/VERSION")" "2026.09.20"
+}
+
+@test "VERSION is 'unreleased' when the live environment has no release marker" {
+  AUTARCHY_LIVE_RELEASE_FILE="$BATS_TEST_TMPDIR/does-not-exist" run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  assert_equal "$(cat "$TARGET/usr/local/share/autarchy/current/VERSION")" "unreleased"
+}
+
+@test "re-running replaces the payload instead of nesting a second copy inside it" {
+  run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  touch "$TARGET/usr/local/share/autarchy/current/stale-file"
+  run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  assert [ ! -e "$TARGET/usr/local/share/autarchy/current/stale-file" ]
+  assert [ ! -e "$TARGET/usr/local/share/autarchy/current/current" ]
+}
+
+@test "runs link-home apply as the new user from the installed payload (Phase 16)" {
   run "$SCRIPT" "$VARS" "$TARGET"
   assert_success
   run calls
-  assert_line "arch-chroot $TARGET runuser -u alice -- bash -c cd /home/alice/Projects/autarchy && install/link-home apply"
+  assert_line "arch-chroot $TARGET runuser -u alice -- bash -c cd /usr/local/share/autarchy/current && install/link-home apply"
 }
 
-@test "clears skel-provided dotfiles before link-home apply, so stow doesn't abort on them" {
+@test "creates the user's XDG directories, English-named and without Projects, before linking dotfiles (Phase 16)" {
+  # xdg-user-dirs 0.20 creates ~/Projects by default; system/xdg/user-dirs.defaults
+  # (installed by sync-system) is what keeps it -- and Desktop/Templates/Public --
+  # out. LC_ALL=C keeps the names English regardless of the chosen locale, which
+  # is what the screenshot/screen-record scripts' $HOME/Pictures fallback assumes.
+  run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  run calls
+  assert_line "arch-chroot $TARGET runuser -u alice -- env HOME=/home/alice LC_ALL=C xdg-user-dirs-update"
+
+  local xdg_line link_line
+  xdg_line=$(grep -n 'xdg-user-dirs-update' "$STUB_LOG" | head -1 | cut -d: -f1)
+  link_line=$(grep -n 'install/link-home apply' "$STUB_LOG" | head -1 | cut -d: -f1)
+  assert [ "$xdg_line" -lt "$link_line" ]
+}
+
+@test "removes only the skel .bashrc before link-home apply, so stow doesn't abort on it (Phase 16)" {
   # useradd -m populates a fresh account from /etc/skel, which ships
-  # .bash_logout/.bash_profile/.bashrc. home/bash/dot-bashrc stows over
-  # exactly .bashrc, and GNU stow aborts its entire combined call (every
-  # package, not just bash) on a single conflict like this -- reproduced
-  # live against this repo's own stow packages, exit 1. Since
-  # configure-base-system runs under set -Eeuo pipefail, that would have
-  # killed the whole script before it ever reached enable_services()
-  # (sddm.service), matching a real hardware install that booted fine
-  # but never got a graphical session.
-  mkdir -p "$TARGET/home/alice"
+  # .bash_logout/.bash_profile/.bashrc. Only .bashrc collides with a stow
+  # package (home/bash/dot-bashrc), and GNU stow aborts its entire combined
+  # call (every package, not just bash) on a single conflict -- which, under
+  # set -Eeuo pipefail, killed the whole script before it reached
+  # enable_services() (a real hardware install that booted to a bare TTY).
+  # .bash_profile is what makes login shells (SSH, TTY) source .bashrc at
+  # all; nothing in home/ replaces it, so it must survive.
   touch "$TARGET/home/alice/.bash_logout" \
     "$TARGET/home/alice/.bash_profile" \
     "$TARGET/home/alice/.bashrc"
@@ -308,11 +418,9 @@ calls() {
   run "$SCRIPT" "$VARS" "$TARGET"
   assert_success
 
-  assert [ ! -e "$TARGET/home/alice/.bash_logout" ]
-  assert [ ! -e "$TARGET/home/alice/.bash_profile" ]
   assert [ ! -e "$TARGET/home/alice/.bashrc" ]
-  run calls
-  assert_line "arch-chroot $TARGET runuser -u alice -- bash -c cd /home/alice/Projects/autarchy && install/link-home apply"
+  assert [ -e "$TARGET/home/alice/.bash_profile" ]
+  assert [ -e "$TARGET/home/alice/.bash_logout" ]
 }
 
 @test "writes ~/.gitconfig.local when both GIT_NAME and GIT_EMAIL are provided (Phase 16)" {
@@ -327,10 +435,23 @@ calls() {
   assert [ -e "$gitconfig" ]
   run cat "$gitconfig"
   assert_line "[user]"
-  assert_line --partial "name = Alice Example"
-  assert_line --partial "email = alice@users.noreply.github.com"
+  assert_line --partial 'name = "Alice Example"'
+  assert_line --partial 'email = "alice@users.noreply.github.com"'
   run calls
   assert_line "arch-chroot $TARGET chown alice:alice /home/alice/.gitconfig.local"
+}
+
+@test "escapes quotes and backslashes in the git identity, so the file stays valid gitconfig (Phase 16)" {
+  # Values are double-quoted with \" and \\ escapes: an unquoted or unescaped
+  # name containing " or \ (or starting a # / ; comment) would corrupt the file.
+  {
+    echo "GIT_NAME='Al \"Ace\" O\\Brien; #1'"
+    echo "GIT_EMAIL=alice@users.noreply.github.com"
+  } >>"$VARS"
+  run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  run cat "$TARGET/home/alice/.gitconfig.local"
+  assert_line --partial 'name = "Al \"Ace\" O\\Brien; #1"'
 }
 
 @test "never writes ~/.gitconfig.local when git identity was skipped (Phase 16)" {

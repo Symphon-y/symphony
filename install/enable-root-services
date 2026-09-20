@@ -3,10 +3,14 @@
 # system/services-root.txt. Mirrors install/enable-user-services (Phase 8) at
 # root scope -- needs root, so the user runs `apply`, never Claude.
 #
-# Usage: install/enable-root-services check|apply
+# Usage: install/enable-root-services check|apply [--root DIR]
 #   check  report any declared unit that isn't both enabled and active; exit 1
 #   apply  enable --now every declared unit (safe to re-run: systemctl's own
 #          enable --now is already a no-op on an already-enabled+running unit)
+#   apply --root DIR
+#          enable (never start) every declared unit inside the not-yet-booted
+#          system mounted at DIR -- what install/configure-base-system uses, so
+#          system/services-root.txt stays the one place this list lives
 set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -14,7 +18,7 @@ readonly REPO_ROOT
 readonly UNITS_FILE="$REPO_ROOT/system/services-root.txt"
 
 usage() {
-  echo "usage: enable-root-services check|apply" >&2
+  echo "usage: enable-root-services check|apply [--root DIR]" >&2
   exit 2
 }
 
@@ -45,16 +49,27 @@ check() {
 }
 
 apply() {
-  local unit
+  local root="" unit
+  if [[ ${1:-} == --root ]]; then
+    root=${2:-}
+    [[ -n $root ]] || usage
+  fi
+
   while IFS= read -r unit; do
-    systemctl enable --now "$unit"
+    if [[ -n $root ]]; then
+      # No running systemd inside a chroot-less target root: enable only.
+      systemctl --root="$root" enable "$unit"
+    else
+      systemctl enable --now "$unit"
+    fi
   done < <(units)
   echo "enabled: $(units | tr '\n' ' ')"
 }
 
 main() {
   case ${1:-} in
-    check | apply) "$1" ;;
+    check) check ;;
+    apply) shift && apply "$@" ;;
     *) usage ;;
   esac
 }

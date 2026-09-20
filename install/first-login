@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
 # first-login: the one piece of desktop bring-up that needs a real,
-# running user session -- enabling user-level systemd units (systemctl
-# --user needs a live D-Bus/systemd session, which install/configure-
-# base-system's arch-chroot doesn't have -- Phase 16). Triggered once
-# from home/hypr/dot-config/hypr/autostart.lua on every Hyprland start;
-# idempotent via a marker file (D-0051's migration-marker idea, applied
-# to a single one-shot task instead of many versioned ones), so it's a
-# no-op after the first successful run.
+# running user session -- rendering the theme and enabling user-level systemd
+# units (systemctl --user needs a live D-Bus/systemd session, which
+# install/configure-base-system's arch-chroot doesn't have -- Phase 16).
+# Triggered once from home/hypr/dot-config/hypr/autostart.lua on every
+# Hyprland start; idempotent via a marker file (D-0051's migration-marker
+# idea, applied to a single one-shot task instead of many versioned ones),
+# so it's a no-op after the first successful run.
+#
+# In order, and the order matters:
+#   1. render the palette from the current wallpaper (matugen). Nothing else
+#      does on a fresh install, and waybar's style.css imports the generated
+#      colors.css -- it has to exist before the bar (and mako, hyprlock, ...)
+#      start in step 2.
+#   2. enable+start the user services.
+#   3. verify they actually came up. The marker is only written after this
+#      passes, so a login where something failed just retries on the next one.
 #
 # Deliberately its own small mechanism, not a repurposed scripts/migrate
 # entry: migrations stay a manually-run, one-time-upgrade concept; this
@@ -17,12 +26,38 @@ set -euo pipefail
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO_ROOT
 readonly ENABLE_USER_SERVICES="${AUTARCHY_ENABLE_USER_SERVICES_SCRIPT:-$REPO_ROOT/install/enable-user-services}"
+readonly MATUGEN="${AUTARCHY_MATUGEN:-matugen}"
 readonly MARKER="${AUTARCHY_FIRST_LOGIN_MARKER:-$HOME/.local/state/autarchy/first-login-done}"
+readonly VERIFY_ATTEMPTS=5
+readonly VERIFY_DELAY="${AUTARCHY_FIRST_LOGIN_VERIFY_DELAY:-2}"
+
+# --source-color-index 0 skips matugen's interactive source-color prompt, the
+# same flag (and reason) as home/hyprpaper/dot-local/bin/wallpaper-set. Rendered
+# straight from current.png rather than through wallpaper-set: that also pushes
+# the image to hyprpaper over IPC, which may not be listening yet this early.
+render_theme() {
+  "$MATUGEN" --config "$HOME/.config/matugen/config.toml" \
+    image "$HOME/.local/share/backgrounds/current.png" --source-color-index 0
+}
+
+# enable --now returns as soon as systemd has queued each start, so a check
+# immediately afterwards can catch a unit still settling -- retry briefly before
+# giving up (and, by not writing the marker, retrying on the next login).
+verify_services() {
+  local attempt
+  for ((attempt = 1; attempt <= VERIFY_ATTEMPTS; attempt++)); do
+    "$ENABLE_USER_SERVICES" check && return 0
+    ((attempt < VERIFY_ATTEMPTS)) && sleep "$VERIFY_DELAY"
+  done
+  return 1
+}
 
 main() {
   [[ -e $MARKER ]] && exit 0
 
+  render_theme
   "$ENABLE_USER_SERVICES" apply
+  verify_services
 
   mkdir -p "$(dirname "$MARKER")"
   touch "$MARKER"

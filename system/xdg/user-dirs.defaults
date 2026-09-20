@@ -1,0 +1,16 @@
+# Target: /etc/xdg/user-dirs.defaults (installed by install/sync-system)
+#
+# Which per-user directories xdg-user-dirs-update creates on a fresh account
+# (install/configure-base-system runs it once at install time; the package's own
+# login-time user unit keeps them in place afterwards).
+#
+# Deliberately not the package's stock list: xdg-user-dirs 0.20 also creates
+# ~/Projects (plus the legacy Desktop, Templates and Public folders), none of which
+# this workstation wants by default. A key left out here is never created and
+# gets no entry in ~/.config/user-dirs.dirs -- and only the first user-dirs.defaults
+# found is read (no merging), so this file has to list every directory we do want.
+DOWNLOAD=Downloads
+DOCUMENTS=Documents
+MUSIC=Music
+PICTURES=Pictures
+VIDEOS=Videos

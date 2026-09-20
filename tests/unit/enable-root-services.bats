@@ -61,3 +61,21 @@ make_stubs() {
   assert_line "systemctl enable --now pacman-filesdb-refresh.timer"
   refute_output --partial "--user"
 }
+
+@test "apply --root DIR enables every declared unit inside that root, without --now (Phase 16)" {
+  # Install-time use: configure-base-system runs this against the not-yet-booted
+  # target, where there is no running systemd to start anything on -- enable only.
+  run "$SCRIPT" apply --root /mnt
+  assert_success
+  run cat "$STUB_LOG"
+  assert_line "systemctl --root=/mnt enable reflector.timer"
+  assert_line "systemctl --root=/mnt enable btrfs-scrub@-.timer"
+  assert_line "systemctl --root=/mnt enable pacman-filesdb-refresh.timer"
+  refute_output --partial "--now"
+}
+
+@test "apply --root without a directory is a usage error" {
+  run "$SCRIPT" apply --root
+  assert_failure 2
+  assert_output --partial "usage"
+}

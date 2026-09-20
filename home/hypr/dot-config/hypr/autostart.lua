@@ -21,7 +21,11 @@
 
 -- Phase 16: install/configure-base-system can't enable any of the above
 -- itself -- systemctl --user needs a real session, which its install-time
--- chroot doesn't have. install/first-login does it here instead, gated by
--- its own marker file, so this is a genuine one-time action even though it
--- runs on every Hyprland start.
-hl.exec_cmd("~/Projects/autarchy/install/first-login")
+-- chroot doesn't have. install/first-login does it here instead (and renders
+-- the theme first), gated by its own marker file, so this is a genuine
+-- one-time action even though it runs on every Hyprland start.
+--
+-- The path is where install_payload puts the OS content on an installed
+-- machine. The -x guard makes this a silent no-op anywhere that layout
+-- doesn't exist (a dev checkout, whose services are already enabled).
+hl.exec_cmd("[ -x /usr/local/share/autarchy/current/install/first-login ] && /usr/local/share/autarchy/current/install/first-login")

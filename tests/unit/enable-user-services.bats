@@ -23,6 +23,9 @@ make_stubs() {
     if [[ "$1 $2" == "--user is-active" ]]; then
       [[ " ${STUB_NOT_ACTIVE:-} " == *" $unit "* ]] && exit 1 || exit 0
     fi
+    if [[ "$1 $2" == "--user enable" ]]; then
+      [[ " ${STUB_FAIL_ENABLE:-} " == *" $unit "* ]] && exit 1
+    fi
     exit 0
   ' >"$bin/systemctl"
   chmod +x "$bin/systemctl"
@@ -58,5 +61,15 @@ make_stubs() {
   assert_success
   run cat "$STUB_LOG"
   assert_line "systemctl --user enable --now mako.service"
+  assert_line "systemctl --user enable --now cliphist.service"
+}
+
+@test "apply keeps enabling the remaining units when one fails, then exits non-zero (Phase 16)" {
+  # Under set -e the first failing unit used to abort the loop, silently
+  # leaving every later unit (waybar, cliphist, ...) never enabled.
+  STUB_FAIL_ENABLE="mako.service" run "$SCRIPT" apply
+  assert_failure
+  assert_output --partial "failed: mako.service"
+  run cat "$STUB_LOG"
   assert_line "systemctl --user enable --now cliphist.service"
 }

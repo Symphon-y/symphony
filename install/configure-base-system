@@ -19,18 +19,38 @@
 # fd 9 for the LUKS passphrase (Phase 15/D-0066). Falls back to
 # `passwd`'s own interactive prompt when fd 8 isn't open.
 #
-# Phase 16 (fully automated desktop bring-up): also gives the new user a
-# real, permanent git checkout of this repo, links their dotfiles against
-# it, enables+autologins SDDM, and writes ~/.gitconfig.local when the
-# collector gathered a git identity (GIT_NAME/GIT_EMAIL, both optional).
-# Enabling *user*-level services (notifications, idle/lock, wallpaper,
-# polkit agent, bar, clipboard) can't happen here -- systemctl --user
-# needs a live session this chroot doesn't have -- see install/first-login,
-# triggered once from the desktop's own Hyprland config instead.
+# Phase 16 (fully automated desktop bring-up): also installs the OS payload
+# (below), creates the user's XDG directories, links their dotfiles against
+# the payload, creates snapper's root config, enables+autologins SDDM, and
+# writes ~/.gitconfig.local when the collector gathered a git identity
+# (GIT_NAME/GIT_EMAIL, both optional). Enabling *user*-level services
+# (notifications, idle/lock, wallpaper, polkit agent, bar, clipboard) can't
+# happen here -- systemctl --user needs a live session this chroot doesn't
+# have -- see install/first-login, triggered once from the desktop's own
+# Hyprland config instead.
+#
+# The installed machine gets no git checkout of this repo (a machine isn't a
+# dev clone -- Windows has no "windows-os" repo either): install_payload puts
+# just the OS content, root-owned, at a fixed path. Fixed, and a real
+# directory rather than a symlink to a versioned one, on purpose: GNU stow
+# records each symlink by the *resolved* path of its stow dir and refuses to
+# restow over links into a different one (confirmed by trying it), so the
+# path has to stay physically the same across future updates.
 set -Eeuo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO_ROOT
+readonly ENABLE_ROOT_SERVICES="${AUTARCHY_ENABLE_ROOT_SERVICES_SCRIPT:-$REPO_ROOT/install/enable-root-services}"
+# The live ISO's own release marker (baked in by release-iso.yml) -- absent on a
+# plain stock-ISO manual install, which is recorded as "unreleased".
+readonly LIVE_RELEASE_FILE="${AUTARCHY_LIVE_RELEASE_FILE:-/etc/autarchy-release}"
+
+# What an installed machine needs from this repo. Not tests/, iso/, gui/ or
+# docs/ (build-time or dev-time only), and never .git or the GUI's vars file
+# that sits at the repo root: an allow-list means nothing else can leak in.
+readonly PAYLOAD_ROOT=/usr/local/share/autarchy
+readonly PAYLOAD_DIR=$PAYLOAD_ROOT/current
+readonly PAYLOAD_CONTENT=(home install migrations packages scripts system)
 
 readonly REQUIRED_VARS=(HOST USERNAME TZONE LOCALE KEYMAP)
 
@@ -42,6 +62,7 @@ readonly SERVICES=(
   systemd-boot-update.service
   fstrim.timer
   paccache.timer
+  snapper-cleanup.timer
   sddm.service
 )
 
@@ -199,44 +220,86 @@ create_user() {
   in_target passwd -l root
 }
 
-# Gives the new user a real, permanent git checkout of this repo (not a
-# plain file copy): $REPO_ROOT here is the live ISO's own baked-in copy
-# (Phase 14), which now includes .git (release-iso.yml no longer excludes
-# it -- 2.7 MB, measured). Without this, install/link-home's stow symlinks
-# would point into the live ISO's ephemeral squashfs, broken the instant
-# the real system boots without it. scripts/update already has a test for
-# exactly this shape (a detached-HEAD checkout it moves onto main), so
-# this completes something already anticipated, not a new coupling.
-copy_repo() {
-  log "Copying the repo to ~$USERNAME/Projects/autarchy"
-  local dest="$TARGET/home/$USERNAME/Projects/autarchy"
-  mkdir -p "$(dirname "$dest")"
-  cp -a "$REPO_ROOT" "$dest"
-  in_target chown -R "$USERNAME:$USERNAME" "/home/$USERNAME/Projects/autarchy"
+# Installs what this machine needs from the repo -- see the header for why it is
+# a plain root-owned tree at a fixed path and not a checkout. $REPO_ROOT here is
+# the live ISO's own baked-in copy (Phase 14). Without this, install/link-home's
+# stow symlinks would point into the live ISO's ephemeral squashfs, broken the
+# instant the real system boots. Re-running replaces the whole tree, so it can
+# never nest a second copy or keep files a newer payload dropped.
+install_payload() {
+  log "Installing the autarchy payload at $PAYLOAD_DIR"
+  local dest="$TARGET$PAYLOAD_DIR" release=unreleased content
+  if [[ -r $LIVE_RELEASE_FILE ]]; then
+    release=$(<"$LIVE_RELEASE_FILE")
+    [[ -n $release ]] || release=unreleased
+  fi
+
+  rm -rf "$dest"
+  mkdir -p "$dest"
+  for content in "${PAYLOAD_CONTENT[@]}"; do
+    cp -a "$REPO_ROOT/$content" "$dest/"
+  done
+  echo "$release" >"$dest/VERSION"
+  in_target chown -R root:root "$PAYLOAD_ROOT"
+}
+
+# Which directories get created is system/xdg/user-dirs.defaults (installed by
+# sync-system, so already in place here); this only runs xdg-user-dirs-update
+# once, as the new user, so they exist before first login. HOME is set
+# explicitly because runuser -u doesn't necessarily change it inside a chroot.
+# LC_ALL=C keeps the names English whatever locale was chosen: the screenshot and
+# screen-record scripts fall back to $HOME/Pictures and $HOME/Videos.
+create_xdg_dirs() {
+  log "Creating $USERNAME's XDG directories"
+  in_target runuser -u "$USERNAME" -- env HOME="/home/$USERNAME" LC_ALL=C xdg-user-dirs-update
 }
 
 # stow needs no live session, just a writable $HOME -- safe to run here,
 # unlike enable_user_services below (see install/first-login).
 #
 # useradd -m (create_user, above) populates the new home from /etc/skel,
-# which ships .bash_logout/.bash_profile/.bashrc -- home/bash/dot-bashrc
-# stows over exactly .bashrc, and GNU stow aborts its entire combined
-# call (every package, not just bash) on a single conflict like that
-# (reproduced live: a real hardware install got this far, crashed here
-# under set -Eeuo pipefail, and never reached enable_services() below --
-# the disk/boot loader/user account were already done, so it still
-# booted, just straight to a bare TTY, no SDDM). Removing the skel files
-# first is safe only here: the account was created one step ago and is
-# certain to hold nothing but stock skel content. install/link-home
-# itself stays untouched -- it's also run by hand against already-
-# customized machines (rebuild.md), where this same removal would be
-# destructive.
+# which ships .bash_logout/.bash_profile/.bashrc -- and home/bash/dot-bashrc
+# stows over exactly .bashrc. GNU stow aborts its entire combined call (every
+# package, not just bash) on a single conflict like that (reproduced live: a
+# real hardware install got this far, crashed here under set -Eeuo pipefail,
+# and never reached enable_services() below -- the disk/boot loader/user
+# account were already done, so it still booted, just straight to a bare TTY,
+# no SDDM). Only .bashrc is removed: .bash_profile is what makes login shells
+# (SSH, a TTY) source .bashrc at all, and nothing in home/ replaces it. Safe to
+# remove here only: the account was created one step ago and is certain to hold
+# nothing but stock skel content. install/link-home itself stays untouched --
+# it's also run by hand against already-customized machines (rebuild.md), where
+# this same removal would be destructive.
 link_home() {
   log "Linking dotfiles for $USERNAME"
-  rm -f "$TARGET/home/$USERNAME"/.bash_logout \
-    "$TARGET/home/$USERNAME"/.bash_profile \
-    "$TARGET/home/$USERNAME"/.bashrc
-  in_target runuser -u "$USERNAME" -- bash -c "cd /home/$USERNAME/Projects/autarchy && install/link-home apply"
+  rm -f "$TARGET/home/$USERNAME/.bashrc"
+  in_target runuser -u "$USERNAME" -- bash -c "cd $PAYLOAD_DIR && install/link-home apply"
+}
+
+# scripts/update takes a pre-update `snapper create`, which fails on a machine
+# with no root config -- and base-install.md's manual snapper steps never ran on
+# an ISO install. Written directly from snapper's own shipped template (with the
+# same settings that runbook applies) instead of `snapper create-config`, which
+# insists on creating its own /.snapshots subvolume: @snapshots is already
+# mounted there (system/storage/subvolumes.txt), by design kept out of
+# snapshots of /.
+configure_snapper() {
+  log "Creating snapper's root config"
+  local template="$TARGET/usr/share/snapper/config-templates/default"
+  [[ -r $template ]] || die "snapper's config template is missing ($template) -- is snapper installed in the target?"
+
+  mkdir -p "$TARGET/etc/snapper/configs"
+  sed -E 's/^(TIMELINE_CREATE)=.*/\1="no"/; s/^(NUMBER_LIMIT)=.*/\1="10"/; s/^(NUMBER_LIMIT_IMPORTANT)=.*/\1="10"/' \
+    "$template" >"$TARGET/etc/snapper/configs/root"
+  sed -i 's/^SNAPPER_CONFIGS=.*/SNAPPER_CONFIGS="root"/' "$TARGET/etc/conf.d/snapper"
+  chmod 750 "$TARGET/.snapshots"
+}
+
+# system/services-root.txt is the one home of this list (Phase 9); enabling only,
+# there's no running systemd inside the target to start anything on.
+enable_root_services() {
+  log "Enabling root-scope maintenance timers"
+  "$ENABLE_ROOT_SERVICES" apply --root "$TARGET"
 }
 
 # D-0026 adopted SDDM but deliberately left autologin unconfigured; Phase
@@ -266,10 +329,17 @@ write_git_identity() {
   log "Writing git identity for $USERNAME"
   cat >"$TARGET/home/$USERNAME/.gitconfig.local" <<EOF
 [user]
-	name = $GIT_NAME
-	email = $GIT_EMAIL
+	name = "$(gitconfig_escape "$GIT_NAME")"
+	email = "$(gitconfig_escape "$GIT_EMAIL")"
 EOF
   in_target chown "$USERNAME:$USERNAME" "/home/$USERNAME/.gitconfig.local"
+}
+
+# A gitconfig value inside double quotes needs only \ and " escaped; quoting
+# also stops a # or ; in a name from starting a comment.
+gitconfig_escape() {
+  local value=${1//\\/\\\\}
+  printf '%s' "${value//\"/\\\"}"
 }
 
 enable_services() {
@@ -295,10 +365,13 @@ main() {
   configure_identity
   configure_boot
   create_user
-  copy_repo
+  install_payload
+  create_xdg_dirs
   link_home
   configure_autologin
   write_git_identity
+  configure_snapper
+  enable_root_services
   enable_services
   link_resolv_conf
 

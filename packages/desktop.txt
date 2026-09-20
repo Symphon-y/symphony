@@ -44,6 +44,7 @@ libnotify                          # notify-send, for qr-capture's success/failu
 chromium                           # default browser; also drives webapp-launch's app-mode windows
 xdg-utils                          # xdg-settings/xdg-open; was already installed transitively,
                                     # never declared until now (a real pkg-audit gap)
+xdg-user-dirs                      # creates ~/Documents, ~/Pictures, ...; which ones is system/xdg/user-dirs.defaults
 
 # Visual system (Phase 6): fonts, icons, cursor, GTK/Qt theming -- see D-0037 onward.
 ttf-jetbrains-mono-nerd            # terminal/bar/UI font, matches the fontconfig override
