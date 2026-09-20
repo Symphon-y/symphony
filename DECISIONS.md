@@ -1993,16 +1993,21 @@ and the old entry is marked `Superseded by D-XXXX`.
   with a "connecting" icon — the `network` module has no such state, so it would mean a second
   module and polling; declined by the user in favour of toasts.
 - **Reasoning:** On the Alienware the picker scanned and saved networks but never connected,
-  while `nmcli --ask device wifi connect` worked. `networkmanager_dmenu` gives fuzzel an empty
-  stdin for the passphrase prompt, and `exit-immediately-if-empty` (added in Phase 5, used by no
-  other menu; `clipboard-menu` already handles a cancelled menu) makes fuzzel quit at once, so an
-  empty password was saved. Separately, the picker exits when NetworkManager *accepts* the
-  request, so nothing reported what happened afterwards and a bad profile stayed saved. GNOME,
-  KDE, Windows and macOS all show a connecting state and an explicit failure; this supplies the
-  same from state we already have. `nm-connection-editor` (right-click) is an editor with no
-  Connect action — by design, not the bug.
+  while `nmcli --ask device wifi connect` worked. Reading the code found a defect that would
+  break the password prompt on a themed machine: `networkmanager_dmenu` gives fuzzel an empty
+  stdin for the passphrase, and `exit-immediately-if-empty` (added in Phase 5, used by no other
+  menu; `clipboard-menu` already handles a cancelled menu) makes fuzzel quit at once, so an empty
+  password would be saved. **That was not the cause on the Alienware:** checking the machine
+  showed `~/.config/fuzzel/` does not exist there (matugen never rendered `fuzzel.ini`), so
+  fuzzel ran on its defaults. The fix stays, as a real latent defect, but the reason the picker
+  fails to connect on that machine is **still open** and needs evidence from the machine
+  (`nmcli connection show`, NetworkManager's journal, the saved profile). Separately, the picker
+  exits when NetworkManager *accepts* the request, so nothing reported what happened afterwards
+  and a bad profile stayed saved. GNOME, KDE, Windows and macOS all show a connecting state and an
+  explicit failure; this supplies the same from state we already have. `nm-connection-editor`
+  (right-click) is an editor with no Connect action -- by design, not the bug.
 - **Consequences:** One more small script in `home/network`. The watcher polls `nmcli` for up to
   30 s after each pick (about one call a second). It reads device and profile state only and
   never a passphrase. It deletes a newly created profile on any failed first attempt, including
   a non-password failure such as an out-of-range access point; the user re-enters the password.
-  Whether removing the setting alone fixes the prompt is confirmed on the machine (tracking doc).
+  The cause of the failed connection on the Alienware is not yet established (see Reasoning).

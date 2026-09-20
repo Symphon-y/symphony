@@ -322,3 +322,9 @@ bar_json() {
   run grep -F 'Amended by D-0075' "$REPO_ROOT/DECISIONS.md"
   assert_success
 }
+
+@test "quirks: the Alienware 14's dell_rbtn blacklist is keyed to its DMI, not to every machine" {
+  run grep -E '^dmi:[^[:space:]]*Alienware[^[:space:]]*[[:space:]]+module_blacklist=dell_rbtn([[:space:]]|$)' \
+    "$REPO_ROOT/system/quirks.txt"
+  assert_success
+}

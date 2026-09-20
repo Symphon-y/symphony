@@ -118,3 +118,21 @@ ALIENWARE_17='dmi:bvnAlienware:bvr A11:bd01/01/2015:svnAlienware:pnAlienware 17:
   assert_success
   assert_output ""
 }
+
+# The real map, against the DMI strings read off the Alienware 14 itself
+# (sys_vendor "Alienware", product_name "Alienware 14").
+@test "the real quirks file blacklists dell_rbtn on the Alienware 14" {
+  unset AUTARCHY_QUIRKS_MAP
+  dmi "$ALIENWARE_14"
+  run "$SCRIPT"
+  assert_success
+  assert_output "module_blacklist=dell_rbtn"
+}
+
+@test "the real quirks file leaves other Alienware models alone" {
+  unset AUTARCHY_QUIRKS_MAP
+  dmi "$ALIENWARE_17"
+  run "$SCRIPT"
+  assert_success
+  assert_output ""
+}

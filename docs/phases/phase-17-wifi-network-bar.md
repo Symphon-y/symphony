@@ -392,8 +392,10 @@ Red confirmed: | Green confirmed: |
   machine; `nmcli --ask device wifi connect` worked and Chromium then browsed). Planned in plan
   mode after a repo investigation and research (fuzzel's dmenu semantics, networkmanager-dmenu's
   source and history, how GNOME/KDE/Windows/macOS show connecting, module-blacklist mechanics).
-  Likely cause, not yet reproduced: `[dmenu] exit-immediately-if-empty=yes` in the fuzzel template
-  closes networkmanager-dmenu's empty-list password prompt. User decisions (asked): fix in place
+  Leading hypothesis when planned: `[dmenu] exit-immediately-if-empty=yes` in the fuzzel template
+  closes networkmanager-dmenu's empty-list password prompt. **Refuted on the machine:** `~/.config/fuzzel/`
+  does not exist there (fuzzel 1.15.0 runs on defaults), so that setting was never active. It stays
+  fixed as a latent defect; the real cause is open. User decisions (asked): fix in place
   plus a feedback wrapper (not an own nmcli script, not nm-applet); the `dell_rbtn` blacklist for
   this model only, by DMI; toasts plus an honest tooltip, no new bar module.
 - **Built (D-0075, red first):** the fuzzel template drops the setting, with a guard test and a
@@ -406,12 +408,16 @@ Red confirmed: | Green confirmed: |
 - **Built (D-0076 mechanism, red first):** `system/quirks.txt` (DMI pattern -> kernel parameter),
   `scripts/quirkparams` (12 bats tests, fails closed, mirrors `hwpkglist`), `install-base-system`
   resolving the parameters before anything destructive, `configure-base-system` appending them to
-  `/etc/kernel/cmdline` before the UKIs are built. The map has no entry yet: it waits for the
-  laptop's DMI strings and the cold-boot result (below).
-- **Waiting on the machine:** (1) with the fuzzel line removed, does `SUPER+CTRL+N` prompt for the
-  password and connect? (2) `cat /sys/class/dmi/id/{sys_vendor,product_name,product_family,modalias}`;
-  then `module_blacklist=dell_rbtn` in `/etc/kernel/cmdline` + `mkinitcpio -P` + reboot: is
-  `dell_rbtn` gone from `lsmod` and WIFI-HW `enabled` with no manual step, on all three boot entries?
+  `/etc/kernel/cmdline` before the UKIs are built. The Alienware 14 entry is in the map; it is
+  unproven until the cold-boot test below passes.
+- **From the machine:** `sys_vendor` = `Alienware`, `product_name` = `Alienware 14`; `~/.config/{matugen,
+  networkmanager-dmenu,waybar}` exist, `~/.config/fuzzel` does not (why matugen did not render
+  `fuzzel.ini` is a second open question). The quirk entry is `dmi:*:svnAlienware:pnAlienware*14:*`.
+- **Waiting on the machine:** (1) why the picker does not connect: needs the saved profile,
+  `nmcli connection show` and NetworkManager's journal, ideally read directly (the user cannot
+  copy and paste between the two machines, which argues for running Claude on the laptop);
+  (2) the cold-boot test: `module_blacklist=dell_rbtn` in `/etc/kernel/cmdline` + `mkinitcpio -P` +
+  reboot: is `dell_rbtn` gone from `lsmod` and WIFI-HW `enabled` with no manual step, on all three boot entries?
 
 ## VM → physical hardware notes
 

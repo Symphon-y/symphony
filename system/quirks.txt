@@ -13,3 +13,11 @@
 # Why not a modprobe.d file: a blacklist there only stops alias autoloading, needs the
 # initramfs rebuilt to reach early boot, and leaves symbol-request loads. module_blacklist=
 # is enforced inside the kernel for every path (D-0076).
+
+# The Alienware 14 (sys_vendor "Alienware", product_name "Alienware 14", read off the
+# machine). Its BIOS reports an airplane-mode *slider* through the ACPI devices
+# DELLABCE/DELRBTN; dell_rbtn turns that into an rfkill that is hard-blocked and cannot be
+# cleared from software, and NetworkManager takes the worst state across Wi-Fi rfkills, so
+# Wi-Fi stays off. `modprobe -r dell_rbtn` clears it until the next boot; udev loads the
+# module again from the ACPI modalias, so it is kept out of the kernel instead.
+dmi:*:svnAlienware:pnAlienware*14:*  module_blacklist=dell_rbtn
