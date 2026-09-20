@@ -28,7 +28,9 @@ one home for each piece of knowledge, red tests first.
 - Hand-off to the installed system: whatever connection the live session saved is
   copied to the target's NetworkManager profile directory (0600, root), so the
   installed laptop autoconnects. The password is never in argv, a log, or the vars file.
-- Regulatory domain from the chosen timezone (only if the spike shows it takes effect).
+- Regulatory domain from the chosen timezone, written to `/etc/conf.d/wireless-regdom`
+  -- the `wireless-regdb` package's own mechanism (spike 3), not the kernel command line.
+- `NetworkManager-wait-online` masked (spike 1: enabling NetworkManager pulls it in).
 - NetworkManager's connectivity check disabled on the installed system and the live
   ISO (no phone-home to `ping.archlinux.org`).
 - Waybar: `network` module with signal-level icons, ethernet / disconnected /
@@ -59,43 +61,76 @@ one home for each piece of knowledge, red tests first.
 - Bar extras: **battery only** (built into Waybar, no daemon). Bluetooth deferred.
 - NetworkManager connectivity check: **disabled**, no-telemetry rule; cost is no
   automatic captive-portal detection.
-- Regulatory domain (mine, spike-gated): derive the country from `TZONE`, persist as
-  `cfg80211.ieee80211_regdom=XX` on the UKI command line -- only if the spike shows
-  it is honoured (Intel iwlwifi is often self-managed and ignores software hints).
+- Regulatory domain (mine; **revised by spike 3**): derive the country from `TZONE`
+  (`zone.tab`, one country per zone) and write `WIRELESS_REGDOM="XX"` to
+  `/etc/conf.d/wireless-regdom`. The original idea was `cfg80211.ieee80211_regdom` on
+  the UKI command line; the spike found `wireless-regdb` already ships a udev rule that
+  runs `set-wireless-regdom` (which sources that file and calls `iw reg set`) whenever
+  `cfg80211` loads, so the package's own primitive wins and `configure_boot` stays
+  untouched. `wireless-regdb` is **not** a dependency of `linux-firmware`, so it goes in
+  `packages/network.txt`. Intel cards that are self-managed may still ignore the hint --
+  checked with `iw reg get` on the Alienware.
+- `NetworkManager-wait-online.service` masked at install (**spike 1**: `systemctl enable
+  NetworkManager` links it into `network-online.target`, which holds boot for anything
+  ordered after the network).
 - Numbering (mine): this is Phase 17; the update pipeline is Phase 18.
 
 **Where each piece of knowledge lives (DRY)**
 
 | Knowledge | Single home |
 |---|---|
-| The `.nmconnection` format (escaping, `psk-flags=0`, never `permissions=`) | `keyfile_for()` in `gui/installer/wifi.py` |
+| The `.nmconnection` format (escaping, `psk-flags=0`, never `permissions=`) | `keyfile_for()` in `gui/installer/wifi.py`. Escape rules (verified against a real NetworkManager 1.58.1, spike 1): `\` -> `\\`, tab/newline/CR -> `\t` `\n` `\r`, a leading or trailing space -> `\s`; nothing else needs escaping (`;` `#` `"` `=` `[` and Unicode round-trip unchanged) |
 | Live-to-target hand-off | a generic copy of whatever the live session saved (`copy_network_profiles`); no format knowledge |
 | Connectivity-check override | `system/networkmanager/20-connectivity.conf`; the ISO's airootfs copy is byte-identical, enforced by a `cmp` test (a symlink out of the profile would dangle in the ISO) |
-| Country-from-timezone | one `regdom_arg()` helper called by `configure_boot`, which already owns `/etc/kernel/cmdline` |
+| Country-from-timezone | one `configure_regdom()` step in `configure-base-system`, writing `/etc/conf.d/wireless-regdom` (the country lookup is a small helper over `zone.tab`) |
 | Network menu entry point | `home/network/dot-local/bin/network-menu` (`network-menu` = picker, `network-menu edit` = editor); Waybar clicks and the keybinding all call it |
 | Bar palette | the matugen `waybar.css` template (gains `@define-color error`) |
 
 **Open**
-- [ ] Spike results below may change the regdom step, the wait-online handling, the
-      `networkmanager-dmenu` password prompt, and whether `wireless-regdb` needs listing.
+- [ ] Spikes 4 and 5 (need a compositor / a booted ISO) may still change the bar wiring and
+      the live-session hand-off; the `networkmanager-dmenu` password prompt under fuzzel
+      is confirmed on the first ISO boot.
 
 ## Spikes (run before any code; results recorded here)
 
-1. `systemctl --root=X enable NetworkManager` in an Arch container: does it pull in
-   `NetworkManager-wait-online`? (If so, add a `mask` step.) Load golden keyfiles with
-   awkward SSIDs/passwords (`;` `\` `#`, spaces, non-ASCII) into NetworkManager and
-   inspect them; capture real `nmcli -t` scan output as fixtures.
-2. `pacman -Si` for `networkmanager-dmenu` and `nm-connection-editor` (repo, offline
-   closure); how `networkmanager-dmenu` uses fuzzel, asks for a WPA password, and
-   handles hidden networks.
-3. Regdom: whether `wireless-regdb` already arrives with `linux-firmware`; `zone.tab`
-   layout; on the Alienware, `iw reg get` (if it says `self-managed`, drop the regdom
-   step and D-0072).
+Spikes 1-3 run 2026-09-20 in an Arch container (NetworkManager 1.58.1).
+
+1. **NetworkManager enable side effects and keyfile acceptance -- done.**
+   - `systemctl --root=X enable NetworkManager.service` creates three links: the service,
+     the dispatcher alias, **and `network-online.target.wants/NetworkManager-wait-online`**
+     -> mask it at install.
+   - A real NetworkManager daemon (containerised, keyfile plugin) loads a hand-written
+     profile only when it is `0600 root` (a `0644` file is ignored, as the docs say).
+   - Written **raw**, values were silently mangled: a backslash in an SSID turned into a
+     space (`\s` is an escape), a password with backslashes came back empty, and leading
+     spaces were trimmed. With the escape rules above all 16 round-trip cases pass,
+     unchanged: plain, `;`, `1;2;3`, `#`, backslashes (including a trailing one and one
+     followed by `s`/`t`), Unicode, leading/trailing/internal spaces, tab, quotes, `[..]`,
+     `=`, a 32-character SSID with a 63-character password. That oracle becomes the golden
+     fixtures for `keyfile_for()`. (Only UTF-8 text SSIDs are supported in v1.)
+   - Live `nmcli -t` scan output can't be produced without a radio; its fixtures follow
+     the escaping documented in the `nmcli` man page and are re-checked on hardware.
+2. **Packages -- done.** `networkmanager-dmenu` 2.6.3 and `nm-connection-editor` 1.36.0 are
+   both in `extra` (60 KiB and 4.5 MiB), so the offline builder's official-package closure
+   picks them up with no AUR step; dependencies are `python-gobject`/`libnm` and
+   `libnma`/`jansson`. `networkmanager-dmenu` reads `~/.config/networkmanager-dmenu/config.ini`;
+   `[dmenu] dmenu_command = fuzzel` is a supported launcher; it has a "launch
+   nm-connection-editor" entry; passwords go through pinentry, the launcher itself
+   (`[dmenu_passphrase]`), or nmcli. **Not confirmed from docs:** fuzzel's password-masking
+   flag and hidden-network handling -- checked on the first ISO boot; `pinentry` is not
+   added as a dependency.
+3. **Regdom -- done; changed the design.** `wireless-regdb` (in `core`, depends on `bash`
+   and `iw`) is *not* pulled in by `linux-firmware`, so it must be listed. Its udev rule
+   runs `set-wireless-regdom` on `cfg80211` load, which sources `/etc/conf.d/wireless-regdom`
+   and runs `iw reg set`; that file ships with all 182 countries commented out. `zone.tab`
+   is tab-separated `CC  coordinates  TZ  comment`, one country per zone (`zone1970.tab`
+   has comma lists, so it is not used); `UTC` has no entry, so it correctly yields none.
+   Still to check on the Alienware: `iw reg get` (a self-managed Intel card may ignore it).
 4. Waybar: `battery` hides when there is no battery; `format-disabled` fires on
-   rfkill; the Nerd Font Wi-Fi glyphs render.
+   rfkill; the Nerd Font Wi-Fi glyphs render. **Pending** -- needs a compositor.
 5. Live boot in a VM: NetworkManager starts, the override is honoured, a root process
    under `cage` can add and activate a connection with no polkit or keyring,
-   `copytoram` doesn't disturb `/etc/NetworkManager`.
+   `copytoram` doesn't disturb `/etc/NetworkManager`. **Pending** -- needs a booted ISO.
 
 ## Acceptance tests (written before implementation)
 
@@ -111,7 +146,7 @@ Files: `gui/tests/test_wifi.py` (new), `gui/tests/test_state.py`,
 | `keyfile_for`: `psk-flags=0`, `autoconnect=true`, explicit uuid, `hidden=true` only when hidden, no security section for open, **never `permissions=`**, golden tests for `;` `\` `#`, spaces, non-ASCII | The one place that knows the format writes files NetworkManager accepts |
 | `WifiBackend` (fake runner): profile written 0600, reload then `connection up`; the password is in **no** argv element, log line or exception message; profile deleted on failure or when switching network; errors map to wrong-password / not-found / timeout | Secrets stay out of `ps`, logs and the target; a bad password is never copied to disk on the target |
 | `Answers.wifi_ssid` is display-only: no Wi-Fi keys in the vars file, no password field anywhere | The vars file contract is unchanged |
-| `configure-base-system`: saved profiles copied at mode 600 root, byte-identical, none = no error; `TZONE=America/New_York` adds `cfg80211.ieee80211_regdom=US`, `UTC` adds nothing, existing cmdline assertions unchanged; drop-in installed | The installed laptop autoconnects; regdom only when known |
+| `configure-base-system`: saved profiles copied at mode 600 root, byte-identical, none = no error; `TZONE=America/New_York` writes `WIRELESS_REGDOM="US"` to `/etc/conf.d/wireless-regdom`, `UTC` and unknown zones write nothing, `/etc/kernel/cmdline` untouched; `NetworkManager-wait-online.service` masked; connectivity drop-in installed | The installed laptop autoconnects; regdom only when known; boot isn't held for a network that isn't there |
 | `network-menu` dispatch: no argument -> `networkmanager_dmenu`, `edit` -> `nm-connection-editor` | Roles, not hardcoded executables |
 | acceptance: `.network` has `on-click`, `on-click-right`, `format-disabled`, `format-disconnected`, a `format-icons` array of >= 4; `battery` in `modules-right`; CSS state selectors; `@define-color error`; `wifi` page sits between LanguageRegion and Account; influences entry present | The bar and installer wiring hold together |
 
@@ -120,7 +155,8 @@ Red confirmed: | Green confirmed: |
 ## Tasks
 
 - [ ] Branch, tracking doc, roadmap row, backlog item (this commit)
-- [ ] Spikes 1-5, results logged
+- [x] Spikes 1-3, results logged (containerised NetworkManager, packages, regdb)
+- [ ] Spikes 4-5 (need a compositor / a booted ISO) -- on the first ISO boot
 - [ ] Step 1 -- live ISO to NetworkManager (red, green)
 - [ ] Step 2 -- `gui/installer/wifi.py` and `gui/tests/test_wifi.py` (red, green)
 - [ ] Step 3 -- `Answers`, Wi-Fi page, Review row, fake backend (red, green)
