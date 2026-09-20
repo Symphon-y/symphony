@@ -1710,3 +1710,165 @@ and the old entry is marked `Superseded by D-XXXX`.
   thin" live package list thin. Automated desktop/Hyprland session
   bring-up after the installed system first boots to a TTY is explicitly
   out of scope here — that is Phase 16's job, not this one.
+
+## D-0068 — One network stack: NetworkManager on the live ISO too (extends D-0014, D-0061)
+
+- **Status:** Accepted (2026-09-20, Phase 17)
+- **Decision:** The live installer ISO runs NetworkManager (with
+  systemd-resolved), the same stack as the installed system (D-0014). `iwd`
+  and `dhcpcd` are removed from the ISO, not left disabled. On the installed
+  system `NetworkManager-wait-online.service` is masked, after the enable.
+- **Alternatives considered:** Keep iwd on the live ISO and translate its
+  credentials into a NetworkManager connection file at install — a second
+  format to own and test, and the terminal fallback would still need the
+  undocumented `iwctl`. Run both — a second manager on the same interface
+  fights NetworkManager for it. No Wi-Fi on the live ISO at all, connecting
+  only after first boot — Omarchy's current ISO does exactly this; it costs
+  nothing when skipped, but leaves the installed laptop offline on first boot,
+  which is what this phase set out to avoid.
+- **Reasoning:** With one stack, whatever the live session saves is already a
+  connection file the installed system understands, so carrying it over is a
+  plain copy (Calamares' `networkcfg` module does the same), and the terminal
+  fallback gets `nmtui` for free. Omarchy's current line moved to
+  NetworkManager for the reasons that would bite here later (enterprise, VPN,
+  hidden and captive-portal networks were the pain on iwd/networkd). Checked
+  against the real package: `systemctl enable NetworkManager` also links
+  `NetworkManager-wait-online` into `network-online.target`, which holds boot
+  for anything ordered after the network — a laptop that is simply off Wi-Fi.
+  Masking must come after the enable, since enabling a masked unit fails.
+- **Consequences:** The ISO is slightly larger (NetworkManager and
+  wpa_supplicant). The old `iwctl` route is gone and the login banner says
+  `nmtui`. The live session stays in the world regulatory domain (D-0072).
+  `tests/acceptance/phase-12.bats` asserted the old dhcpcd/iwd links and now
+  asserts NetworkManager's.
+
+## D-0069 — Wi-Fi hand-off: copy the connection file; the passphrase never in argv, a log, or the vars file
+
+- **Status:** Accepted (2026-09-20, Phase 17)
+- **Decision:** The installer's Wi-Fi page joins a network by writing a
+  NetworkManager connection file (`autarchy-wifi.nmconnection`, mode 0600)
+  and asking NetworkManager to reload it — never `nmcli … password X`.
+  `keyfile_for()` in `gui/installer/wifi.py` is the one place that knows the
+  file format: the secret is stored in the file (`psk-flags=0`), there is no
+  `permissions=` line, and a failed join deletes the file. `configure-base-system`
+  then copies whatever `*.nmconnection` files the live session saved to the
+  target, 0600 root, without knowing their format. The page's `Answers` field
+  is display-only; no password is held anywhere in the vars file or `Answers`.
+- **Alternatives considered:** `nmcli device wifi connect … password X` —
+  the password is then in the process list, readable through `/proc`.
+  Handing the passphrase to the install over a file descriptor like the two
+  passwords (D-0066) — pointless here: the connection is made live on the
+  page, and the target needs a file regardless. libnm through PyGObject —
+  keeps secrets off argv too and gives signal-driven lists, but its objects
+  are hard to fake in unit tests; recorded as the fallback if hand-escaping
+  ever proves fragile (the hand-off contract would not change, since
+  NetworkManager writes the same file). Copying iwd credentials —
+  archinstall's "copy ISO config" copies networkd files, not NetworkManager
+  or iwd state, and mixing iwd with NetworkManager causes conflicts.
+- **Reasoning:** Secret hygiene consistent with D-0066, and a hand-off that
+  also carries connections made with `nmtui` from a shell. Written raw, the
+  file is silently mangled by NetworkManager — a backslash in an SSID became
+  a space, a password containing backslashes came back empty, leading spaces
+  were trimmed — so the escaping was verified against a real NetworkManager
+  1.58.1: `\` → `\\`, tab/newline/CR → `\t` `\n` `\r`, a leading or trailing
+  space → `\s`, and nothing else (`;` `#` `"` `=` `[` and Unicode round-trip
+  unchanged). The production output for 16 awkward SSID/password cases read
+  back exactly. NetworkManager also ignores any connection file other users
+  can read, hence 0600. A file it rejects is ignored silently, so the join
+  checks the connection appeared after the reload. A wrong password must not
+  stay behind to autoconnect-loop or reach the installed system.
+- **Consequences:** The passphrase sits in plaintext at 0600 root on the
+  installed system — NetworkManager's own model for system-owned secrets, and
+  needed because a bare Hyprland session has no keyring agent to hand it back
+  at boot. Joinable from the installer: open, WPA2/WPA3-personal, hidden
+  networks, UTF-8 names; enterprise (802.1X), WEP and OWE are set up after
+  install in `nm-connection-editor`. Failure wording (wrong password, not
+  found, timeout) is matched from `nmcli`'s documented messages and is
+  re-verified on real hardware.
+
+## D-0070 — NetworkManager's connectivity check is disabled
+
+- **Status:** Accepted (2026-09-20, Phase 17)
+- **Decision:** `[connectivity] enabled=false` in
+  `/etc/NetworkManager/conf.d/20-connectivity.conf`, shipped from one source,
+  `system/networkmanager/20-connectivity.conf`, to the installed system by
+  `sync-system`, with a byte-identical copy in the live ISO's airootfs (the
+  profile cannot symlink out of itself; an acceptance test keeps them one file).
+- **Alternatives considered:** Keep the default — Arch ships a file that
+  fetches `http://ping.archlinux.org/nm-check.txt` on every connection, which
+  tells a third party your IP and when you connected. Point it at an endpoint
+  we run — continuously operated infrastructure, the thing D-0050 and D-0061
+  already decline. Lengthen the interval — still phones home.
+- **Reasoning:** The project has no telemetry, and this is a phone-home no one
+  asked for. Checked against the real daemon: a same-named file in `/etc`
+  replaces Arch's shipped one, leaving `[connectivity] enabled=false` with no
+  URI.
+- **Consequences:** NetworkManager can no longer detect captive-portal (hotel,
+  airport) networks by itself; the user opens the login page. Connectivity
+  state still comes from the default route.
+
+## D-0071 — Network UI: `networkmanager-dmenu` + `nm-connection-editor` behind `network-menu`; battery on the bar; Bluetooth deferred
+
+- **Status:** Accepted (2026-09-20, Phase 17)
+- **Decision:** Waybar's `network` module shows one of five signal icons plus
+  distinct icons for cable, cable-without-an-address, not connected and radio
+  off (rfkill), with the details in the tooltip. Left-click and `SUPER+CTRL+N`
+  open the picker (`networkmanager-dmenu` through fuzzel); right-click opens
+  `nm-connection-editor`. All three go through one entry point,
+  `home/network`'s `network-menu` — roles, not executables. A `battery` module
+  (warning 30, critical 15) joins the right side, with `@error` added to the
+  matugen palette.
+- **Alternatives considered:** Omarchy's Quickshell panel — REJECT, a unified
+  shell (D-0025). `nm-applet` in the tray — needs a tray producer and an agent,
+  and is the heavier option. `nmtui` in a floating terminal (Omarchy's earlier
+  approach, with `impala`/`bluetui`) — no GUI, and needs window rules.
+  `impala`/`iwgtk` — iwd-only, and the iwd stack is rejected (D-0068). Our own
+  fuzzel-and-`nmcli` script — would re-implement `networkmanager-dmenu`, which
+  supports fuzzel natively. `eww`/`ags` panels — heavy, and a custom shell.
+- **Reasoning:** Follows the fuzzel menu convention (`power-menu`,
+  `clipboard-menu`, D-0033), and `nm-connection-editor` gives the
+  enterprise/VPN/static-IP coverage the picker doesn't. Reading the
+  `networkmanager_dmenu` source showed fuzzel's `--password` masking is applied
+  only when `[dmenu_passphrase] obscure = True`; its default is `False`, which
+  would show a Wi-Fi password in plain text as it is typed, so the config sets
+  it and a test pins it. A stylesheet naming a colour that isn't defined fails to
+  load, so a migration re-renders the palette on machines themed before `@error`
+  existed, and a test checks every colour `style.css` uses is in the template.
+  The real Waybar, with this config and a palette from the real matugen, was run
+  under a headless Sway: no crash, no CSS errors, and `battery` stays inert with
+  no battery.
+- **Consequences:** `nm-connection-editor` adds GTK3/libnma weight (accepted).
+  Bluetooth is deferred — it needs `bluez` and a running daemon (cutting
+  against "no unnecessary daemons") and a UI choice; so are a volume-mixer click
+  and brightness. `format-disabled` on an rfkill block and the Nerd Font glyphs
+  are verified on hardware.
+
+## D-0072 — Regulatory domain from the timezone, in wireless-regdb's own file (revises the Phase 17 plan)
+
+- **Status:** Accepted (2026-09-20, Phase 17)
+- **Decision:** `configure-base-system` writes `WIRELESS_REGDOM="XX"` to
+  `/etc/conf.d/wireless-regdom`, the country taken from the target's tzdata
+  `zone.tab` for the chosen timezone (one country per zone; `UTC` and similar
+  have none, and set nothing). Any earlier uncommented line is removed first,
+  so a re-run or a changed timezone never leaves two. `wireless-regdb` is
+  listed in `packages/network.txt`. The kernel command line and `configure_boot`
+  are untouched.
+- **Alternatives considered:** `cfg80211.ieee80211_regdom=XX` on the UKI
+  command line — the original plan; the kernel documentation discourages it in
+  favour of userspace hints. `iw reg set` during install — lost at the reboot
+  that ends the install (Omarchy deliberately avoids it for that reason).
+  Asking the user for a region (Windows and macOS do) — the timezone is already
+  chosen and implies it; a separate question can be added later.
+- **Reasoning:** Without a regulatory domain the kernel stays in the
+  restrictive "world" domain — passive-only scanning on many 5 GHz channels, so
+  networks vanish from the list. The spike found `wireless-regdb` already ships
+  a udev rule that runs `set-wireless-regdom` when `cfg80211` loads; that
+  script sources `/etc/conf.d/wireless-regdom` and calls `iw reg set`, so the
+  package's own primitive is the one to set. Verified by running the real
+  function bodies on the real package-shipped file: `WIRELESS_REGDOM="US"`, then
+  the real `set-wireless-regdom` (with `iw` stubbed) produced `iw reg set US`.
+  `wireless-regdb` is not a dependency of `linux-firmware`, so it must be listed.
+- **Consequences:** An Intel card that is self-managed may ignore the hint —
+  `iw reg get` on the Alienware confirms. The live session stays in the world
+  domain, so it may miss some 5 GHz networks. D-0067 (Phase 16's installed-machine
+  layout) is written at that phase's close-out.

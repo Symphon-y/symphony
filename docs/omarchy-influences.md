@@ -61,6 +61,8 @@ assumed.
 | Clipboard | 3 | 5 | ADAPT (D-0025, D-0031) |
 | Screenshots / screen recording | 3 | 5 | ADOPT (D-0036) |
 | Status bar | 3 | 5 | ADAPT (D-0025, D-0031) |
+| Network and Wi-Fi (stack, installer step, bar indicator) | 1, 3 | 17 | ADOPT NetworkManager + wireless-regdb; ADAPT the optional installer step, regdom, bar icon states; REJECT the Quickshell panel and the iwd stack (D-0068 to D-0072) |
+| Bluetooth | 3 | 17 | DEFER (D-0071) |
 | Web-app launchers | 3 | 5 | ADAPT (D-0034) |
 | Theme system and switching | 4 | 6 | ADAPT (matugen, wallpaper-driven, D-0025, D-0037) |
 | Fonts, GTK/Qt, icons, cursors | 4 | 6 | ADAPT (D-0038–D-0041) |
@@ -782,6 +784,68 @@ below are current as of that branch unless a component explicitly discusses v3
   gsettings-only approach for GTK/Qt colors keeps this system's "one palette drives
   everything" promise consistent across every themed component, not just some.
 - Related decision: D-0038, D-0039, D-0040, D-0041
+
+### Network and Wi-Fi (stack, installer step, bar indicator)
+- Omarchy approach: (Read from its current `quattro` source, 2026-09-20.) The
+  installed system runs NetworkManager plus `wireless-regdb`; iwd, `impala` and
+  systemd-networkd were dropped because enterprise, VPN, hidden and
+  captive-portal networks were the pain (its issue tracker: #1414, #2909). It
+  masks `NetworkManager-wait-online`, turns Wi-Fi power-save off through a
+  `conf.d` drop-in, and sets the regulatory domain at install by appending the
+  country for the timezone to `/etc/conf.d/wireless-regdom` (deliberately not
+  `iw reg set`, since the install ends in a reboot). Its ISO has **no** Wi-Fi
+  step (install is offline; Wi-Fi is set up after first boot); its older
+  configurator scanned and joined with `iwctl` and carried the iwd credentials
+  over through archinstall. The bar network widget is a Quickshell panel (not
+  Waybar) with signal icons, connect / password / forget / radio toggle, and a
+  hotkey; a first-run notification appears if there is no link. It also ships
+  per-hardware quirk scripts and a "restart Wi-Fi" recovery action.
+- Problem it solves: getting a laptop online, with a visible, clickable status.
+- Why it is interesting: the NetworkManager choice and its reasons, the
+  regulatory-domain-from-timezone idea, the masked wait-online, and the shape
+  of the icon states are all sound and directly reusable as ideas.
+- Coupling to other Omarchy components: the panel is part of its Quickshell
+  shell, which is what D-0025 rejects; the legacy TUIs (`impala`, `bluetui`)
+  hang off its floating-terminal launcher.
+- Better modern alternatives: Waybar's own `network` module with states and
+  click actions; `networkmanager-dmenu` (fuzzel is supported natively) and
+  `nm-connection-editor` for the interactive parts.
+- Our decision: **ADOPT** NetworkManager and `wireless-regdb` (agrees with
+  D-0014) and masking `NetworkManager-wait-online`. **ADAPT** the optional
+  Wi-Fi step at install (own GTK page, carrying the live connection to the
+  target as a plain connection file, D-0068/D-0069), the regulatory domain from
+  the timezone (through the package's own file, D-0072), and the bar's icon
+  states, click action and hotkey (`SUPER+CTRL+N`, D-0071). **REJECT** the
+  Quickshell panel (D-0025) and the iwd/`impala`/systemd-networkd stack.
+  **DEFER** a first-run "set up Wi-Fi" notification (the bar already shows the
+  state), a "restart Wi-Fi" recovery action for `network-menu`, per-hardware
+  quirk scripts, and automatic captive-portal handling (connectivity check off,
+  D-0070).
+- Our implementation: NetworkManager on the live ISO and the installed system;
+  `gui/installer/wifi.py` and the Wi-Fi page; `copy_network_profiles` and
+  `configure_regdom` in `install/configure-base-system`; Waybar's `network` and
+  `battery` modules; `network-menu`.
+- Reason: keeps everything Omarchy learned the hard way about the stack while
+  staying with small standard tools rather than a bespoke shell, and without an
+  iwd credential format to maintain alongside NetworkManager's.
+- Related decision: D-0068, D-0069, D-0070, D-0071, D-0072
+
+### Bluetooth
+- Omarchy approach: a Waybar `bluetooth` module (icons for off, on, connected)
+  whose click launches `bluetui` in a floating terminal (its later Quickshell
+  panel replaces it).
+- Problem it solves: pairing and switching headphones, mice and keyboards.
+- Why it is interesting: a real, common laptop need.
+- Coupling to other Omarchy components: the floating-terminal launcher and its
+  window rules.
+- Better modern alternatives: `bluez` with `bluetuith`/`bluetui`, or a
+  fuzzel-driven menu over `bluetoothctl`.
+- Our decision: **DEFER**.
+- Our implementation: none yet; the bar has no Bluetooth module.
+- Reason: it needs `bluez` and a running daemon, which cuts against "no
+  unnecessary daemons", plus a UI choice of its own; it is not part of getting a
+  laptop online. Built our own way when taken up, not with Omarchy's packages.
+- Related decision: D-0071
 
 ### Shell and prompt
 - Omarchy approach: **bash** as the login/interactive shell (`default/bashrc` sources

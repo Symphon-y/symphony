@@ -44,6 +44,17 @@ VM), and again for the rebuild test (Phase 8) and physical hardware (Phase 12).
   ```
   On Linux, `sha256sum -c` the `.sha256` and `dd` the ISO as usual.
 
+  **Wi-Fi is optional** -- the install itself needs no network. The GUI installer
+  has a "Connect to Wi-Fi" page (skip it with Next): pick a network, enter the
+  password, and the laptop lands on its desktop already online, because the
+  connection is carried to the installed system as a plain NetworkManager
+  connection file. From a terminal (the fallback installer, `tty2`+) run `nmtui`
+  before `autarchy-install` -- whatever it saves is carried over the same way.
+  The live ISO runs NetworkManager, the same stack as the installed system (D-0068).
+  Enterprise (802.1X) networks are set up after install, in `nm-connection-editor`
+  (right-click the bar's Wi-Fi icon). After first boot the bar's Wi-Fi icon (or
+  `SUPER+CTRL+N`) opens the network picker.
+
   **The whole runbook below (steps 1-7) is replaced by one guided
   command**, printed on screen the moment you log in:
   ```sh

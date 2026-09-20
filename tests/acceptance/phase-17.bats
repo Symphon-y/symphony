@@ -187,3 +187,25 @@ bar_json() {
   assert_line "networkmanager-dmenu"
   assert_line "nm-connection-editor"
 }
+
+# --- Step 6: the record --------------------------------------------------------------
+
+@test "docs: DECISIONS.md records D-0068 to D-0072" {
+  local id
+  for id in D-0068 D-0069 D-0070 D-0071 D-0072; do
+    run grep -E "^## $id " "$REPO_ROOT/DECISIONS.md"
+    assert_success
+  done
+}
+
+@test "docs: omarchy-influences.md classifies network / Wi-Fi and Bluetooth" {
+  run grep -E '^### Network and Wi-Fi' "$REPO_ROOT/docs/omarchy-influences.md"
+  assert_success
+  run grep -E '^### Bluetooth' "$REPO_ROOT/docs/omarchy-influences.md"
+  assert_success
+}
+
+@test "docs: the install runbook says Wi-Fi is optional and how to join from a terminal" {
+  run grep -F 'nmtui' "$REPO_ROOT/docs/runbooks/base-install.md"
+  assert_success
+}

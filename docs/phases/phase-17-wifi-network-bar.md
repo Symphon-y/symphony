@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Planned |
+| **Status** | In progress (implemented and tested; real-hardware verification pending) |
 | **Driver** | Claude + user |
 | **Branch** | `phase/17-wifi-network-bar` (stacked on `phase/16-desktop-bring-up` until 16 merges) |
 | **Started** | 2026-09-20 |
@@ -116,9 +116,13 @@ Spikes 1-3 run 2026-09-20 in an Arch container (NetworkManager 1.58.1).
    `libnma`/`jansson`. `networkmanager-dmenu` reads `~/.config/networkmanager-dmenu/config.ini`;
    `[dmenu] dmenu_command = fuzzel` is a supported launcher; it has a "launch
    nm-connection-editor" entry; passwords go through pinentry, the launcher itself
-   (`[dmenu_passphrase]`), or nmcli. **Not confirmed from docs:** fuzzel's password-masking
-   flag and hidden-network handling -- checked on the first ISO boot; `pinentry` is not
-   added as a dependency.
+   (`[dmenu_passphrase]`), or nmcli. **Settled by reading the source (Step 5):** the
+   package's `networkmanager_dmenu` supports fuzzel natively (`--dmenu --placeholder` for
+   the list, `--password` for the passphrase) -- but only passes `--password` when
+   `[dmenu_passphrase] obscure = True`, whose default is `False`, so without it the Wi-Fi
+   password would be shown in plain text; the shipped config sets it and a test pins it.
+   `pinentry` is not needed and not added. Still to confirm on the first ISO boot: hidden
+   networks through the picker.
 3. **Regdom -- done; changed the design.** `wireless-regdb` (in `core`, depends on `bash`
    and `iw`) is *not* pulled in by `linux-firmware`, so it must be listed. Its udev rule
    runs `set-wireless-regdom` on `cfg80211` load, which sources `/etc/conf.d/wireless-regdom`
@@ -126,8 +130,11 @@ Spikes 1-3 run 2026-09-20 in an Arch container (NetworkManager 1.58.1).
    is tab-separated `CC  coordinates  TZ  comment`, one country per zone (`zone1970.tab`
    has comma lists, so it is not used); `UTC` has no entry, so it correctly yields none.
    Still to check on the Alienware: `iw reg get` (a self-managed Intel card may ignore it).
-4. Waybar: `battery` hides when there is no battery; `format-disabled` fires on
-   rfkill; the Nerd Font Wi-Fi glyphs render. **Pending** -- needs a compositor.
+4. Waybar -- **partly done.** Run for real under a headless Sway with the repo's config,
+   stylesheet and a palette from the real matugen: it stays up, no CSS errors, the
+   `network` module comes up, and `battery` logs "No batteries." and stays inert (so it is
+   safe on a desktop VM). **Still pending, hardware only:** `format-disabled` firing on an
+   rfkill block, and the Nerd Font Wi-Fi glyphs rendering.
 5. Live boot in a VM: NetworkManager starts, the override is honoured, a root process
    under `cage` can add and activate a connection with no polkit or keyring,
    `copytoram` doesn't disturb `/etc/NetworkManager`. **Pending** -- needs a booted ISO.
@@ -162,7 +169,7 @@ Red confirmed: | Green confirmed: |
 - [x] Step 3 -- `Answers`, Wi-Fi page, Review row, demo backend (red, green)
 - [x] Step 4 -- target side: profile copy, connectivity drop-in, regdom, wait-online mask, wireless-regdb (red, green)
 - [x] Step 5 -- Waybar `network`/`battery`, `network-menu`, keybinding, matugen `error` colour, theme migration (red, green)
-- [ ] Step 6 -- `phase-17.bats`, runbooks, influences entry, decisions D-0068 to D-0072, roadmap
+- [x] Step 6 -- `phase-17.bats`, runbooks, influences entry, decisions D-0068 to D-0072, roadmap
 - [ ] Build an ISO locally (`scripts/build-iso`), boot in a VM: guided install with Skip, no regression
 - [ ] Real hardware: Wi-Fi page on the Alienware, install, reboot, land online; icon states,
       left/right click, rfkill, `SUPER+CTRL+N`, battery; password absent from `ps` and the

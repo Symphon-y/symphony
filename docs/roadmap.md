@@ -23,7 +23,7 @@ outlines; their scope is finalized in their own plan mode.
 | 14 | [Bake the repo itself into the ISO](phases/phase-14-bake-repo-into-iso.md) | 1 | Claude | Live environment has `install/`/`system/`/`packages/*.txt` with zero GitHub access needed for the core install | Complete (2026-09-18) |
 | 15 | [Real GUI guided installer](phases/phase-15-gui-installer.md) | 1 | Claude + user | A real graphical wizard (`cage` + hand-written GTK4/libadwaita, not a TUI), auto-started on `tty1`, collects every field once (including both passwords, via file descriptor) and runs the install fully unattended | Complete (2026-09-18) |
 | 16 | [Fully automated desktop bring-up](phases/phase-16-desktop-bring-up.md) | 1, 6 | Claude + user | Reboot after install lands in a working, themed Hyprland desktop with zero manual steps, on a self-contained install (no repo checkout, `~/Projects` never created, XDG directories in place); ISOs can be built locally with `scripts/build-iso` | In progress (real-hardware round 2 under way) |
-| 17 | [Wi-Fi at install, and an interactive network bar](phases/phase-17-wifi-network-bar.md) | 1, 3 | Claude + user | An optional Wi-Fi step in the installer leaves the laptop online on first boot; the status bar shows network state and offers a picker (left-click) and full settings (right-click); battery indicator | Planned |
+| 17 | [Wi-Fi at install, and an interactive network bar](phases/phase-17-wifi-network-bar.md) | 1, 3 | Claude + user | An optional Wi-Fi step in the installer leaves the laptop online on first boot; the status bar shows network state and offers a picker (left-click) and full settings (right-click); battery indicator | In progress (implemented and tested; real-hardware verification pending) |
 | 18 | Release payload and update pipeline | 1, cross-cutting | Claude + user | An installed machine (no repo on it) can check for and apply the latest release on demand: signed versioned payload, pre-update snapshot, rollback | Not started -- own plan mode; the repo is to become public |
 
 ## Decisions deferred to their phase's plan mode
@@ -181,6 +181,24 @@ outlines; their scope is finalized in their own plan mode.
   question only real hardware could answer. A "quick terminal access for
   debugging" feature was explicitly deferred to its own future story,
   not squeezed into this phase's close.
+
+- **Phase 17:** in progress; see D-0068 to D-0072. Asked for an optional Wi-Fi
+  step in the installer and a taskbar where the Wi-Fi icon can be seen and used.
+  Research (Omarchy's current line, Windows/macOS, Calamares, Arch and
+  NetworkManager's own docs) first, then decisions asked directly: NetworkManager
+  on the live ISO too, so carrying the live connection to the installed system is a
+  plain file copy (D-0068); `nm-connection-editor` on right-click; battery as the
+  only extra indicator; the connectivity check off (D-0070). The bar already
+  existed -- Waybar's network module was just display-only. Spikes against a real
+  NetworkManager changed the design twice before any code: a hand-written
+  connection file is silently mangled unless `\`, tabs and leading/trailing spaces
+  are escaped (verified on 16 awkward SSID/password cases, D-0069), and the
+  regulatory domain belongs in `wireless-regdb`'s own file, not the kernel command
+  line (D-0072). Reading `networkmanager-dmenu`'s source found that fuzzel would
+  have shown the Wi-Fi password in plain text without `obscure = True` (D-0071).
+  The real GTK page and the real Waybar were run headless, and each found or ruled
+  out something the unit tests could not. Hardware verification on the Alienware
+  (radio, rfkill, glyphs, autoconnect after reboot) is still open.
 
 ## Cross-cutting concerns (checked in every phase)
 
