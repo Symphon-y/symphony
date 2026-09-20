@@ -27,10 +27,15 @@ REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO_ROOT
 readonly CONFIGURE_SCRIPT="${AUTARCHY_CONFIGURE_SCRIPT:-$REPO_ROOT/install/configure-base-system}"
 readonly HWPKGLIST="${AUTARCHY_HWPKGLIST_SCRIPT:-$REPO_ROOT/scripts/hwpkglist}"
+readonly QUIRKPARAMS="${AUTARCHY_QUIRKPARAMS_SCRIPT:-$REPO_ROOT/scripts/quirkparams}"
 
 # Packages this machine's hardware needs on top of packages/*.txt (Phase 17); filled in by
 # resolve_hardware_packages before anything destructive happens.
 HARDWARE_PACKAGES=()
+
+# Kernel parameters this machine's firmware quirks need (D-0076), space-separated; filled in by
+# resolve_kernel_params and handed to configure-base-system, which puts them on the boot command line.
+KERNEL_PARAMS=""
 
 readonly REQUIRED_VARS=(DISK HOST USERNAME TZONE LOCALE KEYMAP)
 # SWAP_SIZE is optional (Phase 12): unset means zram-only, unchanged from
@@ -100,6 +105,19 @@ resolve_hardware_packages() {
   [[ -z $output ]] || mapfile -t HARDWARE_PACKAGES <<<"$output"
   if ((${#HARDWARE_PACKAGES[@]} > 0)); then
     log "This machine's hardware needs: ${HARDWARE_PACKAGES[*]}"
+  fi
+}
+
+# Which kernel parameters this machine's firmware quirks need (system/quirks.txt, e.g.
+# module_blacklist=dell_rbtn on the Alienware 14). Resolved up front for the same reason as
+# the hardware packages: a broken map stops the install before the disk is touched.
+resolve_kernel_params() {
+  local output
+  output=$("$QUIRKPARAMS")
+  [[ -z $output ]] || KERNEL_PARAMS=$(tr '\n' ' ' <<<"$output")
+  KERNEL_PARAMS=${KERNEL_PARAMS% }
+  if [[ -n $KERNEL_PARAMS ]]; then
+    log "This machine's firmware needs kernel parameters: $KERNEL_PARAMS"
   fi
 }
 
@@ -260,6 +278,7 @@ main() {
   load_config "$vars_file"
   preflight
   resolve_hardware_packages
+  resolve_kernel_params
   confirm_destructive
 
   partition_disk
@@ -270,6 +289,9 @@ main() {
   log "Base disk layout done. Handing off to configure-base-system."
   if [[ -n ${SWAP_SIZE:-} ]]; then
     export AUTARCHY_RESUME_DEVICE="/dev/mapper/$SWAP_MAPPER"
+  fi
+  if [[ -n $KERNEL_PARAMS ]]; then
+    export AUTARCHY_KERNEL_PARAMS="$KERNEL_PARAMS"
   fi
   "$CONFIGURE_SCRIPT" "$vars_file" "$TARGET"
   seed_release_marker

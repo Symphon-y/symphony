@@ -297,3 +297,21 @@ bar_json() {
     assert_success
   done
 }
+
+# --- Firmware quirks and the picker outcome (D-0075, D-0076) -----------------------
+
+@test "quirks: the installer asks scripts/quirkparams and hands the result to configure-base-system" {
+  run grep -F 'quirkparams' "$REPO_ROOT/install/install-base-system"
+  assert_success
+  run grep -F 'AUTARCHY_KERNEL_PARAMS' "$REPO_ROOT/install/configure-base-system"
+  assert_success
+}
+
+@test "quirks: every entry in system/quirks.txt is a DMI pattern and one plain kernel parameter" {
+  # The parser is scripts/quirkparams (a malformed line makes it fail), run here against
+  # the real map and an empty machine.
+  local empty="$BATS_TEST_TMPDIR/sys"
+  mkdir -p "$empty"
+  AUTARCHY_SYS="$empty" run "$REPO_ROOT/scripts/quirkparams"
+  assert_success
+}

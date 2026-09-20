@@ -1,0 +1,15 @@
+# Firmware quirks that need a kernel parameter, chosen by what machine this is.
+#
+# Format: <dmi-modalias-pattern>  <kernel-parameter>   # what it fixes
+#
+# The pattern is a shell glob matched against this machine's DMI modalias, the line in
+# /sys/class/dmi/id/modalias (`dmi:bvn...:svnAlienware:pnAlienware 14:...`). A space in a
+# DMI value is written `*` here, because a field ends at whitespace. The parameter goes
+# on the kernel command line (/etc/kernel/cmdline, baked into every unified kernel
+# image), so it applies from the first instruction of boot and to every kernel.
+# scripts/quirkparams prints the parameters of the entries that match the machine being
+# installed; install-base-system resolves them before the disk is touched.
+#
+# Why not a modprobe.d file: a blacklist there only stops alias autoloading, needs the
+# initramfs rebuilt to reach early boot, and leaves symbol-request loads. module_blacklist=
+# is enforced inside the kernel for every path (D-0076).

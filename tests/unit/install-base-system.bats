@@ -16,6 +16,9 @@ setup() {
   # doesn't explicitly exercise it -- a real /etc/autarchy-release on the
   # machine running these tests must never leak in.
   export AUTARCHY_LIVE_RELEASE_FILE="$BATS_TEST_TMPDIR/no-release-file"
+  # Quirks come from this machine's DMI; hermetic unless a test stubs them (D-0076).
+  stub "$BATS_TEST_TMPDIR/no-quirks" 'exit 0'
+  export AUTARCHY_QUIRKPARAMS_SCRIPT="$BATS_TEST_TMPDIR/no-quirks"
   make_vars
   make_stubs
 }
@@ -373,5 +376,49 @@ hwpkglist_stub() {
   AUTARCHY_HWPKGLIST_SCRIPT="$BATS_TEST_TMPDIR/hwpkglist-stub" run_confirmed
   assert_failure
   run calls
+  refute_output --partial "pacstrap"
+}
+
+# --- firmware quirks (D-0076) ------------------------------------------------------
+
+# scripts/quirkparams answers from the DMI data and is tested on its own; here it is a stub.
+quirkparams_stub() {
+  printf '#!/usr/bin/env bash\n%s\n' "$1" >"$BATS_TEST_TMPDIR/quirkparams-stub"
+  chmod +x "$BATS_TEST_TMPDIR/quirkparams-stub"
+  export AUTARCHY_QUIRKPARAMS_SCRIPT="$BATS_TEST_TMPDIR/quirkparams-stub"
+}
+
+configure_stub_reporting_params() {
+  cat >"$BATS_TEST_TMPDIR/bin/autarchy-configure-stub" <<'STUB'
+#!/usr/bin/env bash
+echo "configure-base-system params=${AUTARCHY_KERNEL_PARAMS-unset}" >>"$STUB_LOG"
+STUB
+  chmod +x "$BATS_TEST_TMPDIR/bin/autarchy-configure-stub"
+}
+
+@test "hands the kernel parameters this machine's quirks need to configure-base-system (D-0076)" {
+  quirkparams_stub 'printf "module_blacklist=dell_rbtn\nquiet\n"'
+  configure_stub_reporting_params
+  run_confirmed
+  assert_success
+  run calls
+  assert_line "configure-base-system params=module_blacklist=dell_rbtn quiet"
+}
+
+@test "hands over no kernel parameters when the machine has no quirks (D-0076)" {
+  quirkparams_stub 'exit 0'
+  configure_stub_reporting_params
+  run_confirmed
+  assert_success
+  run calls
+  assert_line "configure-base-system params=unset"
+}
+
+@test "a failing quirk lookup stops the install before the disk is touched (D-0076)" {
+  quirkparams_stub 'echo "quirkparams: broken map" >&2; exit 1'
+  run_confirmed
+  assert_failure
+  run calls
+  refute_output --partial "sgdisk"
   refute_output --partial "pacstrap"
 }

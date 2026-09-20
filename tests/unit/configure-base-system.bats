@@ -216,6 +216,21 @@ calls() {
   assert_line "blkid -s UUID -o value /dev/disk/by-partlabel/cryptswap"
 }
 
+@test "appends the firmware-quirk kernel parameters install-base-system resolved (D-0076)" {
+  AUTARCHY_KERNEL_PARAMS="module_blacklist=dell_rbtn quiet" run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  assert_equal "$(cat "$TARGET/etc/kernel/cmdline")" \
+    "rd.luks.name=1111-2222=root root=/dev/mapper/root rootflags=subvol=@ rw module_blacklist=dell_rbtn quiet"
+}
+
+@test "quirk parameters come after resume= and are in place before the images are built (D-0076)" {
+  AUTARCHY_RESUME_DEVICE=/dev/mapper/cryptswap AUTARCHY_KERNEL_PARAMS="module_blacklist=dell_rbtn" \
+    run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  assert_equal "$(cat "$TARGET/etc/kernel/cmdline")" \
+    "rd.luks.name=1111-2222=root root=/dev/mapper/root rootflags=subvol=@ rw rd.luks.name=5555-6666=cryptswap resume=/dev/mapper/cryptswap resumeflags=x-systemd.device-timeout=30s module_blacklist=dell_rbtn"
+}
+
 @test "resume= is never added without a matching rd.luks.name= for the same device (D-0065)" {
   # The exact invariant a real hardware boot deadlock violated:
   # systemd-hibernate-resume.service runs inside the initramfs and can
