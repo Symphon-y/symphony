@@ -25,6 +25,10 @@ class Answers:
     git_name: str = ""
     git_email: str = ""
     swap_size: str = ""
+    # Display-only (the Review page): the Wi-Fi network joined on its page, or "" if
+    # skipped. The connection itself reaches the installed system as a NetworkManager
+    # connection file, never through the vars file, and no password is kept here.
+    wifi_ssid: str = ""
 
     def vars_file_content(self) -> str:
         """The KEY=VALUE content install-base-system/configure-base-system

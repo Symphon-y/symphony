@@ -6,6 +6,7 @@ Setup precedent for)."""
 
 from .welcome import WelcomePage
 from .language_region import LanguageRegionPage
+from .wifi import WifiPage
 from .account import AccountPage
 from .disk import DiskPage
 from .encryption import EncryptionPage
@@ -16,6 +17,7 @@ from .progress import ProgressPage
 PAGES = [
     WelcomePage,
     LanguageRegionPage,
+    WifiPage,
     AccountPage,
     DiskPage,
     EncryptionPage,

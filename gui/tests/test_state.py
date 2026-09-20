@@ -1,3 +1,4 @@
+import dataclasses
 import sys
 import unittest
 from pathlib import Path
@@ -45,6 +46,23 @@ class VarsFileContentTest(unittest.TestCase):
         content = answers.vars_file_content()
         self.assertIn("GIT_NAME='Alice Example'\n", content)
         self.assertIn("GIT_EMAIL=alice@users.noreply.github.com\n", content)
+
+
+class WifiAnswerTest(unittest.TestCase):
+    def test_the_wifi_network_name_is_display_only_and_never_in_the_vars_file(self):
+        # The Wi-Fi connection is made live, on its page, and reaches the installed
+        # system as a NetworkManager connection file (install/configure-base-system),
+        # not through the vars file -- this field only lets the Review page show it.
+        content = Answers(wifi_ssid="HomeNet").vars_file_content()
+        self.assertNotIn("HomeNet", content)
+        self.assertNotIn("WIFI", content.upper())
+
+    def test_wifi_is_skipped_by_default(self):
+        self.assertEqual(Answers().wifi_ssid, "")
+
+    def test_no_field_can_hold_a_wifi_password(self):
+        names = {f.name for f in dataclasses.fields(Answers)}
+        self.assertEqual({n for n in names if "psk" in n or ("wifi" in n and "pass" in n)}, set())
 
 
 if __name__ == "__main__":

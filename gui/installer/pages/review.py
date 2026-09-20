@@ -68,6 +68,7 @@ class ReviewPage(Page):
         add("Timezone", answers.timezone)
         add("Locale", answers.locale)
         add("Keyboard layout", answers.keymap)
+        add("Wi-Fi", answers.wifi_ssid or "skipped")
         add("Hibernation swap", answers.swap_size or "none")
         add("Account password", "set")
         add("Disk encryption", "passphrase set")

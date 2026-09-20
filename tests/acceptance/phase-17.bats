@@ -53,3 +53,32 @@ setup() {
   run grep -F 'nmtui' "$ISO/airootfs/root/.bash_profile"
   assert_success
 }
+
+# --- Step 3: the installer's Wi-Fi page ------------------------------------------
+
+@test "installer: the Wi-Fi page sits between LanguageRegion and Account" {
+  local pages="$REPO_ROOT/gui/installer/pages/__init__.py"
+  local list lang wifi account
+  list=$(awk '/^PAGES = \[/,/^\]/' "$pages")
+  lang=$(grep -n 'LanguageRegionPage' <<<"$list" | cut -d: -f1)
+  wifi=$(grep -n 'WifiPage' <<<"$list" | cut -d: -f1)
+  account=$(grep -n 'AccountPage' <<<"$list" | cut -d: -f1)
+  assert [ -n "$wifi" ]
+  assert [ "$lang" -lt "$wifi" ]
+  assert [ "$wifi" -lt "$account" ]
+}
+
+@test "installer: the Review page shows the Wi-Fi network (or that it was skipped)" {
+  run grep -F '"Wi-Fi"' "$REPO_ROOT/gui/installer/pages/review.py"
+  assert_success
+}
+
+@test "installer: the Wi-Fi page picks the demo backend under --dry-run, and never stores a password in Answers" {
+  local page="$REPO_ROOT/gui/installer/pages/wifi.py"
+  run grep -F 'dry_run' "$page"
+  assert_success
+  run grep -F 'demo_backend' "$page"
+  assert_success
+  run grep -E 'answers\.[a-z_]*(psk|pass)' "$page"
+  assert_failure
+}

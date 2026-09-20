@@ -159,7 +159,7 @@ Red confirmed: | Green confirmed: |
 - [ ] Spikes 4-5 (need a compositor / a booted ISO) -- on the first ISO boot
 - [x] Step 1 -- live ISO to NetworkManager (red, green)
 - [x] Step 2 -- `gui/installer/wifi.py` and `gui/tests/test_wifi.py` (red, green)
-- [ ] Step 3 -- `Answers`, Wi-Fi page, Review row, fake backend (red, green)
+- [x] Step 3 -- `Answers`, Wi-Fi page, Review row, demo backend (red, green)
 - [ ] Step 4 -- target side: profile copy, connectivity drop-in, regdom (if spiked in), packages (red, green)
 - [ ] Step 5 -- Waybar `network`/`battery`, `network-menu`, keybinding, matugen `error` colour (red, green)
 - [ ] Step 6 -- `phase-17.bats`, runbooks, influences entry, decisions D-0068 to D-0072, roadmap
@@ -228,6 +228,27 @@ Red confirmed: | Green confirmed: |
   passphrases follow NetworkManager's own rule (8-63 printable ASCII, or 64 hex).
   `nmcli` failure wording (wrong password / not found / timeout) is matched from its
   documented messages and is re-verified on real hardware.
+- **Step 3 -- state, page, demo backend (green).** `Answers.wifi_ssid` is display-only
+  (tests: never in the vars file, no password field can exist). `--dry-run` has no radio,
+  so the page runs against `wifi_demo.demo_backend()` -- the *real* `WifiBackend` over
+  canned `nmcli` answers, not a second implementation, so the page exercises the same
+  parsing, profile writing and error mapping as on hardware. The GTK page is thin
+  (`pages/wifi.py`): scan on a worker thread, signal-sorted rows with lock icons and
+  unescaped SSIDs, enterprise rows greyed out, password row with the built-in show/hide,
+  "Join a hidden network", spinner, inline errors, rfkill button, Forget, Skip. It is
+  registered between LanguageRegion and Account, and Review shows the network or
+  "skipped". Because GTK code can't be unit-tested here, the *real* page was run under a
+  virtual display against the demo backend (`gui/tests/smoke_wifi_page.py`, kept as a
+  documented dev tool CI does not run): 22 checks -- and it paid for itself. Reading the
+  page back found a real flaw that no unit test could: the installer keeps one saved
+  connection, so a *failed* second attempt deletes the first, yet the page went on saying
+  "Connected to HomeNet" while nothing was saved. Fixed (a failure clears the recorded
+  network) and the smoke test now covers it.
+- **Deviation from the plan:** Next is held with "Still connecting" while a join is in
+  flight, rather than never blocked -- a result landing after the install has started
+  could delete the file being copied. Skipping with nothing joined is unaffected. A
+  "Forget" button was added (the backend already had `forget()`), so a joined network can
+  be undone before installing.
 
 ## Backlog (recorded, not in this phase)
 
