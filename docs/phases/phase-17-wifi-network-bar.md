@@ -161,7 +161,7 @@ Red confirmed: | Green confirmed: |
 - [x] Step 2 -- `gui/installer/wifi.py` and `gui/tests/test_wifi.py` (red, green)
 - [x] Step 3 -- `Answers`, Wi-Fi page, Review row, demo backend (red, green)
 - [x] Step 4 -- target side: profile copy, connectivity drop-in, regdom, wait-online mask, wireless-regdb (red, green)
-- [ ] Step 5 -- Waybar `network`/`battery`, `network-menu`, keybinding, matugen `error` colour (red, green)
+- [x] Step 5 -- Waybar `network`/`battery`, `network-menu`, keybinding, matugen `error` colour, theme migration (red, green)
 - [ ] Step 6 -- `phase-17.bats`, runbooks, influences entry, decisions D-0068 to D-0072, roadmap
 - [ ] Build an ISO locally (`scripts/build-iso`), boot in a VM: guided install with Skip, no regression
 - [ ] Real hardware: Wi-Fi page on the Alienware, install, reboot, land online; icon states,
@@ -260,6 +260,30 @@ Red confirmed: | Green confirmed: |
   `set-wireless-regdom` turned the result into `iw reg set US` (and UTC wrote nothing).
   One of my own tests was wrong, not the code (it `find`ed a directory the implementation
   deliberately does not create when nothing is saved) and was corrected.
+- **Step 5 -- the bar and the menu (green).** `home/network/` is a new stow package:
+  `network-menu` (no argument = the picker, `edit` = the settings window; Waybar's two
+  clicks and `SUPER+CTRL+N` all call it, never the tools) and the
+  `networkmanager-dmenu` config. Waybar's `network` module now shows one of five signal
+  icons plus distinct cable / cable-without-an-address / not-connected / radio-off icons,
+  with the name and details in the tooltip, refreshing every 5 s; a `battery` module
+  (warning 30, critical 15) joins the right side; the stale "no battery" header comment is
+  gone. `#network.disconnected` and `#battery.*` are styled with a new `@error` in the
+  matugen template. Two things beyond the plan turned up: **(1)** reading the
+  `networkmanager_dmenu` source showed fuzzel's `--password` masking is applied only when
+  `[dmenu_passphrase] obscure = True` -- its default is `False`, which would have shown
+  the Wi-Fi password in plain text -- so the config sets it and a test pins it; **(2)** a
+  machine themed before this has a `colors.css` with no `@error`, and a stylesheet naming
+  an undefined colour fails to load, so a migration
+  (`migrations/*-rerender-theme-for-waybar-error-color.sh`, idempotent, skipped on a
+  never-themed machine) re-renders the palette; a test also checks that every colour
+  `style.css` uses is defined by the template, so this can't recur silently. Beyond the
+  static tests, the *real* Waybar was run under a headless Sway with the repo's config and
+  stylesheet and a palette rendered by the real matugen: it stays up (10 s, no crash),
+  reports no CSS errors, brings the `network` module up, and `battery` logs "No batteries."
+  and stays inert -- **spike 4's battery question is answered.** (The unrelated
+  `wireplumber` module segfaults without PipeWire in a bare container, so it was left out of
+  that run; the only other error was the container having no `/dev/rfkill`.) Still for real
+  hardware: `format-disabled` on an rfkill block, and the Nerd Font glyph rendering.
 - **Deviation from the plan:** Next is held with "Still connecting" while a join is in
   flight, rather than never blocked -- a result landing after the install has started
   could delete the file being copied. Skipping with nothing joined is unaffected. A

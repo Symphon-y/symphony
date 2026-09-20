@@ -25,6 +25,9 @@ hl.bind(mainMod .. " + SHIFT + Q", hl.dsp.exit())
 hl.bind(mainMod .. " + SPACE", hl.dsp.exec_cmd("fuzzel"))
 hl.bind(mainMod .. " + ESCAPE", hl.dsp.exec_cmd("power-menu"))
 hl.bind(mainMod .. " + CTRL + V", hl.dsp.exec_cmd("clipboard-menu"))
+-- Network picker (Phase 17): same as clicking the bar's Wi-Fi icon; a hotkey too,
+-- because a small icon is hard to hit. network-menu edit is the icon's right-click.
+hl.bind(mainMod .. " + CTRL + N", hl.dsp.exec_cmd("network-menu"))
 
 -- Capture (Phase 5) -- PRINT family, matching the convention already recorded
 -- from Phase 3's research

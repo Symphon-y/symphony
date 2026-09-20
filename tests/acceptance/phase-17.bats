@@ -9,6 +9,7 @@ setup() {
   load '../helpers/common'
   ISO="$REPO_ROOT/iso/profile"
   WANTS="$ISO/airootfs/etc/systemd/system/multi-user.target.wants"
+  BAR="$REPO_ROOT/home/waybar/dot-config/waybar"
 }
 
 # --- Step 1: the live ISO runs NetworkManager ------------------------------------
@@ -103,4 +104,86 @@ setup() {
   run "$REPO_ROOT/scripts/pkglist" "$REPO_ROOT"/packages/*.txt
   assert_success
   assert_line "wireless-regdb"
+}
+
+# --- Step 5: the bar and the menu ---------------------------------------------------
+
+# Waybar's config is JSONC; strip whole-line // comments (as phase-05.bats does) so jq can read it.
+bar_json() {
+  sed -E 's#^[[:space:]]*//.*$##' "$BAR/config.jsonc"
+}
+
+@test "bar: the network module is interactive -- click opens the picker, right-click the settings" {
+  run bash -c "$(declare -f bar_json); BAR='$BAR'; bar_json | jq -r '.network[\"on-click\"], .network[\"on-click-right\"]'"
+  assert_success
+  assert_line --index 0 "network-menu"
+  assert_line --index 1 "network-menu edit"
+}
+
+@test "bar: the network module shows signal strength and every state it can be in" {
+  run bash -c "$(declare -f bar_json); BAR='$BAR'; bar_json | jq -e '
+    (.network[\"format-icons\"] | length) >= 4
+    and (.network | has(\"format-wifi\") and has(\"format-ethernet\") and has(\"format-disconnected\")
+         and has(\"format-disabled\") and has(\"format-linked\"))
+    and (.network.interval <= 10)
+    and (.network | has(\"tooltip-format-wifi\") and has(\"tooltip-format-disconnected\"))'"
+  assert_success
+}
+
+@test "bar: a battery module sits on the right, with warning below critical thresholds" {
+  run bash -c "$(declare -f bar_json); BAR='$BAR'; bar_json | jq -e '
+    (.[\"modules-right\"] | index(\"battery\") != null) and (.[\"modules-right\"] | index(\"network\") != null)
+    and (.battery.states.warning > .battery.states.critical) and (.battery.states.critical > 0)'"
+  assert_success
+}
+
+@test "bar: the header no longer claims there is no battery module" {
+  run grep -F 'no cpu/memory/battery' "$BAR/config.jsonc"
+  assert_failure
+}
+
+@test "bar: the stylesheet styles the network and battery states" {
+  local selector
+  for selector in '#network.disconnected' '#network.disabled' '#network.linked' '#battery.warning' '#battery.critical'; do
+    run grep -F "$selector" "$BAR/style.css"
+    assert_success
+  done
+}
+
+@test "bar: every colour the stylesheet uses is defined by the matugen template" {
+  # A stylesheet that names a colour colors.css doesn't define fails to load, and
+  # the bar is left unstyled -- so the template is the single list to check against.
+  local template="$REPO_ROOT/home/matugen/dot-config/matugen/templates/waybar.css"
+  local name
+  while read -r name; do
+    run grep -F "@define-color $name " "$template"
+    assert_success
+  done < <(grep -o '@[a-z_]*' "$BAR/style.css" | sort -u | grep -vx '@import' | sed 's/^@//')
+}
+
+@test "bar: the palette gains an error colour" {
+  run grep -F '@define-color error ' "$REPO_ROOT/home/matugen/dot-config/matugen/templates/waybar.css"
+  assert_success
+}
+
+@test "menu: SUPER+CTRL+N opens network-menu" {
+  run grep -E 'CTRL \+ N".*exec_cmd\("network-menu"\)' "$REPO_ROOT/home/hypr/dot-config/hypr/bindings.lua"
+  assert_success
+}
+
+@test "menu: the networkmanager-dmenu config uses fuzzel and masks the password as it is typed" {
+  # networkmanager-dmenu only passes fuzzel --password when obscure = True; its
+  # default is False, which would show a Wi-Fi password in plain text.
+  local conf="$REPO_ROOT/home/network/dot-config/networkmanager-dmenu/config.ini"
+  run grep -E '^dmenu_command[[:space:]]*=[[:space:]]*fuzzel$' "$conf"
+  assert_success
+  run awk '/^\[dmenu_passphrase\]/{s=1;next} /^\[/{s=0} s && /^obscure[[:space:]]*=[[:space:]]*True$/{f=1} END{exit !f}' "$conf"
+  assert_success
+}
+
+@test "packages: the network picker and the settings window are in the inventory" {
+  run "$REPO_ROOT/scripts/pkglist" "$REPO_ROOT"/packages/*.txt
+  assert_success
+  assert_line "networkmanager-dmenu"
+  assert_line "nm-connection-editor"
 }

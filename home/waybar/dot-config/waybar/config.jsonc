@@ -1,6 +1,6 @@
 // Target: ~/.config/waybar/config.jsonc (linked by install/link-home)
 //
-// A minimal, non-cluttered bar: no cpu/memory/battery modules on a desktop VM.
+// A minimal, non-cluttered bar: workspaces, clock, volume, network, battery, tray.
 // Colors come from ~/.config/waybar/colors.css (matugen-generated, imported by
 // style.css) -- this file only defines structure.
 {
@@ -11,7 +11,7 @@
 
   "modules-left": ["hyprland/workspaces"],
   "modules-center": ["clock"],
-  "modules-right": ["wireplumber", "network", "tray"],
+  "modules-right": ["wireplumber", "network", "battery", "tray"],
 
   "hyprland/workspaces": {
     "format": "{icon}",
@@ -33,11 +33,38 @@
     "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
   },
 
+  // Signal strength as one of five icons (weakest to strongest), plus a distinct icon
+  // for cable, cable-without-an-address, not connected, and radio off (rfkill). The
+  // name and details are in the tooltip. Click opens the network picker, right-click
+  // the full settings (Phase 17): both go through network-menu, never the tools.
   "network": {
-    "format-wifi": "  {essid}",
-    "format-ethernet": "󰈀 {ifname}",
-    "format-disconnected": "disconnected",
-    "tooltip-format": "{ifname}: {ipaddr}/{cidr}"
+    "interval": 5,
+    "format-wifi": "{icon}",
+    "format-icons": ["󰤯", "󰤟", "󰤢", "󰤥", "󰤨"],
+    "format-ethernet": "󰈀",
+    "format-linked": "󰈂",
+    "format-disconnected": "󰤮",
+    "format-disabled": "󰤭",
+    "tooltip-format-wifi": "{essid}  {signalStrength}%  {frequency} GHz\n{ipaddr}/{cidr}",
+    "tooltip-format-ethernet": "{ifname}\n{ipaddr}/{cidr}",
+    "tooltip-format-linked": "{ifname}: cable connected, no address",
+    "tooltip-format-disconnected": "Not connected -- click to choose a network",
+    "tooltip-format-disabled": "Wi-Fi is off -- click to open the network menu",
+    "on-click": "network-menu",
+    "on-click-right": "network-menu edit"
+  },
+
+  // For the laptop. Waybar shows nothing when there is no battery (a desktop VM).
+  "battery": {
+    "states": {
+      "warning": 30,
+      "critical": 15
+    },
+    "format": "{icon} {capacity}%",
+    "format-charging": "󰂄 {capacity}%",
+    "format-plugged": "󰚥 {capacity}%",
+    "format-icons": ["󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"],
+    "tooltip-format": "{timeTo}"
   },
 
   "tray": {

@@ -23,6 +23,8 @@ vulkan-intel                  # Vulkan driver for the Intel iGPU
 xdg-terminal-exec             # resolves the $terminal role; AUR (yay), see packages/external.md
 fuzzel                         # launcher; also the --dmenu engine behind the power/system menu
 waybar                         # status bar, matugen-templated
+networkmanager-dmenu           # network picker through fuzzel (bar Wi-Fi icon, SUPER+CTRL+N): list, join, password, hidden (Phase 17, D-0071)
+nm-connection-editor           # full network settings, the icon's right-click: VPN, static IP, 802.1X (a GTK3 window)
 cliphist                       # clipboard history
 wl-clipboard                   # wl-copy/wl-paste, the primitive cliphist and capture scripts use
 grim                            # screenshot capture

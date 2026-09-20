@@ -30,6 +30,7 @@ window#waybar {
 #clock,
 #wireplumber,
 #network,
+#battery,
 #tray {
   padding: 0 10px;
 }
@@ -37,4 +38,29 @@ window#waybar {
 #wireplumber.muted {
   color: @on_background;
   opacity: 0.6;
+}
+
+/* Network (Phase 17): not connected is the one state that needs attention; radio
+ * off and cable-without-an-address are quieter, like a muted volume. */
+#network.disconnected {
+  color: @error;
+}
+
+#network.disabled,
+#network.linked {
+  opacity: 0.6;
+}
+
+/* Battery: primary while charging, then error-coloured as it runs down. */
+#battery.charging {
+  color: @primary;
+}
+
+#battery.warning {
+  color: @error;
+  opacity: 0.75;
+}
+
+#battery.critical {
+  color: @error;
 }

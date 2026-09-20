@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/network-menu (linked by install/link-home)
+#
+# The one entry point for network UI (Phase 17, D-0071). Waybar's Wi-Fi icon and
+# SUPER+CTRL+N call this, never the tools directly -- roles, not hardcoded
+# executables, so swapping the picker or the settings window later is a one-file
+# change. Same shape as power-menu and clipboard-menu.
+#
+#   network-menu        the network picker: networkmanager-dmenu through fuzzel
+#                       (~/.config/networkmanager-dmenu/config.ini)
+#   network-menu edit   full network settings: nm-connection-editor -- hidden
+#                       networks, VPN, static addresses, 802.1X, which the picker
+#                       does not do
+set -euo pipefail
+
+usage() {
+  echo "usage: network-menu [edit]" >&2
+  exit 2
+}
+
+case ${1:-} in
+  "") exec networkmanager_dmenu ;;
+  edit) exec nm-connection-editor ;;
+  *) usage ;;
+esac

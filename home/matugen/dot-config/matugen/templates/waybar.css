@@ -7,3 +7,4 @@
 @define-color on_background {{ colors.on_background.default.hex }};
 @define-color primary {{ colors.primary.default.hex }};
 @define-color on_primary {{ colors.on_primary.default.hex }};
+@define-color error {{ colors.error.default.hex }};
