@@ -126,7 +126,9 @@ calls() {
   run "$SCRIPT" --out "$BATS_TEST_TMPDIR/out"
   assert_success
   run calls
-  assert_line --regexp '^docker cp .*/iso/build-in-container autarchy-iso-build-[0-9]+:/build\.sh$'
+  # A relative path (the script cds into the repo first): an absolute host path
+  # would need translating on Windows, where the engine is a native program.
+  assert_line --regexp '^docker cp iso/build-in-container autarchy-iso-build-[0-9]+:/build\.sh$'
 }
 
 @test "copies the built ISO and its checksum into the out dir and says where" {

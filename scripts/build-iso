@@ -29,12 +29,16 @@ REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO_ROOT
 readonly ENGINE="${AUTARCHY_CONTAINER_ENGINE:-docker}"
 readonly IMAGE=archlinux:latest
-readonly IN_CONTAINER_SCRIPT="$REPO_ROOT/iso/build-in-container"
+readonly IN_CONTAINER_SCRIPT=iso/build-in-container # relative to REPO_ROOT
 
-# Git Bash on Windows rewrites anything that looks like a POSIX path in a
-# native program's arguments (NAME:/out/. included). Nothing below wants that;
-# harmless elsewhere.
-export MSYS_NO_PATHCONV=1
+# Every container-engine call goes through here. Git Bash on Windows rewrites
+# anything that looks like a POSIX path in a native program's arguments
+# (NAME:/out/. included), which is wrong for a container path -- but that
+# rewriting has to stay on for the git calls, where the repo path (/c/Users/...)
+# does need translating for a native git.exe. Harmless on Linux and macOS.
+engine() {
+  MSYS_NO_PATHCONV=1 "$ENGINE" "$@"
+}
 
 log() {
   printf '==> %s\n' "$*"
@@ -52,7 +56,7 @@ usage() {
 
 container=""
 cleanup() {
-  [[ -n $container ]] && "$ENGINE" rm -f "$container" >/dev/null 2>&1
+  [[ -n $container ]] && engine rm -f "$container" >/dev/null 2>&1
   return 0
 }
 
@@ -92,16 +96,17 @@ main() {
   trap cleanup EXIT
 
   log "Building $short as '$tag' in a privileged $IMAGE container"
-  "$ENGINE" create -i --privileged --name "$container" \
+  engine create -i --privileged --name "$container" \
     -e "AUTARCHY_SHA=$sha" -e "AUTARCHY_TAG=$tag" \
     "$IMAGE" bash /build.sh >/dev/null
-  "$ENGINE" cp "$IN_CONTAINER_SCRIPT" "$container:/build.sh"
+  # Relative path from inside the repo, so no host path reaches the engine.
+  (cd "$REPO_ROOT" && engine cp "$IN_CONTAINER_SCRIPT" "$container:/build.sh")
 
   local started=$SECONDS
-  git -C "$REPO_ROOT" bundle create -q - --all | "$ENGINE" start -a -i "$container"
+  git -C "$REPO_ROOT" bundle create -q - --all | engine start -a -i "$container"
 
   # cd + "." instead of an output path argument: no host path translation.
-  (cd "$out" && "$ENGINE" cp "$container:/out/." .)
+  (cd "$out" && engine cp "$container:/out/." .)
   local iso="$out/autarchy-$tag.iso"
   [[ -e $iso ]] || die "the build finished but $iso was not produced"
 
