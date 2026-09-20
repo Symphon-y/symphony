@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/network-watch (linked by install/link-home)
+#
+# Say what happened after the network picker returned (Phase 17, D-0075).
+# networkmanager-dmenu hands the request to NetworkManager and exits the moment it is
+# *accepted*: a wrong password or a timeout afterwards is silent, and the failed
+# profile stays saved, so the next pick just fails again. This watches the Wi-Fi
+# device and turns its state into toasts (mako, via notify-send):
+#
+#   Connecting to <name>...      the device started connecting
+#   Connected to <name>          it got there
+#   Could not connect to <name>  it gave up (critical: stays until dismissed)
+#   Still connecting to <name>   nothing settled within the timeout
+#
+# On a failure it deletes the profile the attempt *created* -- so the next pick asks for
+# the password again -- and never one that already existed. A cancelled picker is silent.
+#
+# Reads on stdin the UUIDs of the profiles that existed before the picker ran (what
+# network-menu snapshots); anything not in that list was created by this attempt.
+# It never touches a passphrase: it only reads device and profile state.
+#
+# NETWORK_WATCH_TIMEOUT / NETWORK_WATCH_GRACE (seconds, default 30 / 3) bound the watch
+# and the wait for an attempt to show up (tests).
+set -euo pipefail
+
+# nmcli's words are matched below, so never a translated one.
+export LC_ALL=C
+
+readonly TIMEOUT=${NETWORK_WATCH_TIMEOUT:-30}
+readonly GRACE=${NETWORK_WATCH_GRACE:-3}
+readonly WIFI_PROFILE_TYPE=802-11-wireless
+
+before=()
+wifi_device="" wifi_state=""
+active_uuid="" active_name=""
+
+# nmcli -t escapes ':' and '\' with a backslash.
+unescape() {
+  local s=${1//\\\\/$'\001'}
+  s=${s//\\:/:}
+  printf '%s' "${s//$'\001'/\\}"
+}
+
+# One toast per message, replacing the previous one (the synchronous hint) so a
+# "Connecting" does not pile up behind its "Connected". Without notify-send the
+# message goes to stderr rather than nowhere.
+toast() {
+  local urgency=$1 message=$2
+  if command -v notify-send >/dev/null 2>&1; then
+    notify-send -a network -u "$urgency" -h string:x-canonical-private-synchronous:network-watch \
+      "Network" "$message"
+  else
+    printf 'network: %s\n' "$message" >&2
+  fi
+}
+
+# Sets wifi_device and wifi_state (both empty when there is no Wi-Fi device or
+# NetworkManager is not answering).
+read_wifi_device() {
+  local dev type state
+  wifi_device="" wifi_state=""
+  while IFS=: read -r dev type state; do
+    if [[ $type == wifi ]]; then
+      wifi_device=$dev wifi_state=$state
+      return 0
+    fi
+  done < <(nmcli -t -f DEVICE,TYPE,STATE device 2>/dev/null || true)
+}
+
+# Sets active_uuid and active_name to the connection the Wi-Fi device is on or
+# activating, or leaves them empty.
+read_active_connection() {
+  local uuid dev name
+  active_uuid="" active_name=""
+  while IFS=: read -r uuid dev name; do
+    if [[ $dev == "$wifi_device" ]]; then
+      active_uuid=$uuid active_name=$(unescape "$name")
+      return 0
+    fi
+  done < <(nmcli -t -f UUID,DEVICE,NAME connection show --active 2>/dev/null || true)
+}
+
+existed_before() {
+  local uuid
+  for uuid in "${before[@]}"; do
+    [[ $uuid == "$1" ]] && return 0
+  done
+  return 1
+}
+
+# The Wi-Fi profiles this attempt created, as "uuid<TAB>name" lines.
+new_wifi_profiles() {
+  local uuid type name
+  while IFS=: read -r uuid type name; do
+    [[ $type == "$WIFI_PROFILE_TYPE" ]] || continue
+    existed_before "$uuid" || printf '%s\t%s\n' "$uuid" "$(unescape "$name")"
+  done < <(nmcli -t -f UUID,TYPE,NAME connection show 2>/dev/null || true)
+}
+
+# A failed attempt. A profile it created is deleted so the next pick prompts again; one
+# that was already saved is left alone, with the way to forget it.
+fail() {
+  local uuid=$1 name=$2
+  if existed_before "$uuid"; then
+    toast critical "Could not connect to $name. If its saved password is wrong, forget the network (right-click the network icon) and pick it again."
+  else
+    toast critical "Could not connect to $name -- check the password."
+    nmcli connection delete uuid "$uuid" >/dev/null 2>&1 || true
+  fi
+}
+
+# The attempt never showed up as a state (it was over before the first look, or it never
+# began): report what it left behind, or stay silent if it left nothing.
+settle_untracked() {
+  local uuid name
+  if [[ $wifi_state == connected* ]]; then
+    return 0
+  fi
+  while IFS=$'\t' read -r uuid name; do
+    fail "$uuid" "$name"
+  done < <(new_wifi_profiles)
+}
+
+main() {
+  if [[ ! -t 0 ]]; then
+    mapfile -t before
+  fi
+
+  local elapsed=0 tracked=0 announced=0 tracked_uuid="" tracked_name=""
+  while ((elapsed < TIMEOUT)); do
+    read_wifi_device
+    [[ -n $wifi_device ]] || return 0
+
+    case $wifi_state in
+      connecting*)
+        read_active_connection
+        if [[ -n $active_uuid ]]; then
+          tracked_uuid=$active_uuid tracked_name=$active_name
+        fi
+        tracked=1
+        if ((! announced)); then
+          announced=1
+          toast normal "Connecting to ${tracked_name:-the network}..."
+        fi
+        ;;
+      connected*)
+        read_active_connection
+        if ((tracked)) || { [[ -n $active_uuid ]] && ! existed_before "$active_uuid"; }; then
+          toast normal "Connected to ${active_name:-the network}"
+          return 0
+        fi
+        ;;
+      *)
+        if ((tracked)); then
+          fail "$tracked_uuid" "${tracked_name:-the network}"
+          return 0
+        fi
+        ;;
+    esac
+
+    if ((! tracked && elapsed >= GRACE)); then
+      settle_untracked
+      return 0
+    fi
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+
+  toast normal "Still connecting to ${tracked_name:-the network}..."
+}
+
+main "$@"
