@@ -7,7 +7,9 @@
 # change. Same shape as power-menu and clipboard-menu.
 #
 #   network-menu        the network picker: networkmanager-dmenu through fuzzel
-#                       (~/.config/networkmanager-dmenu/config.ini)
+#                       (~/.config/networkmanager-dmenu/config.ini), then network-watch
+#                       reports whether the connection worked (D-0075) -- the picker
+#                       itself exits as soon as NetworkManager accepts the request
 #   network-menu edit   full network settings: nm-connection-editor -- hidden
 #                       networks, VPN, static addresses, 802.1X, which the picker
 #                       does not do
@@ -18,8 +20,22 @@ usage() {
   exit 2
 }
 
+# The picker, then the watcher. The watcher needs the profiles that existed before, to
+# tell what this attempt created; if they can't be listed it is skipped, because an empty
+# list would make every saved profile look new.
+pick() {
+  local before status=0 watch=1
+  before=$(nmcli -t -f UUID connection show 2>/dev/null) || watch=0
+
+  networkmanager_dmenu || status=$?
+  if ((watch)); then
+    printf '%s\n' "$before" | network-watch
+  fi
+  return "$status"
+}
+
 case ${1:-} in
-  "") exec networkmanager_dmenu ;;
+  "") pick ;;
   edit) exec nm-connection-editor ;;
   *) usage ;;
 esac

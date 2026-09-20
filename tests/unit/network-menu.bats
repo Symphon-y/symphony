@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Unit tests for home/network/dot-local/bin/network-menu. Both tools it launches are
+# Unit tests for home/network/dot-local/bin/network-menu. Everything it launches is
 # stubbed on PATH, so nothing real opens.
 
 setup() {
@@ -7,29 +7,36 @@ setup() {
   SCRIPT="$REPO_ROOT/home/network/dot-local/bin/network-menu"
   export STUB_LOG="$BATS_TEST_TMPDIR/calls.log"
   : >"$STUB_LOG"
-  local bin="$BATS_TEST_TMPDIR/bin"
-  mkdir -p "$bin"
+  BIN="$BATS_TEST_TMPDIR/bin"
+  mkdir -p "$BIN"
   local tool
   for tool in networkmanager_dmenu nm-connection-editor; do
     # shellcheck disable=SC2016 # the stub body expands when the stub runs, not here
-    printf '#!/usr/bin/env bash\necho "${0##*/}${*:+ $*}" >>"$STUB_LOG"\n' >"$bin/$tool"
-    chmod +x "$bin/$tool"
+    printf '#!/usr/bin/env bash\necho "${0##*/}${*:+ $*}" >>"$STUB_LOG"\n' >"$BIN/$tool"
   done
-  PATH="$bin:$PATH"
+  # nmcli answers the profile snapshot; network-watch records the snapshot it is handed.
+  # shellcheck disable=SC2016 # the stub body expands when the stub runs, not here
+  printf '#!/usr/bin/env bash\necho "nmcli $*" >>"$STUB_LOG"\nprintf "u-1\nu-2\n"\n' >"$BIN/nmcli"
+  # shellcheck disable=SC2016
+  printf '#!/usr/bin/env bash\necho "network-watch [$(tr "\n" " " </dev/stdin)]" >>"$STUB_LOG"\n' >"$BIN/network-watch"
+  chmod +x "$BIN"/*
+  PATH="$BIN:$PATH"
 }
 
 calls() {
   cat "$STUB_LOG"
 }
 
-@test "with no argument, opens the network picker (networkmanager-dmenu)" {
+@test "with no argument: snapshots the saved profiles, opens the picker, then watches the outcome" {
   run "$SCRIPT"
   assert_success
   run calls
-  assert_output "networkmanager_dmenu"
+  assert_line --index 0 "nmcli -t -f UUID connection show"
+  assert_line --index 1 "networkmanager_dmenu"
+  assert_line --index 2 "network-watch [u-1 u-2 ]"
 }
 
-@test "'edit' opens the full network settings (nm-connection-editor)" {
+@test "'edit' opens the full network settings (nm-connection-editor), with no watcher" {
   run "$SCRIPT" edit
   assert_success
   run calls
@@ -44,8 +51,18 @@ calls() {
   assert_output ""
 }
 
-@test "the exit status of the launched tool is passed through" {
-  printf '#!/usr/bin/env bash\nexit 7\n' >"$BATS_TEST_TMPDIR/bin/networkmanager_dmenu"
+@test "the exit status of the picker is passed through, and it is still watched" {
+  printf '#!/usr/bin/env bash\nexit 7\n' >"$BIN/networkmanager_dmenu"
   run "$SCRIPT"
   assert_failure 7
+  run calls
+  assert_output --partial "network-watch"
+}
+
+@test "if the profiles cannot be listed, the picker still opens but nothing is watched (an empty snapshot would make every saved profile look new)" {
+  printf '#!/usr/bin/env bash\nexit 1\n' >"$BIN/nmcli"
+  run "$SCRIPT"
+  assert_success
+  run calls
+  assert_output "networkmanager_dmenu"
 }
