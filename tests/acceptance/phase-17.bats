@@ -315,3 +315,10 @@ bar_json() {
   AUTARCHY_SYS="$empty" run "$REPO_ROOT/scripts/quirkparams"
   assert_success
 }
+
+@test "docs: DECISIONS.md records D-0075, and D-0071 points at it" {
+  run grep -E '^## D-0075 ' "$REPO_ROOT/DECISIONS.md"
+  assert_success
+  run grep -F 'Amended by D-0075' "$REPO_ROOT/DECISIONS.md"
+  assert_success
+}

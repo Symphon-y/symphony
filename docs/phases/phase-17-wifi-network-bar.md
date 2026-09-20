@@ -385,6 +385,33 @@ Red confirmed: | Green confirmed: |
   on the user's test** from `autarchy.nogui`: `grep -H . /sys/class/rfkill/rfkill*/{name,hard,soft};
   modprobe -r dell_rbtn; rfkill list`, then the result decides between a DMI-gated blacklist and the
   `acpi_osi` parameter.
+- **Problem 2 result: `modprobe -r dell_rbtn` clears the hard block** (user's test on the
+  installed system, `wl` loaded: `dell-rbtn` was hard *and* soft blocked, removal made Wi-Fi
+  work) -- but it does not survive a reboot, because nothing stops udev loading the module again.
+- **Problem 3 -- the picker scanned and saved but never connected** (found on the installed
+  machine; `nmcli --ask device wifi connect` worked and Chromium then browsed). Planned in plan
+  mode after a repo investigation and research (fuzzel's dmenu semantics, networkmanager-dmenu's
+  source and history, how GNOME/KDE/Windows/macOS show connecting, module-blacklist mechanics).
+  Likely cause, not yet reproduced: `[dmenu] exit-immediately-if-empty=yes` in the fuzzel template
+  closes networkmanager-dmenu's empty-list password prompt. User decisions (asked): fix in place
+  plus a feedback wrapper (not an own nmcli script, not nm-applet); the `dell_rbtn` blacklist for
+  this model only, by DMI; toasts plus an honest tooltip, no new bar module.
+- **Built (D-0075, red first):** the fuzzel template drops the setting, with a guard test and a
+  migration for machines themed before (`1789937867-rerender-fuzzel-without-exit-if-empty.sh`, 3
+  bats tests); `home/network/dot-local/bin/network-watch` (15 bats tests: connect, wrong password on
+  a new profile deletes it, on an existing one never, fast failure, cancel, switching networks,
+  timeout, colon in a name, no Wi-Fi device, no `notify-send`, never asks for secrets, a new
+  Ethernet profile is never touched); `network-menu` snapshots, runs the picker, then the watcher
+  (5 bats tests); Waybar's linked tooltip reworded.
+- **Built (D-0076 mechanism, red first):** `system/quirks.txt` (DMI pattern -> kernel parameter),
+  `scripts/quirkparams` (12 bats tests, fails closed, mirrors `hwpkglist`), `install-base-system`
+  resolving the parameters before anything destructive, `configure-base-system` appending them to
+  `/etc/kernel/cmdline` before the UKIs are built. The map has no entry yet: it waits for the
+  laptop's DMI strings and the cold-boot result (below).
+- **Waiting on the machine:** (1) with the fuzzel line removed, does `SUPER+CTRL+N` prompt for the
+  password and connect? (2) `cat /sys/class/dmi/id/{sys_vendor,product_name,product_family,modalias}`;
+  then `module_blacklist=dell_rbtn` in `/etc/kernel/cmdline` + `mkinitcpio -P` + reboot: is
+  `dell_rbtn` gone from `lsmod` and WIFI-HW `enabled` with no manual step, on all three boot entries?
 
 ## VM → physical hardware notes
 
@@ -400,7 +427,7 @@ Red confirmed: | Green confirmed: |
 
 - [ ] All acceptance tests pass
 - [ ] Static checks pass
-- [ ] `DECISIONS.md` updated (D-0068 to D-0074)
+- [ ] `DECISIONS.md` updated (D-0068 to D-0076)
 - [ ] `docs/omarchy-influences.md` updated
 - [ ] `docs/roadmap.md` status updated
 - [ ] Branch merged to `main`

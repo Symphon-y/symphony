@@ -1809,6 +1809,8 @@ and the old entry is marked `Superseded by D-XXXX`.
 
 ## D-0071 — Network UI: `networkmanager-dmenu` + `nm-connection-editor` behind `network-menu`; battery on the bar; Bluetooth deferred
 
+> Amended by D-0075: the picker's password prompt and its visible outcome.
+
 - **Status:** Accepted (2026-09-20, Phase 17)
 - **Decision:** Waybar's `network` module shows one of five signal icons plus
   distinct icons for cable, cable-without-an-address, not connected and radio
@@ -1966,3 +1968,41 @@ and the old entry is marked `Superseded by D-XXXX`.
   module or with an `acpi_osi` kernel parameter, but nothing confirms either for the 14, so
   that waits for a test on the machine (`modprobe -r dell_rbtn` from `autarchy.nogui`) rather
   than being guessed. Phase 12's planned `packages/alienware-14.txt` is superseded by this.
+
+## D-0075 — The network picker's password prompt is fixed at its source, and its outcome is reported (amends D-0071)
+
+- **Status:** Accepted (2026-09-20, Phase 17)
+- **Decision:** `~/.config/fuzzel/fuzzel.ini` no longer sets `[dmenu] exit-immediately-if-empty`
+  (the matugen template drops it; a migration re-renders machines themed before). A new
+  `network-watch` script runs after the picker: `network-menu` snapshots the saved profiles'
+  UUIDs, runs `networkmanager_dmenu`, then feeds the snapshot to `network-watch`, which watches
+  the Wi-Fi device through `nmcli` and shows mako toasts — Connecting, Connected, a critical
+  Could not connect, or Still connecting after 30 s. On a failure it deletes only the Wi-Fi
+  profile *this attempt created* (a UUID absent from the snapshot), so the next pick asks for
+  the password again; a profile that already existed is never deleted, and the toast says how
+  to forget it. A cancelled picker is silent. If the profiles cannot be listed the watcher is
+  skipped, because an empty snapshot would make every saved profile look new. Waybar's
+  `format-linked` tooltip no longer says "cable".
+- **Alternatives considered:** Replace `networkmanager-dmenu` with our own fuzzel + `nmcli`
+  script — the password would go on `nmcli`'s command line (visible in `ps`), which D-0069
+  forbids; `networkmanager-dmenu` hands it to NetworkManager over D-Bus. This is now the reason
+  D-0071 rejected it, not effort. `nm-applet` in the tray — a GTK3 stack plus a secret agent and
+  keyring we don't otherwise have. A `pinentry =` wrapper around `fuzzel --prompt-only
+  --password` — kept as the fallback if removing the setting doesn't fix the prompt on the
+  machine (it needs `networkmanager-dmenu` 2.7.1+ to accept arguments). A custom Waybar module
+  with a "connecting" icon — the `network` module has no such state, so it would mean a second
+  module and polling; declined by the user in favour of toasts.
+- **Reasoning:** On the Alienware the picker scanned and saved networks but never connected,
+  while `nmcli --ask device wifi connect` worked. `networkmanager_dmenu` gives fuzzel an empty
+  stdin for the passphrase prompt, and `exit-immediately-if-empty` (added in Phase 5, used by no
+  other menu; `clipboard-menu` already handles a cancelled menu) makes fuzzel quit at once, so an
+  empty password was saved. Separately, the picker exits when NetworkManager *accepts* the
+  request, so nothing reported what happened afterwards and a bad profile stayed saved. GNOME,
+  KDE, Windows and macOS all show a connecting state and an explicit failure; this supplies the
+  same from state we already have. `nm-connection-editor` (right-click) is an editor with no
+  Connect action — by design, not the bug.
+- **Consequences:** One more small script in `home/network`. The watcher polls `nmcli` for up to
+  30 s after each pick (about one call a second). It reads device and profile state only and
+  never a passphrase. It deletes a newly created profile on any failed first attempt, including
+  a non-password failure such as an out-of-range access point; the user re-enters the password.
+  Whether removing the setting alone fixes the prompt is confirmed on the machine (tracking doc).
