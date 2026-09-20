@@ -25,6 +25,14 @@ class Win: dry_run = True
 def pump(ms):
     loop = GLib.MainLoop(); GLib.timeout_add(ms, loop.quit); loop.run()
 
+def wait_until(condition, ms=6000):
+    """Run the main loop in short slices until `condition()` holds (or `ms` pass) -- a
+    fixed sleep is a race against the page's worker thread, and flaked on a cold start."""
+    waited = 0
+    while waited < ms and not condition():
+        pump(100)
+        waited += 100
+
 def check(label, cond):
     print(("ok   " if cond else "FAIL ") + label)
     if not cond: check.bad += 1
@@ -34,7 +42,7 @@ Adw.init()
 page, answers = WifiPage(), Answers()
 widget = page.build(answers)
 check("build() returns a widget", widget is not None)
-page.on_shown(answers, Win()); pump(700)
+page.on_shown(answers, Win()); wait_until(lambda: page._radio is not None and not page._busy)
 titles = [r.get_title() for r in page._rows]
 check(f"scan populated {len(titles)} network rows, strongest first", titles[:2] == ["HomeNet", "Neighbour 5G"])
 check("an SSID with a colon is shown unescaped", any("Cafe: Free Wi-Fi" in t for t in titles))
@@ -102,7 +110,7 @@ def shown_page(radio, diagnostics):
     win.set_child(page.build(Answers()))
     win.present()
     page.on_shown(Answers(), Win())
-    pump(700)
+    wait_until(lambda: page._radio is not None and not page._busy)
     return page, win
 
 
@@ -135,6 +143,23 @@ check("unknown: says it could not read the state, not a hardware switch", "Could
 
 page, win = shown_page("enabled:disabled", NOTHING)
 check("soft block: turned off, with the button to turn it on", page._status_row.get_title() == "Wi-Fi is turned off." and page._radio_button.get_visible())
+
+# The Alienware 14's real case: a Broadcom BCM4352 bound to the bcma bus driver, which never
+# gets a Wi-Fi interface. The page should say the installed system has the driver, not "BIOS".
+page = WifiPage(
+    diagnostics=lambda: Diagnostics("", [], [], [PciAdapter("14e4:43b1", "bcma-pci-bridge")]),
+    known={"14e4:43b1": "Broadcom BCM4352 802.11ac"},
+)
+page._backend = demo_backend(delay=0, radio="missing:enabled")
+win = Gtk.Window()
+win.set_child(page.build(Answers()))
+win.present()
+page.on_shown(Answers(), Win())
+wait_until(lambda: page._radio is not None and not page._busy)
+status = page._status_row.get_title()
+check("known adapter: names it and says Wi-Fi comes after the first boot", "Broadcom BCM4352" in status and "after the first boot" in status)
+check("known adapter: does not send the user to the BIOS", "BIOS" not in status)
+check("known adapter: skipping still works", page.validate(Answers()) is None)
 
 # Polling must stop when the page is no longer on screen.
 page, win = shown_page("disabled:enabled", BLOCKED)

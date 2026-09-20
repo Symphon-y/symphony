@@ -1,0 +1,14 @@
+# PCI devices that need packages the general inventory (packages/*.txt) does not carry.
+#
+# Format: <vendor:device>  <list>   # what the device is
+#
+# <list> names packages/hardware/<list>.txt, an ordinary package list (one package per
+# line with a "# why" comment, parsed only by scripts/pkglist). scripts/hwpkglist adds the
+# lists of the devices that are on the PCI bus at install time to what pacstrap installs,
+# so a machine only gets, say, a proprietary driver if it has the chip that needs it;
+# iso/build-offline-repo bakes every list into the offline repo so that works with no
+# network. The installer's Wi-Fi page reads the note to say what an adapter needs.
+#
+# Lowercase hex, as sysfs prints it (lspci -nn shows the pair in brackets).
+
+14e4:43b1  broadcom-wl  # Broadcom BCM4352 802.11ac

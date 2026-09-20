@@ -1,0 +1,10 @@
+# Broadcom BCM4352 802.11ac (PCI 14e4:43b1; the Dell DW1550 in the Alienware 14). Installed
+# only on a machine that has it (system/hardware.txt, scripts/hwpkglist) -- see D-0074.
+#
+# No open driver supports this chip: b43 predates 802.11ac and brcmfmac's ID table does not
+# list it. The kernel's bcma bus driver binds to it but only enumerates its cores, so no Wi-Fi
+# interface ever appears. Only Broadcom's proprietary wl driver works.
+
+broadcom-wl-dkms   # the wl driver, built by DKMS; ships its own modprobe blacklist (bcma, b43, ssb, brcm*)
+linux-headers      # DKMS builds wl against the headers of every installed kernel...
+linux-lts-headers  # ...and this system installs both kernels (D-0012)

@@ -177,6 +177,24 @@ class StatusMessageTest(unittest.TestCase):
         self.assertIn("ath9k", message)
         self.assertNotIn("No Wi-Fi adapter", message)
 
+    def test_a_known_adapter_that_needs_an_extra_driver_says_so_instead_of_pointing_at_the_bios(self):
+        # Found on the Alienware 14: a Broadcom BCM4352 (14e4:43b1) shows up bound to
+        # bcma-pci-bridge, which is only the bus, and no Wi-Fi interface ever appears.
+        # The BIOS is not the problem; the missing driver is, and the installed system
+        # gets it (system/hardware.txt).
+        self.sys.pci("0000:03:00.0", "0x028000", "0x14e4", "0x43b1", driver="bcma-pci-bridge")
+        known = {"14e4:43b1": "Broadcom BCM4352 802.11ac"}
+        message = status_message(RadioState.NO_ADAPTER, collect(self.sys.root), known)
+        self.assertIn("Broadcom BCM4352", message)
+        self.assertIn("after the first boot", message)
+        self.assertNotIn("BIOS", message)
+
+    def test_an_adapter_not_in_the_map_is_described_from_what_was_found(self):
+        self.sys.pci("0000:03:00.0", "0x028000", "0x14e4", "0x43b1", driver="bcma-pci-bridge")
+        message = status_message(RadioState.NO_ADAPTER, collect(self.sys.root), {})
+        self.assertIn("bcma-pci-bridge", message)
+        self.assertIn("BIOS", message)
+
     def test_a_soft_block_is_just_off(self):
         self.assertEqual(self.message(RadioState.SOFT_BLOCKED), "Wi-Fi is turned off.")
 

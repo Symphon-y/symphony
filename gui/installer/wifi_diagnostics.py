@@ -16,6 +16,7 @@ of the machine running them. Anything unreadable is skipped, never an error.
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -136,11 +137,18 @@ def collect(sys_root: Path | str = DEFAULT_SYS) -> Diagnostics:
     )
 
 
-def status_message(radio: RadioState, diagnostics: Diagnostics) -> str | None:
+def status_message(
+    radio: RadioState, diagnostics: Diagnostics, known: Mapping[str, str] | None = None
+) -> str | None:
     """What to tell the user about the radio, or None when it is on. Specific
     enough to act on (which device, what to try) and never a claim the facts do
     not support: a hardware switch is only blamed when NetworkManager reports a
-    hard block, and a missing adapter is reported as missing, not as switched off."""
+    hard block, and a missing adapter is reported as missing, not as switched off.
+
+    `known` is system/hardware.txt (hardware_map.load_map): an adapter listed there
+    is one the installed system gets a driver for, which is a better thing to say than
+    "check the BIOS" -- found on the Alienware 14, whose Broadcom BCM4352 binds to the
+    bcma bus driver and never gets a Wi-Fi interface."""
     if radio is RadioState.ON:
         return None
     if radio is RadioState.SOFT_BLOCKED:
@@ -160,6 +168,13 @@ def status_message(radio: RadioState, diagnostics: Diagnostics) -> str | None:
 
     # NO_ADAPTER: NetworkManager knows of no Wi-Fi hardware.
     adapters = diagnostics.pci_adapters
+    for adapter in adapters:
+        if known and adapter.ids in known:
+            name = known[adapter.ids] or adapter.ids
+            return (
+                f"Your Wi-Fi adapter ({name}) needs a driver that is installed with the "
+                "system, so Wi-Fi will be available after the first boot. You can skip this page."
+            )
     unbound = [a for a in adapters if not a.driver]
     if unbound:
         ids = ", ".join(a.ids for a in unbound)

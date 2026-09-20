@@ -182,7 +182,7 @@ outlines; their scope is finalized in their own plan mode.
   debugging" feature was explicitly deferred to its own future story,
   not squeezed into this phase's close.
 
-- **Phase 17:** in progress; see D-0068 to D-0072. Asked for an optional Wi-Fi
+- **Phase 17:** in progress; see D-0068 to D-0074. Asked for an optional Wi-Fi
   step in the installer and a taskbar where the Wi-Fi icon can be seen and used.
   Research (Omarchy's current line, Windows/macOS, Calamares, Arch and
   NetworkManager's own docs) first, then decisions asked directly: NetworkManager

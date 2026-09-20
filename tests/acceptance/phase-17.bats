@@ -224,3 +224,52 @@ bar_json() {
   run grep -F 'autarchy.nogui' "$REPO_ROOT/docs/runbooks/base-install.md"
   assert_success
 }
+
+# --- Hardware that needs extra packages: the PCI-ID map (Broadcom BCM4352) ---------------
+
+@test "hardware: every map entry names a package list that exists" {
+  local id list
+  while read -r id list _; do
+    assert [ -e "$REPO_ROOT/packages/hardware/$list.txt" ]
+  done < <(sed -E 's/#.*//' "$REPO_ROOT/system/hardware.txt" | awk 'NF >= 2')
+}
+
+@test "hardware: the BCM4352 (14e4:43b1) needs the proprietary wl driver, with headers for both kernels" {
+  run grep -E '^14e4:43b1[[:space:]]+broadcom-wl([[:space:]]|$)' "$REPO_ROOT/system/hardware.txt"
+  assert_success
+  run "$REPO_ROOT/scripts/pkglist" "$REPO_ROOT/packages/hardware/broadcom-wl.txt"
+  assert_success
+  assert_line "broadcom-wl-dkms"
+  # DKMS builds against the headers of each installed kernel; the system has both (D-0012).
+  assert_line "linux-headers"
+  assert_line "linux-lts-headers"
+}
+
+@test "hardware: the proprietary driver is gated by the hardware, not in the general inventory" {
+  run "$REPO_ROOT/scripts/pkglist" "$REPO_ROOT"/packages/*.txt
+  assert_success
+  refute_line "broadcom-wl-dkms"
+}
+
+@test "hardware: the offline package repo bakes in the hardware lists too, so an offline install can add them" {
+  run grep -F 'packages/hardware' "$REPO_ROOT/iso/build-offline-repo"
+  assert_success
+}
+
+@test "hardware: the installer asks scripts/hwpkglist what to add" {
+  run grep -F 'hwpkglist' "$REPO_ROOT/install/install-base-system"
+  assert_success
+}
+
+@test "hardware: the installer page reads the same map to describe an adapter" {
+  run grep -F 'hardware_map' "$REPO_ROOT/gui/installer/pages/wifi.py"
+  assert_success
+}
+
+@test "docs: DECISIONS.md records D-0073 and D-0074" {
+  local id
+  for id in D-0073 D-0074; do
+    run grep -E "^## $id " "$REPO_ROOT/DECISIONS.md"
+    assert_success
+  done
+}

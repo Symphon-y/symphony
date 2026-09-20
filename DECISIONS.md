@@ -1903,15 +1903,66 @@ and the old entry is marked `Superseded by D-XXXX`.
   than `enabled` as a hard block, but a real NetworkManager 1.58.1 in a container with no
   Wi-Fi device prints `missing:enabled` (exit 0) — so the message could name the wrong cause
   entirely — and the tests had only ever used a fake runner with four made-up fixtures. The
-  hardware research found the P39G's adapter is the Qualcomm Atheros Killer Wireless-N 1202
-  (AR9462, PCI 168c:0034, in-tree `ath9k`), that its BIOS has a "Function Key Behavior"
-  setting and a "Wireless" menu whose "Wireless Network: Disabled" makes the card invisible to
-  the OS, and that a Dell community report fixed an Alienware 14-R1 whose Fn+F2 did nothing
-  through that BIOS setting; `dell-laptop` most likely never binds (vendor "Alienware"), so a
-  real hard block would come from the adapter's own rfkill line held by the embedded
-  controller.
+  hardware research found that the P39G's BIOS has a "Function Key Behavior" setting and a
+  "Wireless" menu whose "Wireless Network: Disabled" makes the card invisible to the OS, and
+  that a Dell community report fixed an Alienware 14-R1 whose Fn+F2 did nothing through that
+  BIOS setting. **Correction (same day):** that research also named the adapter, the Qualcomm
+  Atheros Killer Wireless-N 1202 (AR9462, `ath9k`) -- wrong for this unit. The new "Details"
+  on the first hardware boot showed PCI 14e4:43b1, a Broadcom BCM4352, which needs the
+  proprietary `wl` driver (D-0074), and an `rfkill` device `dell-rbtn` hard-blocked
+  (`dell-rbtn` registers an rfkill only for a firmware-reported airplane-mode slider; the state
+  is whatever the BIOS returns); this entry's diagnostics are what found both.
 - **Consequences:** The real cause on this machine is settled by the new "Details" on the
   next boot rather than assumed. Hardware quirks specific to one laptop stay out of the
   installer; what it does is make the problem legible. The tests now use real `nmcli` strings
   and a fake sysfs tree; only the empty-tree case of the sysfs reader has been run on a real
   `/sys`, so the first hardware boot is also its first real exercise.
+
+## D-0074 — Hardware that needs extra packages is declared by PCI ID and added only where it is present (the Broadcom BCM4352's proprietary driver)
+
+- **Status:** Accepted (2026-09-20, Phase 17)
+- **Decision:** `system/hardware.txt` maps a PCI `vendor:device` ID to a list under
+  `packages/hardware/` — ordinary package lists (one package per line with a "why"
+  comment), parsed only by `scripts/pkglist`. `scripts/hwpkglist` prints the packages of every
+  list whose device is on the PCI bus; `install-base-system` resolves them up front, before
+  anything destructive, and adds them to the `pacstrap` list; `iso/build-offline-repo` bakes
+  every hardware list into the offline repo so an offline install can add them; `pkg-audit`
+  treats them as declared when installed and never as missing when not. A malformed map line
+  or an unknown list fails closed (nothing printed, exit 1), so a broken map stops the install
+  before the disk is touched. The first entry is `14e4:43b1` (Broadcom BCM4352) →
+  `broadcom-wl-dkms` plus `linux-headers` and `linux-lts-headers`. The installer's Wi-Fi page
+  reads the same file to say what an adapter needs. The live ISO carries no `wl`; on this
+  laptop the page says the adapter needs a driver that comes with the installed system, so
+  Wi-Fi is available after the first boot.
+- **Alternatives considered:** Install it on every machine — about 300 MB of kernel headers and
+  a proprietary module on hardware that doesn't need them. A host-keyed list
+  (`packages/alienware-14.txt`, Phase 12's plan) — keyed by a hostname the user chooses, not by
+  the hardware. Build `wl` into the live ISO so the page can connect during install — dkms, the
+  headers and a compiler in the live image (about 200 MB more, more RAM pinned) and a build step
+  that must track the kernel; declined by the user, since the install itself needs no network.
+  Ship no driver — leaves the laptop needing Ethernet or a USB adapter. A precompiled package —
+  `broadcom-wl` no longer exists in Arch's repositories, only the DKMS one. Omarchy's shape (a
+  script per chip checking PCI IDs during install, `install/hardware/fix-bcm43xx.sh`) — ADAPTed
+  as declarative data plus one tested selector, so the next quirk is a line in a file.
+- **Reasoning:** The evidence came from the machine itself: the installer page's new Details
+  (D-0073) showed `14e4:43b1` bound to `bcma-pci-bridge`. No open driver supports that chip —
+  `b43` predates 802.11ac, `brcmfmac`'s ID table does not list it, and `bcma` only enumerates
+  its cores, so no Wi-Fi interface ever appears and NetworkManager reports no adapter. Only
+  Broadcom's proprietary `wl` works. It builds against both current kernels (`linux` 7.2.6 and
+  `linux-lts` 6.18.52, checked in a container), and in a real `pacstrap` — base plus both
+  kernels plus what `hwpkglist` added, in one transaction like the installer's — DKMS built
+  `wl` for both inside the new system. The package ships its own module blacklist (`bcma`,
+  `b43`, `ssb`, `brcm*`), so no extra configuration is needed. A proprietary, kernel-tainting
+  module is accepted for this hardware, and only for it: the user confirmed shipping it gated
+  by the chip.
+- **Consequences:** Proprietary code on machines with this chip only. DKMS needs the headers of
+  every installed kernel and builds at install time (a little longer), and rebuilds through its
+  pacman hook whenever a kernel updates; a kernel too new for the packaged patches would break
+  the build, so this rides on the package tracking the kernel (it currently covers 7.2). No
+  Wi-Fi during install on this laptop — the live session has no `wl` — so the laptop comes up
+  offline and the user joins from the bar after first boot. Separately, the `dell-rbtn` rfkill
+  (a firmware-reported airplane-mode slider, hard-blocked) would keep NetworkManager from
+  enabling Wi-Fi even with the driver; other Alienware owners cleared it by blacklisting the
+  module or with an `acpi_osi` kernel parameter, but nothing confirms either for the 14, so
+  that waits for a test on the machine (`modprobe -r dell_rbtn` from `autarchy.nogui`) rather
+  than being guessed. Phase 12's planned `packages/alienware-14.txt` is superseded by this.

@@ -341,3 +341,37 @@ EOF
   run calls
   assert_line "arch-chroot $TARGET chown -R alice:alice /home/alice/.local"
 }
+
+# scripts/hwpkglist answers from the PCI bus and is tested on its own; here it is a stub.
+hwpkglist_stub() {
+  printf '#!/usr/bin/env bash\n%s\n' "$1" >"$BATS_TEST_TMPDIR/hwpkglist-stub"
+  chmod +x "$BATS_TEST_TMPDIR/hwpkglist-stub"
+}
+
+@test "pacstraps the packages this machine's hardware needs on top of the declared ones (Phase 17)" {
+  hwpkglist_stub 'printf "broadcom-wl-dkms\nlinux-headers\n"'
+  AUTARCHY_HWPKGLIST_SCRIPT="$BATS_TEST_TMPDIR/hwpkglist-stub" run_confirmed
+  assert_success
+  run calls
+  assert_line --partial "pacstrap -K -M $TARGET"
+  assert_line --partial " broadcom-wl-dkms"
+  assert_line --partial " linux-headers"
+  # ...alongside the ordinary inventory, not instead of it.
+  assert_line --partial " networkmanager"
+}
+
+@test "pacstraps no hardware-specific packages when the hardware needs none (Phase 17)" {
+  hwpkglist_stub 'exit 0'
+  AUTARCHY_HWPKGLIST_SCRIPT="$BATS_TEST_TMPDIR/hwpkglist-stub" run_confirmed
+  assert_success
+  run calls
+  refute_output --partial "broadcom-wl-dkms"
+}
+
+@test "a failing hardware lookup stops the install before pacstrap touches anything (Phase 17)" {
+  hwpkglist_stub 'echo "hwpkglist: broken map" >&2; exit 1'
+  AUTARCHY_HWPKGLIST_SCRIPT="$BATS_TEST_TMPDIR/hwpkglist-stub" run_confirmed
+  assert_failure
+  run calls
+  refute_output --partial "pacstrap"
+}

@@ -37,7 +37,7 @@ one home for each piece of knowledge, red tests first.
   rfkill-disabled / linked states, tooltip, and click actions; a `battery` module.
 - `network-menu` entry point: left-click and `SUPER+CTRL+N` open the
   `networkmanager-dmenu` picker through fuzzel; right-click opens `nm-connection-editor`.
-- Docs, decisions D-0068 to D-0072, an Omarchy-influences entry for network/Wi-Fi UI.
+- Docs, decisions D-0068 to D-0074, an Omarchy-influences entry for network/Wi-Fi UI.
 
 **Out of scope**
 - Enterprise 802.1X, VPN UI, captive-portal UI, tray producers (enterprise and VPN
@@ -169,7 +169,8 @@ Red confirmed: | Green confirmed: |
 - [x] Step 3 -- `Answers`, Wi-Fi page, Review row, demo backend (red, green)
 - [x] Step 4 -- target side: profile copy, connectivity drop-in, regdom, wait-online mask, wireless-regdb (red, green)
 - [x] Step 5 -- Waybar `network`/`battery`, `network-menu`, keybinding, matugen `error` colour, theme migration (red, green)
-- [x] Step 6 -- `phase-17.bats`, runbooks, influences entry, decisions D-0068 to D-0072, roadmap
+- [x] Hotfixes -- diagnosing a blocked or missing radio (D-0073) and the PCI-ID hardware map with the Broadcom driver (D-0074), red then green
+- [x] Step 6 -- `phase-17.bats`, runbooks, influences entry, decisions D-0068 to D-0074, roadmap
 - [ ] Build an ISO locally (`scripts/build-iso`), boot in a VM: guided install with Skip, no regression
 - [ ] Real hardware: Wi-Fi page on the Alienware, install, reboot, land online; icon states,
       left/right click, rfkill, `SUPER+CTRL+N`, battery; password absent from `ps` and the
@@ -327,9 +328,10 @@ Red confirmed: | Green confirmed: |
      block, named no device, offered no next step, and only re-read on a click; and the live
      session offered no way to look (`cage` has no VT switching; `iw`, `lspci`, `lsusb` and
      `evtest` were not on the ISO; `system-report` collected nothing about Wi-Fi).
-  3. **The hardware (sources; two items inferred).** The P39G's adapter is the Qualcomm Atheros
-     Killer Wireless-N 1202 = AR9462 (PCI 168c:0034, in-tree `ath9k`, Bluetooth on the same
-     card). Its BIOS has *Advanced > Function Key Behavior* and a *Wireless* menu (Wireless
+  3. **The hardware (sources; two items inferred).** *(Wrong on one point, corrected below: the
+     research named the adapter as the Qualcomm Atheros Killer Wireless-N 1202 / AR9462 --
+     this unit's is a Broadcom BCM4352.)* The BIOS has *Advanced > Function Key Behavior*
+     and a *Wireless* menu (Wireless
      Network, Wireless Switch/Hotkey); the owner's manual says "Wireless Network: Disabled"
      makes the device invisible to the OS; a Dell community report of an Alienware 14-R1 whose
      Fn+F2 did nothing was fixed through Function Key Behavior. `dell-laptop` probably never
@@ -352,6 +354,38 @@ Red confirmed: | Green confirmed: |
   enabled); power-cycle the embedded controller (shut down, unplug AC, hold the power button
   ~30 s); then try Fn+F2. On the new ISO the page names what it finds.
 
+### 2026-09-20 (second hardware boot: what the new Details showed)
+- **The page now reported:** "A Wi-Fi adapter `14e4:43b1`, driver `bcma-pci-bridge`, was found but
+  the system can't use it", and `rfkill dell-rbtn (wlan): hard-blocked`, `hci0 (bluetooth):
+  not blocked`. Two separate problems, and **my hardware research was wrong about the adapter**
+  (it named an Atheros Killer 1202; this unit has a Broadcom BCM4352 -- corrected in D-0073).
+- **Problem 1 -- no driver.** `14e4:43b1` is a BCM4352. Nothing open supports it (`b43` predates
+  802.11ac, `brcmfmac`'s ID table lacks it, `bcma-pci-bridge` only enumerates the chip's cores),
+  so no Wi-Fi interface ever appears and NetworkManager prints `missing`. Only the proprietary
+  `wl` (`broadcom-wl-dkms`) works; the precompiled `broadcom-wl` no longer exists in Arch. Checked
+  for real: it builds against `linux` 7.2.6 and `linux-lts` 6.18.52; in a real `pacstrap` of
+  base plus both kernels plus the hardware packages (one transaction, like the installer's) DKMS
+  built `wl` for both inside the new system, and the package ships its own modprobe blacklist.
+- **Built (D-0074, red first):** `system/hardware.txt` (PCI ID -> package list),
+  `packages/hardware/broadcom-wl.txt`, `scripts/hwpkglist` (12 bats tests, fails closed),
+  `install-base-system` resolving and adding the packages before anything destructive,
+  `iso/build-offline-repo` baking every hardware list into the offline repo, `pkg-audit` treating
+  them as declared-but-optional, and the Wi-Fi page reading the same map (`hardware_map.py`) to
+  say "your adapter needs a driver that comes with the installed system, so Wi-Fi will be
+  available after the first boot" instead of "check the BIOS". User decisions (asked): ship it
+  only when the chip is present; the live session just explains; test `dell-rbtn` before shipping
+  a fix. One real smoke-test flake (1 run in 3) was traced to a fixed 700 ms sleep in the test
+  itself and replaced with a wait for the condition (6 stable runs).
+- **Problem 2 -- `dell-rbtn`, still open.** It registers an rfkill only for a firmware-reported
+  airplane-mode *slider*; the state is whatever the BIOS returns and software cannot change it,
+  and NetworkManager takes the worst state across all Wi-Fi rfkill devices, so it would keep
+  Wi-Fi off even with the driver. Other Alienware owners (13 R3, 15 R2) and several Inspiron
+  owners cleared it by blacklisting `dell_rbtn` (or, on the 15 R2, `acpi_osi="!Windows 2012"`);
+  nothing confirms either for the 14 and no source shows `modprobe -r` clearing it live. **Waiting
+  on the user's test** from `autarchy.nogui`: `grep -H . /sys/class/rfkill/rfkill*/{name,hard,soft};
+  modprobe -r dell_rbtn; rfkill list`, then the result decides between a DMI-gated blacklist and the
+  `acpi_osi` parameter.
+
 ## VM → physical hardware notes
 
 - A VM has no real radio: the unit tests use a fake command runner and recorded
@@ -366,7 +400,7 @@ Red confirmed: | Green confirmed: |
 
 - [ ] All acceptance tests pass
 - [ ] Static checks pass
-- [ ] `DECISIONS.md` updated (D-0068 to D-0072)
+- [ ] `DECISIONS.md` updated (D-0068 to D-0074)
 - [ ] `docs/omarchy-influences.md` updated
 - [ ] `docs/roadmap.md` status updated
 - [ ] Branch merged to `main`

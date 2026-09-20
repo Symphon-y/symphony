@@ -85,3 +85,21 @@ fixture() {
   assert_success
   assert_output --partial "no drift"
 }
+
+@test "a hardware-specific package (packages/hardware/) that is installed is not reported as undeclared" {
+  fixture base.txt "git"
+  mkdir -p "$PKGS/hardware"
+  printf '%s\n' "broadcom-wl-dkms" >"$PKGS/hardware/broadcom-wl.txt"
+  STUB_EXPLICIT="git broadcom-wl-dkms" run "$SCRIPT" --packages-dir "$PKGS"
+  assert_success
+  assert_output --partial "no drift"
+}
+
+@test "a hardware-specific package that is not installed is not reported as missing (it only applies to some machines)" {
+  fixture base.txt "git"
+  mkdir -p "$PKGS/hardware"
+  printf '%s\n' "broadcom-wl-dkms" >"$PKGS/hardware/broadcom-wl.txt"
+  STUB_EXPLICIT="git" run "$SCRIPT" --packages-dir "$PKGS"
+  assert_success
+  assert_output --partial "no drift"
+}

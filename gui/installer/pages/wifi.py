@@ -17,7 +17,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, GLib, Gtk
 
-from .. import wifi, wifi_diagnostics
+from .. import hardware_map, wifi, wifi_diagnostics
 from ..page import Page
 from ..state import Answers
 from ..wifi_demo import demo_backend
@@ -39,10 +39,12 @@ def _signal_icon(signal: int) -> str:
 class WifiPage(Page):
     title = "Wi-Fi"
 
-    def __init__(self, diagnostics=None) -> None:
-        # What to read the machine's Wi-Fi facts from; injectable so the smoke test
-        # can present a blocked laptop without one.
+    def __init__(self, diagnostics=None, known=None) -> None:
+        # What to read the machine's Wi-Fi facts from, and which adapters the installed
+        # system has a driver for (system/hardware.txt); both injectable so the smoke
+        # test can present a particular laptop without one.
         self._diagnostics = diagnostics or wifi_diagnostics.collect
+        self._known = hardware_map.load_map() if known is None else known
         self._radio: wifi.RadioState | None = None
         self._poll_id: int | None = None
         self._root: Gtk.Widget | None = None
@@ -206,10 +208,10 @@ class WifiPage(Page):
 
         if radio in (wifi.RadioState.HARD_BLOCKED, wifi.RadioState.SOFT_BLOCKED, wifi.RadioState.NO_ADAPTER):
             aps = []
-            self._show_status(wifi_diagnostics.status_message(radio, diagnostics))
+            self._show_status(wifi_diagnostics.status_message(radio, diagnostics, self._known))
         elif radio is wifi.RadioState.UNKNOWN:
             # Can't tell -- a scan may still work, so leave whatever it found.
-            self._show_status(wifi_diagnostics.status_message(radio, diagnostics))
+            self._show_status(wifi_diagnostics.status_message(radio, diagnostics, self._known))
         elif self._connected_ssid:
             self._show_status(f"Connected to {self._connected_ssid}.")
         elif ethernet:

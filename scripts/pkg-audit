@@ -30,6 +30,13 @@ fi
 installed=$(pacman -Qqe | sort)
 present=$(pacman -Qq | sort)
 declared=$(scripts/pkglist "$packages_dir"/*.txt)
+# Hardware-specific packages (packages/hardware/, Phase 17) apply only to machines with
+# that hardware: they satisfy "declared" when installed, but are never "missing" when not.
+hardware_declared=""
+if compgen -G "$packages_dir/hardware/*.txt" >/dev/null; then
+  hardware_declared=$(scripts/pkglist "$packages_dir"/hardware/*.txt)
+fi
+allowed=$(printf '%s\n%s\n' "$declared" "$hardware_declared" | grep . | sort -u)
 desktop_declared=$(scripts/pkglist "$packages_dir/desktop.txt")
 # pacman -Qqm exits non-zero when it finds no foreign packages; only the (empty)
 # output matters then, so a failing pipeline here isn't this script's failure.
@@ -41,7 +48,7 @@ indent() {
 
 problems=0
 
-undeclared=$(comm -23 <(echo "$installed") <(echo "$declared"))
+undeclared=$(comm -23 <(echo "$installed") <(echo "$allowed"))
 if [[ -n $undeclared ]]; then
   echo "installed but not declared in $packages_dir/*.txt:"
   indent "$undeclared"

@@ -26,6 +26,11 @@ set -Eeuo pipefail
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO_ROOT
 readonly CONFIGURE_SCRIPT="${AUTARCHY_CONFIGURE_SCRIPT:-$REPO_ROOT/install/configure-base-system}"
+readonly HWPKGLIST="${AUTARCHY_HWPKGLIST_SCRIPT:-$REPO_ROOT/scripts/hwpkglist}"
+
+# Packages this machine's hardware needs on top of packages/*.txt (Phase 17); filled in by
+# resolve_hardware_packages before anything destructive happens.
+HARDWARE_PACKAGES=()
 
 readonly REQUIRED_VARS=(DISK HOST USERNAME TZONE LOCALE KEYMAP)
 # SWAP_SIZE is optional (Phase 12): unset means zram-only, unchanged from
@@ -83,6 +88,19 @@ preflight() {
   local mounted
   mounted=$(lsblk -no MOUNTPOINT "$DISK" 2>/dev/null | grep -c . || true)
   ((mounted == 0)) || die "'$DISK' has a mounted partition -- unmount it first"
+}
+
+# Which extra packages the PCI devices on this machine need (system/hardware.txt, e.g.
+# the proprietary driver for a Broadcom BCM4352 Wi-Fi chip). Resolved up front, with the
+# other checks: a broken map must stop the install before the disk is touched, and a
+# failure inside `mapfile < <(...)` would be silent, hence the command substitution.
+resolve_hardware_packages() {
+  local output
+  output=$("$HWPKGLIST")
+  [[ -z $output ]] || mapfile -t HARDWARE_PACKAGES <<<"$output"
+  if ((${#HARDWARE_PACKAGES[@]} > 0)); then
+    log "This machine's hardware needs: ${HARDWARE_PACKAGES[*]}"
+  fi
 }
 
 # The one interactive moment: typing the disk path back, not just y/n, so a
@@ -170,6 +188,7 @@ install_packages_and_fstab() {
   log "Installing packages (pacstrap)"
   local packages=()
   mapfile -t packages < <("$REPO_ROOT/scripts/pkglist" "$REPO_ROOT"/packages/*.txt)
+  packages+=("${HARDWARE_PACKAGES[@]}")
   # -M: don't copy the live ISO's own (nonexistent/blank) mirrorlist into
   # the installed system -- leaves the target to use its own freshly-
   # pacstrap'd pacman-mirrorlist package's template instead.
@@ -240,6 +259,7 @@ main() {
 
   load_config "$vars_file"
   preflight
+  resolve_hardware_packages
   confirm_destructive
 
   partition_disk

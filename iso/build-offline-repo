@@ -31,7 +31,10 @@ main() {
 
   log "Downloading the official-repo package closure"
   local all_pkgs=() official_pkgs=()
-  mapfile -t all_pkgs < <("$REPO_ROOT/scripts/pkglist" "$REPO_ROOT"/packages/*.txt)
+  # packages/hardware/*.txt too (Phase 17): install-base-system adds only the ones a
+  # machine's PCI devices call for (scripts/hwpkglist), but an offline install can only
+  # add what is baked in here, so every list goes in.
+  mapfile -t all_pkgs < <("$REPO_ROOT/scripts/pkglist" "$REPO_ROOT"/packages/*.txt "$REPO_ROOT"/packages/hardware/*.txt)
   mapfile -t official_pkgs < <(printf '%s\n' "${all_pkgs[@]}" |
     grep -vxFf <(printf '%s\n' "${AUR_PACKAGES[@]}"))
   # A blank dbpath, not the container's real one: pacman -Syw against an
