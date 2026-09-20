@@ -312,6 +312,27 @@ Green confirmed: 2026-09-20 (`scripts/check` green; `phase-16.bats` 6/6)
   bootstrap is fully retired" fails on this branch's HEAD too (it flags
   `docs/roadmap.md`); acceptance tests aren't part of CI's `scripts/check`.
 
+- **Local ISO builds** (user: skip the 20-40 minute CI round trip and burn
+  straight to USB). `scripts/build-iso` runs the release workflow's steps in a
+  privileged Arch container on the dev machine -- from a git bundle streamed in,
+  not a bind mount of the working tree, because a Windows checkout has CRLF
+  endings, flattened symlinks and no file modes that would otherwise ship in the
+  ISO -- and `docker cp`s the result out. First real build of `5b1d194`: 11m31s,
+  2.9 GB, and it got through `git archive`'s pathspec exclude, the offline repo
+  and mkarchiso first time. The one bug only the real host could show: a blanket
+  `MSYS_NO_PATHCONV=1` stopped Git Bash translating `/c/Users/...` for native
+  `git.exe`; scoped to the container-engine calls now. `iso/write-usb.ps1` is the
+  Windows raw-write counterpart of `dd` (USB-only, refuses the system disk, typed
+  confirmation, checksum before and read-back after); its write/verify loops were
+  tested against a scratch file and its refusals against fake disks -- the raw
+  `\\.\PhysicalDriveN` write itself is first exercised on real hardware.
+- **Hardware round 2, first result:** the install stopped in `sgdisk` ("could not
+  create partition 2 ... unable to set partition 2's name to cryptswap"). Cause:
+  a malformed hibernation swap size typed on the Disk page -- user error, not a
+  code defect -- but the error names nothing about the size. Recorded as a backlog
+  item (validate the swap size in the GUI, the terminal fallback and
+  `install-base-system`'s preflight) rather than fixed here.
+
 ## VM → physical hardware notes
 
 - Every script-level behavior is bats-verified against stubs (no real

@@ -62,3 +62,29 @@ setup() {
   run grep -F '/usr/local/share/autarchy/current/install/first-login' "$REPO_ROOT/home/hypr/dot-config/hypr/autostart.lua"
   assert_success
 }
+
+@test "iso/write-usb.ps1 keeps its safety checks: USB-only, not the system disk, typed confirmation, checksum, read-back" {
+  # Can't be run here (Windows-only, needs a real disk); these are the guards a
+  # later edit must not quietly drop.
+  local ps="$REPO_ROOT/iso/write-usb.ps1"
+  run grep -F "BusType -ne 'USB'" "$ps"
+  assert_success
+  # shellcheck disable=SC2016 # matching PowerShell's literal text, not expanding it
+  run grep -F 'IsSystem -or $Disk.IsBoot' "$ps"
+  assert_success
+  run grep -F 'Read-Host' "$ps"
+  assert_success
+  run grep -F 'Test-IsoChecksum' "$ps"
+  assert_success
+  run grep -F 'Get-PrefixHash' "$ps"
+  assert_success
+}
+
+@test "scripts/build-iso builds from git objects, not a bind mount of the working tree" {
+  # No host:container volume mapping (`command -v` is a different -v).
+  run grep -E -- '(^|[[:space:]])-v[[:space:]]+[^[:space:]]+:|--volume|--mount' "$REPO_ROOT/scripts/build-iso"
+  assert_failure
+  # shellcheck disable=SC2016 # matching the script's literal text, not expanding it
+  run grep -F 'git -C "$REPO_ROOT" bundle create' "$REPO_ROOT/scripts/build-iso"
+  assert_success
+}

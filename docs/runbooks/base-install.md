@@ -24,6 +24,26 @@ VM), and again for the rebuild test (Phase 8) and physical hardware (Phase 12).
   ```
   Only write the reassembled file to USB once that reports `OK`.
 
+  **Building the ISO yourself instead of waiting on CI** (the 20-40 minute
+  GitHub Actions round trip is most of a real-hardware test cycle). Needs only
+  git and a container engine (Docker Desktop is fine on Windows):
+  ```sh
+  scripts/build-iso                # builds the committed HEAD -> out/autarchy-local-<sha>.iso
+  scripts/build-iso --tag 2026.09.20-test1 --ref my-branch
+  ```
+  It runs the same steps as the release workflow in a privileged Arch
+  container and never uploads anything. Only *committed* work goes in (it warns
+  if the tree is dirty). Then write it to a USB stick -- on Windows, from an
+  **elevated** PowerShell (`iso/write-usb.ps1` lists the USB disks first and
+  touches nothing until you pass `-DiskNumber` and type the number back; it
+  refuses non-USB and system disks, checks the ISO against its `.sha256`, and
+  reads the stick back afterwards):
+  ```powershell
+  .\iso\write-usb.ps1                  # list the USB disks it would accept
+  .\iso\write-usb.ps1 -DiskNumber 4    # erase that disk and write the ISO
+  ```
+  On Linux, `sha256sum -c` the `.sha256` and `dd` the ISO as usual.
+
   **The whole runbook below (steps 1-7) is replaced by one guided
   command**, printed on screen the moment you log in:
   ```sh
