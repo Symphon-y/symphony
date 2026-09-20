@@ -47,7 +47,7 @@
     "format-disabled": "󰤭",
     "tooltip-format-wifi": "{essid}  {signalStrength}%  {frequency} GHz\n{ipaddr}/{cidr}",
     "tooltip-format-ethernet": "{ifname}\n{ipaddr}/{cidr}",
-    "tooltip-format-linked": "{ifname}: cable connected, no address",
+    "tooltip-format-linked": "{ifname}: linked, waiting for an address",
     "tooltip-format-disconnected": "Not connected -- click to choose a network",
     "tooltip-format-disabled": "Wi-Fi is off -- click to open the network menu",
     "on-click": "network-menu",

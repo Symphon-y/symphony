@@ -190,6 +190,21 @@ bar_json() {
   assert_failure
 }
 
+@test "bar: the linked tooltip is true for Wi-Fi too (a link with no address yet is not necessarily a cable)" {
+  run bash -c "$(declare -f bar_json); BAR='$BAR'; bar_json | jq -r '.network[\"tooltip-format-linked\"]'"
+  assert_success
+  refute_output --partial "cable"
+  assert_output --partial "{ifname}"
+}
+
+@test "menu: network-watch reports the connection outcome, and network-menu calls it (D-0075)" {
+  # Executable on Linux; a Windows checkout loses the bit, so the index mode answers there.
+  [[ -x "$REPO_ROOT/home/network/dot-local/bin/network-watch" ]] ||
+    git -C "$REPO_ROOT" ls-files -s -- home/network/dot-local/bin/network-watch | grep -q '^100755'
+  run grep -F 'network-watch' "$REPO_ROOT/home/network/dot-local/bin/network-menu"
+  assert_success
+}
+
 @test "packages: the network picker and the settings window are in the inventory" {
   run "$REPO_ROOT/scripts/pkglist" "$REPO_ROOT"/packages/*.txt
   assert_success
