@@ -158,7 +158,7 @@ Red confirmed: | Green confirmed: |
 - [x] Spikes 1-3, results logged (containerised NetworkManager, packages, regdb)
 - [ ] Spikes 4-5 (need a compositor / a booted ISO) -- on the first ISO boot
 - [x] Step 1 -- live ISO to NetworkManager (red, green)
-- [ ] Step 2 -- `gui/installer/wifi.py` and `gui/tests/test_wifi.py` (red, green)
+- [x] Step 2 -- `gui/installer/wifi.py` and `gui/tests/test_wifi.py` (red, green)
 - [ ] Step 3 -- `Answers`, Wi-Fi page, Review row, fake backend (red, green)
 - [ ] Step 4 -- target side: profile copy, connectivity drop-in, regdom (if spiked in), packages (red, green)
 - [ ] Step 5 -- Waybar `network`/`battery`, `network-menu`, keybinding, matugen `error` colour (red, green)
@@ -204,6 +204,30 @@ Red confirmed: | Green confirmed: |
     that `configure_boot` already owns, spike-gated; one `network-menu` entry point.
 - User decisions (asked directly): NetworkManager on the live ISO; `nm-connection-editor`
   on right-click; battery as the only extra indicator; connectivity check disabled.
+
+### 2026-09-20 (implementation)
+- **Step 1 -- live ISO on NetworkManager (green).** Red first: the phase-17 static tests
+  and the updated phase-12 wants assertion failed, then passed. `iwd` and `dhcpcd` are
+  removed (a second manager would fight NetworkManager), the connectivity override ships
+  in the live airootfs -- checked against a real NetworkManager, the same-named `/etc`
+  file replaces Arch's shipped one and leaves `enabled=false` with no URI -- and the
+  terminal-fallback banner now says `nmtui`. `tests/helpers/common.bash` gained
+  `is_symlink`, which falls back to the git index because this repo's symlinks are
+  flattened to plain files in a Windows checkout.
+- **Step 2 -- `gui/installer/wifi.py` (green).** 43 new tests (red = the module did not
+  exist), all passing first time. Then the check that matters: the *production*
+  `keyfile_for()` output for all 16 awkward SSID/password cases was fed to a real
+  NetworkManager 1.58.1 and every `id`, `ssid`, `psk`, `psk-flags=0` and `key-mgmt`
+  came back exactly. Design points settled while writing it: one fixed profile file
+  (`autarchy-wifi.nmconnection`) so no file name is built from a user-typed SSID and
+  joining another network replaces the first; the profile is written 0600 under any
+  umask and tightened if it already existed looser; a file NetworkManager silently
+  ignores is detected after the reload; a failed join deletes the profile (a wrong
+  password must not stay to autoconnect-loop or reach the installed system); the
+  passphrase is scrubbed from every error message and never in any argv element; WPA
+  passphrases follow NetworkManager's own rule (8-63 printable ASCII, or 64 hex).
+  `nmcli` failure wording (wrong password / not found / timeout) is matched from its
+  documented messages and is re-verified on real hardware.
 
 ## Backlog (recorded, not in this phase)
 
