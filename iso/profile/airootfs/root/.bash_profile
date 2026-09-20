@@ -10,7 +10,15 @@
 # on plain getty, landing on this same login shell below, as the escape
 # hatch to the terminal fallback (autarchy-install) or the manual
 # runbook path if the GUI can't start on real hardware.
-if [[ $(tty) == /dev/tty1 ]]; then
+#
+# autarchy.nogui on the kernel command line (systemd-boot: press `e` on the entry
+# and append it) skips the GUI and leaves this login shell on tty1 -- the only way
+# to a terminal on tty1, since cage has no VT switching (D-0066), for diagnosing
+# hardware the installer can't get past (a Wi-Fi adapter that is blocked or missing).
+#
+# Matched as a whole space-delimited token, not with grep -w (which would also
+# match autarchy.nogui-something: '-' counts as a word boundary).
+if [[ $(tty) == /dev/tty1 ]] && ! grep -qE '(^| )autarchy\.nogui( |$)' "${AUTARCHY_CMDLINE_FILE:-/proc/cmdline}"; then
   # Pinned, not left to GTK's own default: GTK >=4.16 defaults to a
   # Vulkan (GSK) renderer on Wayland, and the Alienware's Haswell/HD 4600
   # iGPU has documented blank-window bugs on exactly this GPU generation

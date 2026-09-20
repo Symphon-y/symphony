@@ -1872,3 +1872,46 @@ and the old entry is marked `Superseded by D-XXXX`.
   `iw reg get` on the Alienware confirms. The live session stays in the world
   domain, so it may miss some 5 GHz networks. D-0067 (Phase 16's installed-machine
   layout) is written at that phase's close-out.
+
+## D-0073 — A blocked or missing Wi-Fi radio is named and diagnosed on the installer page, never guessed
+
+- **Status:** Accepted (2026-09-20, Phase 17)
+- **Decision:** `WifiBackend.radio_state()` reads `nmcli -t -f WIFI-HW,WIFI radio`
+  explicitly: `enabled`/`disabled` in `WIFI-HW` are "not blocked" and "hard-blocked",
+  `missing` is a new `NO_ADAPTER` state, and any value it does not recognise is
+  `UNKNOWN` — never a confident "hardware switch". Every command runs under
+  `LC_ALL=C`. The Wi-Fi page says what is true for each state: a hard block names the
+  blocking rfkill device and its driver, a missing adapter says none was found (or
+  names one with no driver), and a "Details" section shows the machine's own facts
+  (rfkill devices, Wi-Fi adapters on the PCI bus and whether a driver bound, wireless
+  interfaces), read from sysfs by a GTK-free module (`gui/installer/wifi_diagnostics.py`).
+  The page re-reads the state every couple of seconds while it is blocked, missing or
+  unreadable and stops when it leaves the screen, so pressing the Wi-Fi key or fixing a
+  BIOS setting is noticed on its own. The live ISO gains `iw`, `pciutils`, `usbutils`
+  and `evtest`; `autarchy.nogui` on the kernel command line skips the GUI and leaves a
+  terminal on tty1; `scripts/system-report` gains a Wi-Fi section built on the same module.
+- **Alternatives considered:** Keep one generic message — what failed. Show raw
+  `rfkill list` output — needs the tool and a parser, and still doesn't say what to do.
+  An in-GUI terminal — the Phase 15 deferred idea (D-0066); `cage` has no key bindings, so
+  it needs its own mechanism, and a boot-time option answers the immediate need at a
+  fraction of the cost (it stays deferred). Trying to clear a hard block from software —
+  not possible, `rfkill unblock` only changes the soft bit. Blacklisting Dell kernel
+  modules speculatively — no evidence any of them is involved.
+- **Reasoning:** Found on real hardware. On the Alienware 14 (P39G) the page said "Wi-Fi is
+  switched off by a hardware switch" while the laptop's Wi-Fi key (F2) did nothing, and the
+  live session had no terminal to look with. The code treated every `WIFI-HW` value other
+  than `enabled` as a hard block, but a real NetworkManager 1.58.1 in a container with no
+  Wi-Fi device prints `missing:enabled` (exit 0) — so the message could name the wrong cause
+  entirely — and the tests had only ever used a fake runner with four made-up fixtures. The
+  hardware research found the P39G's adapter is the Qualcomm Atheros Killer Wireless-N 1202
+  (AR9462, PCI 168c:0034, in-tree `ath9k`), that its BIOS has a "Function Key Behavior"
+  setting and a "Wireless" menu whose "Wireless Network: Disabled" makes the card invisible to
+  the OS, and that a Dell community report fixed an Alienware 14-R1 whose Fn+F2 did nothing
+  through that BIOS setting; `dell-laptop` most likely never binds (vendor "Alienware"), so a
+  real hard block would come from the adapter's own rfkill line held by the embedded
+  controller.
+- **Consequences:** The real cause on this machine is settled by the new "Details" on the
+  next boot rather than assumed. Hardware quirks specific to one laptop stay out of the
+  installer; what it does is make the problem legible. The tests now use real `nmcli` strings
+  and a fake sysfs tree; only the empty-tree case of the sysfs reader has been run on a real
+  `/sys`, so the first hardware boot is also its first real exercise.

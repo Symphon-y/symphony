@@ -50,6 +50,10 @@ class RadioState(Enum):
     ON = "on"
     SOFT_BLOCKED = "soft-blocked"
     HARD_BLOCKED = "hard-blocked"
+    #: NetworkManager knows of no Wi-Fi hardware or killswitch at all (nmcli prints
+    #: `missing`, NetworkManager >= 1.34): no adapter is visible to the OS. Not the
+    #: same as a hardware switch being off, and not fixable by one.
+    NO_ADAPTER = "no-adapter"
     UNKNOWN = "unknown"
 
 
@@ -256,10 +260,18 @@ Runner = Callable[[list[str]], "subprocess.CompletedProcess[str]"]
 
 
 def run_command(argv: list[str]) -> "subprocess.CompletedProcess[str]":
-    """Run a command, capturing text. A missing program is a failed result, not a
-    crash -- same shape as system_info.py's subprocess calls."""
+    """Run a command, capturing text, in the C locale: nmcli translates the words
+    this module reads (`enabled`, `missing`, its failure messages), so a non-English
+    session would break both the radio state and the error mapping. A missing
+    program is a failed result, not a crash -- same shape as system_info.py."""
     try:
-        return subprocess.run(argv, capture_output=True, text=True, check=False)
+        return subprocess.run(
+            argv,
+            capture_output=True,
+            text=True,
+            check=False,
+            env={**os.environ, "LC_ALL": "C"},
+        )
     except OSError as error:
         return subprocess.CompletedProcess(argv, 127, "", str(error))
 
@@ -318,12 +330,24 @@ class WifiBackend:
         )  # fmt: skip
 
     def radio_state(self) -> RadioState:
+        """The Wi-Fi radio's state, from `nmcli radio`: WIFI-HW is the rfkill
+        hardware switch (`enabled` = not blocked, `disabled` = hard-blocked,
+        `missing` = no Wi-Fi hardware or killswitch known to NetworkManager) and WIFI
+        is the software switch. Only a value we recognise is acted on: anything else
+        -- nmcli failing while NetworkManager starts (exit 8), a word we have not
+        seen -- is UNKNOWN, never a confident "hardware switch". (This used to treat
+        every WIFI-HW that was not `enabled` as a hard block, which reported `missing`
+        that way; found on real hardware.)"""
         result = self._run(["nmcli", "-t", "-f", "WIFI-HW,WIFI", "radio"])
         fields = result.stdout.strip().split(":")
         if result.returncode != 0 or len(fields) != 2:
             return RadioState.UNKNOWN
         hardware, software = fields
-        if hardware != "enabled":
+        if hardware == "missing":
+            return RadioState.NO_ADAPTER
+        if hardware not in ("enabled", "disabled") or software not in ("enabled", "disabled"):
+            return RadioState.UNKNOWN
+        if hardware == "disabled":
             return RadioState.HARD_BLOCKED
         return RadioState.ON if software == "enabled" else RadioState.SOFT_BLOCKED
 

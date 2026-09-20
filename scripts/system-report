@@ -12,8 +12,10 @@
 set -uo pipefail
 shopt -s nullglob
 
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+readonly REPO_ROOT
 # shellcheck source-path=SCRIPTDIR source=lib/identifiers.bash
-source "$(dirname "${BASH_SOURCE[0]}")/lib/identifiers.bash"
+source "$REPO_ROOT/scripts/lib/identifiers.bash"
 
 has() {
   command -v "$1" >/dev/null 2>&1
@@ -102,6 +104,28 @@ report_network() {
   fi
 }
 
+# Everything needed to tell apart the ways Wi-Fi can be missing (Phase 17): NetworkManager's
+# view of the radio, the rfkill switches, the adapter on the PCI bus and whether a driver
+# bound to it, the modules and kernel messages. The machine's own facts come from the same
+# module the installer's Wi-Fi page shows under Details, not a second copy of the logic.
+report_wifi() {
+  try nmcli radio
+  echo
+  try rfkill list all
+  echo
+  if has python3 && [[ -d $REPO_ROOT/gui/installer ]]; then
+    (cd "$REPO_ROOT/gui" && python3 -m installer.wifi_diagnostics)
+  fi
+  echo
+  if has lspci; then
+    lspci -nnk | grep -i -A3 -E 'network|wireless' || echo "(no PCI network controller)"
+  fi
+  echo
+  lsmod 2>/dev/null | grep -E 'ath|iwl|brcm|rtw|mt76|dell|wmi|rfkill' || echo "(no relevant kernel modules loaded)"
+  echo
+  dmesg 2>/dev/null | grep -i -E 'ath9k|iwlwifi|firmware|rfkill|wmi' | tail -20 || echo "(no relevant kernel messages, or dmesg is not readable)"
+}
+
 report_time() {
   try timedatectl
 }
@@ -180,6 +204,7 @@ main() {
   section "GPU" report_gpu
   section "Storage" report_storage
   section "Network" report_network
+  section "Wi-Fi" report_wifi
   section "Time" report_time
   section "Audio" report_audio
   section "Input devices" report_input

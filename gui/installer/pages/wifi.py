@@ -17,7 +17,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, GLib, Gtk
 
-from .. import wifi
+from .. import wifi, wifi_diagnostics
 from ..page import Page
 from ..state import Answers
 from ..wifi_demo import demo_backend
@@ -39,7 +39,13 @@ def _signal_icon(signal: int) -> str:
 class WifiPage(Page):
     title = "Wi-Fi"
 
-    def __init__(self) -> None:
+    def __init__(self, diagnostics=None) -> None:
+        # What to read the machine's Wi-Fi facts from; injectable so the smoke test
+        # can present a blocked laptop without one.
+        self._diagnostics = diagnostics or wifi_diagnostics.collect
+        self._radio: wifi.RadioState | None = None
+        self._poll_id: int | None = None
+        self._root: Gtk.Widget | None = None
         self._backend: wifi.WifiBackend | None = None
         self._selected: wifi.AccessPoint | None = None
         self._hidden = False
@@ -81,6 +87,15 @@ class WifiPage(Page):
         self._status_row.add_suffix(self._refresh_button)
         status_group.add(self._status_row)
 
+        # The machine's own facts about its Wi-Fi radio, shown when something is
+        # wrong: the live installer has no terminal to look for them in.
+        self._details = Gtk.Expander(label="Details")
+        self._details_label = Gtk.Label(wrap=True, xalign=0, selectable=True)
+        self._details_label.add_css_class("dim-label")
+        self._details.set_child(self._details_label)
+        self._details.set_visible(False)
+        box.append(self._details)
+
         self._networks = Adw.PreferencesGroup(title="Networks")
         box.append(self._networks)
         self._hidden_row = Adw.ActionRow(title="Join a hidden network...", activatable=True)
@@ -108,6 +123,7 @@ class WifiPage(Page):
         self._show_status("Looking for networks...")
         self._radio_button.set_visible(False)
         self._forget_button.set_visible(False)
+        self._root = box
         return box
 
     # -- page lifecycle
@@ -160,10 +176,15 @@ class WifiPage(Page):
         self._set_busy(True)
         self._show_status("Looking for networks...")
         backend = self._backend
-        self._in_thread(
-            lambda: (backend.radio_state(), backend.ethernet_connected(), backend.scan(rescan=rescan)),
-            self._scan_done,
-        )
+        collect = self._diagnostics
+
+        def work():
+            radio = backend.radio_state()
+            # The machine's facts are only worth reading when something is off.
+            diagnostics = collect() if radio is not wifi.RadioState.ON else None
+            return radio, backend.ethernet_connected(), backend.scan(rescan=rescan), diagnostics
+
+        self._in_thread(work, self._scan_done)
 
     def _scan_done(self, result, error) -> None:
         self._set_busy(False)
@@ -171,15 +192,24 @@ class WifiPage(Page):
             self._show_status("Could not look for networks.")
             self._show_error(str(error))
             return
-        radio, ethernet, aps = result
+        radio, ethernet, aps, diagnostics = result
+        self._radio = radio
+        problem = radio is not wifi.RadioState.ON
         self._radio_button.set_visible(radio is wifi.RadioState.SOFT_BLOCKED)
         self._forget_button.set_visible(bool(self._connected_ssid))
-        if radio is wifi.RadioState.HARD_BLOCKED:
+
+        # When something is off, say what is true (which device, what to try) and put
+        # the machine's own facts one click away.
+        self._details.set_visible(problem and diagnostics is not None)
+        if problem and diagnostics is not None:
+            self._details_label.set_label("\n".join(diagnostics.lines()))
+
+        if radio in (wifi.RadioState.HARD_BLOCKED, wifi.RadioState.SOFT_BLOCKED, wifi.RadioState.NO_ADAPTER):
             aps = []
-            self._show_status("Wi-Fi is switched off by a hardware switch.")
-        elif radio is wifi.RadioState.SOFT_BLOCKED:
-            aps = []
-            self._show_status("Wi-Fi is turned off.")
+            self._show_status(wifi_diagnostics.status_message(radio, diagnostics))
+        elif radio is wifi.RadioState.UNKNOWN:
+            # Can't tell -- a scan may still work, so leave whatever it found.
+            self._show_status(wifi_diagnostics.status_message(radio, diagnostics))
         elif self._connected_ssid:
             self._show_status(f"Connected to {self._connected_ssid}.")
         elif ethernet:
@@ -187,6 +217,29 @@ class WifiPage(Page):
         else:
             self._show_status("Choose a network." if aps else "No networks found -- try Refresh.")
         self._populate(aps)
+        self._ensure_polling(problem)
+
+    # -- noticing a change without a click on Refresh
+
+    def _ensure_polling(self, wanted: bool) -> None:
+        if wanted and self._poll_id is None:
+            self._poll_id = GLib.timeout_add_seconds(2, self._poll)
+
+    def _poll(self) -> bool:
+        """While the radio is blocked, missing or unreadable, re-read its state every
+        couple of seconds, so pressing the Wi-Fi key, fixing a BIOS setting, or
+        NetworkManager finishing its start-up is noticed on its own. Stops once the
+        radio is on or the page is no longer on screen."""
+        if self._radio is wifi.RadioState.ON or self._root is None or not self._root.get_mapped():
+            self._poll_id = None
+            return False
+        if not self._busy:
+            self._in_thread(self._backend.radio_state, self._poll_done)
+        return True
+
+    def _poll_done(self, state, error) -> None:
+        if error is None and state is not None and state is not self._radio:
+            self._refresh(rescan=True)
 
     def _populate(self, aps: list[wifi.AccessPoint]) -> None:
         for row in self._rows:

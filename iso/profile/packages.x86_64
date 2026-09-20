@@ -46,6 +46,14 @@ efibootmgr
 # deliberately absent, a second manager would fight it for the interface.
 networkmanager
 systemd-resolvconf
+# Diagnosing hardware from the live session (Phase 17): why Wi-Fi is blocked or
+# missing. iw for the regulatory domain and the adapter, lspci/lsusb to see whether
+# the adapter is there at all, evtest to see whether a hotkey (a laptop's Wi-Fi
+# key) sends the OS an event.
+iw
+pciutils
+usbutils
+evtest
 
 # Repo access (replaces today's manual `pacman -Sy git github-cli` -- runbook
 # step 1) and the test runner for the Red step (runbook step 3).

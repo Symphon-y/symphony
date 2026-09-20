@@ -323,11 +323,35 @@ class WifiBackendTest(unittest.TestCase):
             "enabled:disabled": RadioState.SOFT_BLOCKED,
             "disabled:disabled": RadioState.HARD_BLOCKED,
             "disabled:enabled": RadioState.HARD_BLOCKED,
+            # What a real NetworkManager 1.58.1 prints, captured in a container with
+            # no Wi-Fi device: the daemon knows of no Wi-Fi hardware or killswitch at
+            # all. This used to be reported as "switched off by a hardware switch".
+            "missing:enabled": RadioState.NO_ADAPTER,
+            "missing:disabled": RadioState.NO_ADAPTER,
         }
         for out, expected in cases.items():
             with self.subTest(out=out):
                 be, _ = self.backend({("nmcli", "-t", "-f", "WIFI-HW,WIFI", "radio"): Result(stdout=out + "\n")})
                 self.assertEqual(be.radio_state(), expected)
+
+    def test_a_value_it_does_not_recognise_is_unknown_never_a_confident_hard_block(self):
+        # A localized nmcli, a future NetworkManager word, or garbage: say "can't
+        # tell" rather than blame a hardware switch.
+        for out in ["aktiviert:aktiviert", "unavailable:enabled", "enabled:whatever", "garbage", "", "a:b:c"]:
+            with self.subTest(out=out):
+                be, _ = self.backend({("nmcli", "-t", "-f", "WIFI-HW,WIFI", "radio"): Result(stdout=out + "\n")})
+                self.assertEqual(be.radio_state(), RadioState.UNKNOWN)
+
+    def test_a_failing_nmcli_is_unknown(self):
+        # Exit 8 is what nmcli returns while NetworkManager is still starting.
+        be, _ = self.backend(
+            {
+                ("nmcli", "-t", "-f", "WIFI-HW,WIFI", "radio"): Result(
+                    returncode=8, stderr="Error: NetworkManager is not running."
+                )
+            }
+        )
+        self.assertEqual(be.radio_state(), RadioState.UNKNOWN)
 
     def test_enabling_the_radio_clears_rfkill_then_turns_it_on(self):
         be, runner = self.backend()
@@ -484,6 +508,13 @@ class DefaultRunnerTest(unittest.TestCase):
     def test_runs_a_real_command_and_captures_its_output(self):
         result = wifi.run_command(["echo", "hello"])
         self.assertEqual((result.returncode, result.stdout.strip()), (0, "hello"))
+
+    def test_commands_run_in_the_c_locale(self):
+        # nmcli translates the words this module reads (`enabled`, `missing`, the
+        # failure messages); a non-English session would otherwise break both the
+        # radio state and the wrong-password / not-found mapping.
+        result = wifi.run_command(["sh", "-c", "printf %s \"$LC_ALL\""])
+        self.assertEqual(result.stdout, "C")
 
     def test_a_missing_command_is_a_failed_result_not_a_crash(self):
         result = wifi.run_command(["definitely-not-a-command-xyz"])

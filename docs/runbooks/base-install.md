@@ -55,6 +55,19 @@ VM), and again for the rebuild test (Phase 8) and physical hardware (Phase 12).
   (right-click the bar's Wi-Fi icon). After first boot the bar's Wi-Fi icon (or
   `SUPER+CTRL+N`) opens the network picker.
 
+  **When Wi-Fi is missing or blocked** the installer's Wi-Fi page says which
+  (a hardware or BIOS switch holding a present adapter off, an adapter the system
+  cannot see at all, or an adapter with no driver) and shows the machine's own facts
+  under "Details"; it notices a change (pressing the laptop's Wi-Fi key, fixing a
+  BIOS setting) by itself. To get a terminal on the live ISO for anything further --
+  `cage` has no VT switching, so tty2 is unreachable while the GUI runs -- press `e`
+  on the boot entry, append `autarchy.nogui` to its options, and boot: tty1 then
+  stays a normal login shell, and `scripts/system-report` (a "Wi-Fi" section) or
+  `rfkill list all`, `nmcli radio`, `lspci -nnk`, `iw reg get` and `evtest` (does the
+  Wi-Fi key send an event?) are all there. Some laptops (Dell/Alienware among them)
+  toggle Wi-Fi with a hotkey handled in firmware, gated by BIOS "Function Key
+  Behavior" and "Wireless" settings.
+
   **The whole runbook below (steps 1-7) is replaced by one guided
   command**, printed on screen the moment you log in:
   ```sh

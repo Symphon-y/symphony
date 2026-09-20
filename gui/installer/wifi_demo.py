@@ -39,10 +39,13 @@ def _result(argv, returncode=0, stdout="", stderr=""):
 
 
 class _DemoNetworkManager:
-    def __init__(self, profile: Path, delay: float) -> None:
+    def __init__(self, profile: Path, delay: float, radio: str = "enabled:enabled") -> None:
         self._profile = profile
         self._delay = delay
         self._connected = False
+        # What `nmcli -t -f WIFI-HW,WIFI radio` prints: enabled:enabled, enabled:disabled
+        # (soft-blocked), disabled:enabled (hard-blocked), missing:enabled (no adapter).
+        self.radio = radio
 
     def _saved(self, key: str) -> str:
         try:
@@ -57,7 +60,7 @@ class _DemoNetworkManager:
             if fields == "IN-USE,SSID,SIGNAL,SECURITY":
                 return _result(argv, stdout=_SCAN + "\n")
             if fields == "WIFI-HW,WIFI":
-                return _result(argv, stdout="enabled:enabled\n")
+                return _result(argv, stdout=self.radio + "\n")
             if fields == "TYPE,STATE":
                 return _result(argv, stdout="wifi:disconnected\n")
             if fields == "STATE":
@@ -79,8 +82,18 @@ class _DemoNetworkManager:
         return _result(argv)
 
 
-def demo_backend(profile_dir: str | Path | None = None, delay: float = 1.2) -> WifiBackend:
+class _DemoBackend(WifiBackend):
+    """The real WifiBackend, plus a hook to change the simulated radio state --
+    the user pressing the Wi-Fi key, or fixing a BIOS setting, while the page is open."""
+
+    def set_demo_radio(self, radio: str) -> None:
+        self._run.radio = radio
+
+
+def demo_backend(
+    profile_dir: str | Path | None = None, delay: float = 1.2, radio: str = "enabled:enabled"
+) -> _DemoBackend:
     """A WifiBackend over canned answers. `delay` is how long a join takes, so the
-    page's spinner can be seen."""
+    page's spinner can be seen; `radio` is the simulated `nmcli radio` state."""
     directory = Path(profile_dir or tempfile.mkdtemp(prefix="autarchy-wifi-demo-"))
-    return WifiBackend(run=_DemoNetworkManager(directory / PROFILE_NAME, delay), profile_dir=directory)
+    return _DemoBackend(run=_DemoNetworkManager(directory / PROFILE_NAME, delay, radio), profile_dir=directory)

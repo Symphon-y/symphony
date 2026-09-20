@@ -209,3 +209,18 @@ bar_json() {
   run grep -F 'nmtui' "$REPO_ROOT/docs/runbooks/base-install.md"
   assert_success
 }
+
+# --- Hotfix: diagnosing a blocked or missing Wi-Fi radio on the live ISO ------------
+
+@test "iso: the live ISO carries the tools to diagnose Wi-Fi hardware (iw, lspci, lsusb, evtest)" {
+  local pkg
+  for pkg in iw pciutils usbutils evtest; do
+    run grep -Fx "$pkg" "$ISO/packages.x86_64"
+    assert_success
+  done
+}
+
+@test "docs: the runbook explains autarchy.nogui for a terminal on the live ISO" {
+  run grep -F 'autarchy.nogui' "$REPO_ROOT/docs/runbooks/base-install.md"
+  assert_success
+}

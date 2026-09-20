@@ -79,5 +79,69 @@ page.save(answers); check("hidden: connected and recorded", answers.wifi_ssid ==
 # --- forget
 page._on_forget(None); pump(600); page.save(answers)
 check("forget: cleared", answers.wifi_ssid == "" and not page._forget_button.get_visible())
+
+# --- blocked / missing / unknown radio states (Phase 17 hotfix, found on real hardware) ---
+from gi.repository import Gtk
+from installer.wifi_demo import demo_backend
+from installer.wifi_diagnostics import Diagnostics, PciAdapter, RfkillDevice
+
+BLOCKED = Diagnostics(
+    machine="Alienware Alienware 14",
+    rfkill=[RfkillDevice("phy0", "wlan", True, False, "ath9k")],
+    wireless_interfaces=[],
+    pci_adapters=[PciAdapter("168c:0034", "ath9k")],
+)
+NOTHING = Diagnostics(machine="", rfkill=[], wireless_interfaces=[], pci_adapters=[])
+
+
+def shown_page(radio, diagnostics):
+    """A real page inside a real (mapped) window, over a demo backend in `radio` state."""
+    page = WifiPage(diagnostics=lambda: diagnostics)
+    page._backend = demo_backend(delay=0, radio=radio)
+    win = Gtk.Window()
+    win.set_child(page.build(Answers()))
+    win.present()
+    page.on_shown(Answers(), Win())
+    pump(700)
+    return page, win
+
+
+page, win = shown_page("disabled:enabled", BLOCKED)
+status = page._status_row.get_title()
+check("hard block: names the blocking device and driver", "phy0 (ath9k)" in status and "wireless switch" in status)
+check("hard block: suggests the key and the BIOS", "BIOS" in status)
+check("hard block: no networks are listed", page._rows == [])
+check("hard block: Details are shown, with the adapter's ids", page._details.get_visible() and "168c:0034" in page._details_label.get_label())
+check("hard block: skipping still works", page.validate(Answers()) is None)
+
+# The user presses the Wi-Fi key: the page notices by itself, without a click on Refresh.
+page._backend.set_demo_radio("enabled:enabled")
+pump(3500)
+check("recovery: picks up the change on its own and lists networks", page._status_row.get_title() == "Choose a network." and len(page._rows) > 0)
+check("recovery: Details are hidden again", not page._details.get_visible())
+pump(2500)
+check("recovery: polling stops once the radio is on", page._poll_id is None)
+
+page, win = shown_page("missing:enabled", NOTHING)
+status = page._status_row.get_title()
+check("no adapter: says so, and does not blame a hardware switch", "No Wi-Fi adapter" in status and "hardware switch" not in status)
+check("no adapter: Details say none was found on the PCI bus", "No Wi-Fi adapter found on the PCI bus" in page._details_label.get_label())
+
+page, win = shown_page("missing:enabled", Diagnostics("", [], [], [PciAdapter("168c:0034", "")]))
+check("no driver: names the adapter and that no driver is using it", "168c:0034" in page._status_row.get_title() and "no driver" in page._status_row.get_title())
+
+page, win = shown_page("garbage", NOTHING)
+check("unknown: says it could not read the state, not a hardware switch", "Could not read" in page._status_row.get_title())
+
+page, win = shown_page("enabled:disabled", NOTHING)
+check("soft block: turned off, with the button to turn it on", page._status_row.get_title() == "Wi-Fi is turned off." and page._radio_button.get_visible())
+
+# Polling must stop when the page is no longer on screen.
+page, win = shown_page("disabled:enabled", BLOCKED)
+check("polling: running while blocked and on screen", page._poll_id is not None)
+win.set_child(None)   # the wizard moved on
+pump(2600)
+check("polling: stops when the page leaves the screen", page._poll_id is None)
+
 print("\nGTK page smoke failures:", check.bad)
 sys.exit(1 if check.bad else 0)

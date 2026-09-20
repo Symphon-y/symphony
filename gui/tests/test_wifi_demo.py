@@ -37,6 +37,21 @@ class DemoBackendTest(unittest.TestCase):
         self.assertIn("Cafe: Free Wi-Fi", aps)
         self.assertEqual(self.backend.scan(), sorted(self.backend.scan(), key=lambda a: (-a.signal, a.ssid)))
 
+    def test_it_can_simulate_each_radio_state_and_a_change_of_state(self):
+        # So the page's blocked / no-adapter / recovery paths can be driven without
+        # hardware (gui/tests/smoke_wifi_page.py).
+        for radio, expected in {
+            "disabled:enabled": RadioState.HARD_BLOCKED,
+            "enabled:disabled": RadioState.SOFT_BLOCKED,
+            "missing:enabled": RadioState.NO_ADAPTER,
+        }.items():
+            with self.subTest(radio=radio):
+                backend = demo_backend(profile_dir=self._dir.name, delay=0, radio=radio)
+                self.assertEqual(backend.radio_state(), expected)
+        backend = demo_backend(profile_dir=self._dir.name, delay=0, radio="disabled:enabled")
+        backend.set_demo_radio("enabled:enabled")  # the user pressed the Wi-Fi key
+        self.assertEqual(backend.radio_state(), RadioState.ON)
+
     def test_the_radio_is_on_and_there_is_no_ethernet(self):
         self.assertEqual(self.backend.radio_state(), RadioState.ON)
         self.assertFalse(self.backend.ethernet_connected())

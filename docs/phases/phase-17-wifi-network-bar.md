@@ -310,6 +310,48 @@ Red confirmed: | Green confirmed: |
   `SWAP_SIZE` before anything destructive runs. Red tests first; small enough to
   bundle into whichever phase next touches the installer.
 
+### 2026-09-20 (first hardware boot: "Wi-Fi is switched off by a hardware switch")
+- **Symptom.** `autarchy-local-c4f55d5` on the Alienware 14 (P39G): the Wi-Fi page said the
+  radio was switched off by a hardware switch, and the F2 key (which carries a Wi-Fi symbol)
+  did nothing however it was combined (F2, Shift/Alt/Fn/Super+F2). The live session had no
+  terminal to investigate with.
+- **Two read-only investigations** (our code and the live ISO's tooling; the hardware and
+  Linux rfkill research), then a container check to settle the one point they disagreed on.
+  Findings, in order of certainty:
+  1. **A defect in our code.** `radio_state()` treated every `WIFI-HW` value other than
+     `enabled` as a hard block. A real NetworkManager 1.58.1 in a container with no Wi-Fi
+     device prints `missing:enabled` (exit 0), so "no adapter visible to the OS" was reported
+     as "hardware switch" -- possibly the very message seen. It had only ever been tested
+     with a fake runner and four invented fixtures, never real `nmcli` output.
+  2. **A dead end.** The page hid the network list *and* the "Turn Wi-Fi on" button on a hard
+     block, named no device, offered no next step, and only re-read on a click; and the live
+     session offered no way to look (`cage` has no VT switching; `iw`, `lspci`, `lsusb` and
+     `evtest` were not on the ISO; `system-report` collected nothing about Wi-Fi).
+  3. **The hardware (sources; two items inferred).** The P39G's adapter is the Qualcomm Atheros
+     Killer Wireless-N 1202 = AR9462 (PCI 168c:0034, in-tree `ath9k`, Bluetooth on the same
+     card). Its BIOS has *Advanced > Function Key Behavior* and a *Wireless* menu (Wireless
+     Network, Wireless Switch/Hotkey); the owner's manual says "Wireless Network: Disabled"
+     makes the device invisible to the OS; a Dell community report of an Alienware 14-R1 whose
+     Fn+F2 did nothing was fixed through Function Key Behavior. `dell-laptop` probably never
+     binds (vendor "Alienware"), so a genuine hard block would be the adapter's own rfkill
+     line held by the embedded controller; Fn+F2 there is typically handled in firmware and may
+     send the OS no event at all. Whether this machine is a real hard block or a missing
+     adapter is decided by the new page's Details, not assumed.
+- **Fixed (red first, D-0073).** Explicit radio classification with a new `NO_ADAPTER` state
+  and `UNKNOWN` for anything unrecognised; commands run under `LC_ALL=C`; a GTK-free
+  `wifi_diagnostics` module (fake-sysfs tests) whose facts and per-state messages the page
+  shows -- the blocking device and driver, or the adapter found with/without a driver, or that
+  none was found -- with a Details section and auto-recheck that notices a change without a
+  click and stops when the page leaves the screen. The real GTK page was driven under a
+  virtual display through hard block, recovery, no adapter, no driver, unknown and soft block
+  (37 checks). The live ISO gained `iw`, `pciutils`, `usbutils`, `evtest`; `autarchy.nogui` on
+  the kernel command line skips the GUI and leaves a terminal on tty1 (documented in
+  `base-install.md`); `scripts/system-report` gained a Wi-Fi section reusing the same module.
+- **For the user, before the new ISO** (no code): in the BIOS set *Function Key Behavior* to
+  function-key-first and check the *Wireless* menu (Wireless Network / Wireless Switch/Hotkey
+  enabled); power-cycle the embedded controller (shut down, unplug AC, hold the power button
+  ~30 s); then try Fn+F2. On the new ISO the page names what it finds.
+
 ## VM → physical hardware notes
 
 - A VM has no real radio: the unit tests use a fake command runner and recorded
