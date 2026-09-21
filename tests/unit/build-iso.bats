@@ -91,6 +91,18 @@ calls() {
   assert_output --partial "definitely-not-installed"
 }
 
+@test "AUTARCHY_CONTAINER_ENGINE may carry a prefix, e.g. 'sudo podman' where rootless podman can't mount a chroot" {
+  # A stub "sudo" that logs and runs the rest, so the engine stub sees the same calls.
+  # shellcheck disable=SC2016 # stub body expands when the stub runs
+  printf '#!/usr/bin/env bash\necho "sudo $1" >>"$STUB_LOG"\nexec "$@"\n' >"$BATS_TEST_TMPDIR/bin/sudo"
+  chmod +x "$BATS_TEST_TMPDIR/bin/sudo"
+  AUTARCHY_CONTAINER_ENGINE="sudo docker" run "$SCRIPT" --out "$BATS_TEST_TMPDIR/out"
+  assert_success
+  run calls
+  assert_line "sudo docker"
+  assert_output --partial "docker create"
+}
+
 @test "builds in a privileged Arch container, with the resolved commit and default tag passed in" {
   run "$SCRIPT" --out "$BATS_TEST_TMPDIR/out"
   assert_success

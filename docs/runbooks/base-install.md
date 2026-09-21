@@ -33,7 +33,15 @@ VM), and again for the rebuild test (Phase 8) and physical hardware (Phase 12).
   ```
   It runs the same steps as the release workflow in a privileged Arch
   container and never uploads anything. Only *committed* work goes in (it warns
-  if the tree is dirty). Then write it to a USB stick -- on Windows, from an
+  if the tree is dirty). On an autarchy machine the engine is rootless podman,
+  which cannot do the mounts `pacstrap` needs inside the container (it fails at
+  `mount: .../airootfs/dev: permission denied`), so run the engine as root --
+  the script itself and the git bundle stay yours:
+  ```sh
+  AUTARCHY_CONTAINER_ENGINE="sudo podman" scripts/build-iso
+  ```
+  (The copied-out ISO is then root-owned; `dd` needs root anyway.) About 3 GB
+  of packages are downloaded per build. Then write it to a USB stick -- on Windows, from an
   **elevated** PowerShell (`iso/write-usb.ps1` lists the USB disks first and
   touches nothing until you pass `-DiskNumber` and type the number back; it
   refuses non-USB and system disks, checks the ISO against its `.sha256`, and

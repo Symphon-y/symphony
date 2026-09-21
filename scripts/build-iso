@@ -16,7 +16,11 @@
 #   --out DIR   where the ISO and its .sha256 land (default: ./out)
 #
 # Needs only a container engine (docker by default; AUTARCHY_CONTAINER_ENGINE
-# overrides) and git -- it runs the same on Linux, macOS and Windows/Git Bash.
+# overrides, and may carry a prefix: "sudo podman") and git -- it runs the same
+# on Linux, macOS and Windows/Git Bash. Rootless podman is not enough: pacstrap's
+# chroot setup needs a real mount (`mount: .../airootfs/dev: permission denied`
+# on the Alienware), so on a podman host run it as `AUTARCHY_CONTAINER_ENGINE="sudo
+# podman"` -- the engine is root, the script and the git bundle stay yours.
 # The repo reaches the container as a git bundle on stdin and the ISO comes back
 # through `cp`: no bind mounts, so no host path or permission translation.
 #
@@ -27,7 +31,8 @@ set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO_ROOT
-readonly ENGINE="${AUTARCHY_CONTAINER_ENGINE:-docker}"
+read -ra ENGINE <<<"${AUTARCHY_CONTAINER_ENGINE:-docker}" # words: a prefix is allowed
+readonly ENGINE
 readonly IMAGE=archlinux:latest
 readonly IN_CONTAINER_SCRIPT=iso/build-in-container # relative to REPO_ROOT
 
@@ -37,7 +42,7 @@ readonly IN_CONTAINER_SCRIPT=iso/build-in-container # relative to REPO_ROOT
 # rewriting has to stay on for the git calls, where the repo path (/c/Users/...)
 # does need translating for a native git.exe. Harmless on Linux and macOS.
 engine() {
-  MSYS_NO_PATHCONV=1 "$ENGINE" "$@"
+  MSYS_NO_PATHCONV=1 "${ENGINE[@]}" "$@"
 }
 
 log() {
@@ -82,8 +87,8 @@ main() {
     die "no such commit or ref: $ref"
   short=$(git -C "$REPO_ROOT" rev-parse --short "$sha")
   [[ -n $tag ]] || tag="local-$short"
-  command -v "$ENGINE" >/dev/null ||
-    die "container engine '$ENGINE' not found (install it, or set AUTARCHY_CONTAINER_ENGINE)"
+  command -v "${ENGINE[0]}" >/dev/null ||
+    die "container engine '${ENGINE[0]}' not found (install it, or set AUTARCHY_CONTAINER_ENGINE)"
 
   # A common surprise otherwise: edit, build, boot, and the fix isn't there.
   if [[ -n $(git -C "$REPO_ROOT" status --porcelain --untracked-files=no) ]]; then
