@@ -172,7 +172,8 @@ Red confirmed: | Green confirmed: |
 - [x] Hotfixes -- diagnosing a blocked or missing radio (D-0073) and the PCI-ID hardware map with the Broadcom driver (D-0074), red then green
 - [x] Step 6 -- `phase-17.bats`, runbooks, influences entry, decisions D-0068 to D-0074, roadmap
 - [ ] Build an ISO locally (`scripts/build-iso`), boot in a VM: guided install with Skip, no regression
-- [ ] Real hardware: Wi-Fi page on the Alienware, install, reboot, land online; icon states,
+- [x] Real hardware (installed machine, via dev-deploy): icon states, left/right click, `SUPER+CTRL+N`, battery, toasts, autoconnect after reboot, `dell_rbtn` blacklist on all three boot entries; the Wi-Fi *page* cannot join on this laptop (no `wl` on the live ISO -- it says so) and is smoke-test-verified
+- [ ] Real hardware, fresh install from the next local ISO: page shows the driver message, install, reboot, land online with the bar; icon states,
       left/right click, rfkill, `SUPER+CTRL+N`, battery; password absent from `ps` and the
       journal; profile files `0600 root`
 - [x] Hotfix -- the picker asked for SAE on a WPA2/WPA3 network (D-0077), red then green
@@ -461,6 +462,13 @@ Red confirmed: | Green confirmed: |
   hard-blocked; the user pressed Fn+F2 and power-cycled the EC in between, unsure which counted).
   The slider is firmware state that persists across boots and can be toggled; the blacklist stays
   the right defence, its cold-boot proof still owed.
+- **`dell_rbtn` cold-boot proof done (D-0076 written).** `module_blacklist=dell_rbtn` appended to
+  `/etc/kernel/cmdline` by hand (the install predates the quirk map), `mkinitcpio -P`, then
+  three reboots: `arch-linux` (7.2.6), `arch-linux-lts` (6.18.52) and
+  `arch-linux-lts-fallback` -- each logged `Module dell_rbtn is blacklisted`, had no
+  `dell_rbtn` in `lsmod`, only `phy0`/`hci0` in `rfkill list`, "Wi-Fi enabled by radio
+  killswitch", and autoconnected to the 5 GHz network. That also closes the autoconnect-after-
+  reboot check. The fresh install from the next ISO proves the map itself produces the line.
 - **Kernel warnings from `wl`** at every boot ("Unpatched return thunk in use", a `memcpy`
   field-spanning write in `wl_cfg80211_hybrid.c`), kernel tainted `P S W IOE`. Known
   broadcom-wl-dkms noise on current kernels; Wi-Fi works. Recorded for the hardware doc.

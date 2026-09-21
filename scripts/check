@@ -17,7 +17,7 @@ while IFS= read -r file; do
   fi
 done < <(
   find scripts install -type f | sort
-  find home -path '*/dot-local/bin/*' -type f | sort
+  find home -path '*/dot-local/bin/*' -type f -not -path '*/__pycache__/*' | sort
   find migrations -name '*.sh' -type f 2>/dev/null | sort
   find iso/profile/airootfs -type f -path '*/bin/*' 2>/dev/null | sort
   printf '%s\n' iso/build-offline-repo iso/build-in-container iso/profile/airootfs/root/.bash_profile

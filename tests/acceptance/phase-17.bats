@@ -304,9 +304,9 @@ bar_json() {
   assert_success
 }
 
-@test "docs: DECISIONS.md records D-0073 and D-0074" {
+@test "docs: DECISIONS.md records D-0073, D-0074 and D-0076" {
   local id
-  for id in D-0073 D-0074; do
+  for id in D-0073 D-0074 D-0076; do
     run grep -E "^## $id " "$REPO_ROOT/DECISIONS.md"
     assert_success
   done

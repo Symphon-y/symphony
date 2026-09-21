@@ -2015,6 +2015,45 @@ and the old entry is marked `Superseded by D-XXXX`.
   The cause of the failed connection on the Alienware was established once Claude Code ran on the
   machine and could read its journal: D-0077.
 
+## D-0076 — Firmware quirks are declared per machine by DMI and land on the kernel command line (the Alienware 14's `dell_rbtn`)
+
+- **Status:** Accepted (2026-09-20, Phase 17). Mechanism mirrors D-0074.
+- **Decision:** `system/quirks.txt` maps a DMI-modalias glob to a kernel parameter;
+  `scripts/quirkparams` prints the parameters whose pattern matches
+  `/sys/class/dmi/id/modalias` (fails closed on a malformed line, like `hwpkglist`);
+  `install-base-system` resolves them before anything destructive and `configure-base-system`
+  appends them to `/etc/kernel/cmdline` before the unified kernel images are built, so the
+  parameter is in every UKI -- default, LTS and both fallbacks. The first entry is
+  `dmi:*:svnAlienware:pnAlienware*14:*  module_blacklist=dell_rbtn`.
+- **Alternatives considered:** A `modprobe.d` blacklist -- stops alias autoloading only, needs
+  the initramfs rebuilt to reach early boot, and does not stop a symbol-request load;
+  `module_blacklist=` is enforced in the kernel for every path. `acpi_osi="!Windows 2012"`
+  (what an Alienware 15 R2 owner used) -- a blunt change to every ACPI method for one driver.
+  A boot-time script that `modprobe -r`s the module -- a race with udev on every boot. Applying
+  the blacklist to every machine -- `dell_rbtn` is correct on laptops with a real slider;
+  the map is keyed to this model. Hand-editing `/etc/kernel/cmdline` on the machine -- what the
+  proof below did, but the installer must produce it on its own.
+- **Reasoning:** The BIOS reports an airplane-mode *slider* through ACPI (`DELLABCE`);
+  `dell_rbtn` turns that into an rfkill whose state is whatever the firmware returns and which
+  software cannot clear, and NetworkManager takes the worst state across all Wi-Fi rfkills, so
+  Wi-Fi was hard-blocked on three boots in a row even with the driver working. The user's
+  `modprobe -r dell_rbtn` cleared it live (so the embedded controller does not actually cut
+  the radio); udev reloads the module from the ACPI modalias on the next boot. The state
+  toggles too: a later boot came up unblocked after Fn+F2 and an EC power-cycle, which makes
+  the block intermittent, not permanent -- worse to leave. **Proof, from the machine:** with
+  `module_blacklist=dell_rbtn` on the command line and `mkinitcpio -P`, all three entries
+  (`arch-linux` 7.2.6, `arch-linux-lts` 6.18.52, `arch-linux-lts-fallback`) logged `Module
+  dell_rbtn is blacklisted`, `lsmod` had no `dell_rbtn`, `rfkill list` showed only `phy0` and
+  `hci0`, NetworkManager reported "Wi-Fi enabled by radio killswitch" and autoconnected to the
+  saved 5 GHz network with no manual step.
+- **Consequences:** Fn+F2 does nothing on this model (it only ever moved the firmware slider
+  the kernel now ignores); Wi-Fi is turned off from the bar or `nmcli radio wifi off` instead.
+  One more file for the installer to consult (`quirks.txt`), read by nothing else -- the GUI
+  page does not need it. A machine installed before this entry (the Alienware) got the
+  parameter by hand; a fresh install from the next ISO gets it from the map, which the round-2
+  install checks (`cat /proc/cmdline`). Together with D-0074 the hardware knowledge for this
+  laptop lives in two declarative files and two selectors, no per-machine scripts.
+
 ## D-0077 — The picker asks for WPA2-PSK on a WPA2/WPA3 transition network, through a shim, not a fork (extends D-0075)
 
 - **Status:** Accepted (2026-09-20, Phase 17)
