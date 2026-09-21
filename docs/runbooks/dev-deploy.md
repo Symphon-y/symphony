@@ -46,7 +46,13 @@ sudo install/sync-system apply          # system/ files (root-owned)
 install/link-home apply                 # restow: new files get their links
 install/enable-user-services apply      # any new user units
 scripts/migrate apply                   # one-time upgrades, recorded in ~/.local/state
+hyprctl reload                          # clears the red "cannot open hyprland.lua" overlay
 ```
+
+The overlay is expected: step 2 removes the payload before copying it back,
+and Hyprland's config watcher reloads during the gap, when every link under
+`~/.config/hypr` is dangling. The reload after the copy makes it go away;
+`hyprctl configerrors` should then print nothing.
 
 Packages are not part of this: a new entry in `packages/*.txt` is installed by
 hand (`install/install-packages`, from the payload) until Phase 18 does it.
