@@ -61,7 +61,7 @@ assumed.
 | Clipboard | 3 | 5 | ADAPT (D-0025, D-0031) |
 | Screenshots / screen recording | 3 | 5 | ADOPT (D-0036) |
 | Status bar | 3 | 5 | ADAPT (D-0025, D-0031) |
-| Network and Wi-Fi (stack, installer step, bar indicator) | 1, 3 | 17 | ADOPT NetworkManager + wireless-regdb; ADAPT the optional installer step, regdom, bar icon states; REJECT the Quickshell panel and the iwd stack (D-0068 to D-0072) |
+| Network and Wi-Fi (stack, installer step, bar indicator) | 1, 3 | 17 | ADOPT NetworkManager + wireless-regdb; ADAPT the optional installer step, regdom, bar icon states, hardware quirks as declarative maps; REJECT the Quickshell panel and the iwd stack (D-0068 to D-0077) |
 | Bluetooth | 3 | 17 | DEFER (D-0071) |
 | Web-app launchers | 3 | 5 | ADAPT (D-0034) |
 | Theme system and switching | 4 | 6 | ADAPT (matugen, wallpaper-driven, D-0025, D-0037) |
@@ -278,10 +278,14 @@ below are current as of that branch unless a component explicitly discusses v3
 - Our implementation: SDDM configured for Wayland only (`system/sddm/
   10-wayland.conf`, just `DisplayServer=wayland`, no forced default session), the
   `hyprland` package's own shipped `hyprland-uwsm.desktop` picked at the greeter.
+  Since Phase 16 the installer also writes `/etc/sddm.conf.d/20-autologin.conf` for
+  the created user into that session -- Omarchy's autologin, adopted after all
+  (D-0067): LUKS is the gate at boot, and a fresh install must reach the desktop
+  with nothing typed. The PAM keyring edit is not needed (no keyring here).
 - Reason: `uwsm` is worth adopting regardless of the greeter choice; SDDM won the
   greeter-vs-TTY question on convention and documentation, not a technical
   requirement.
-- Related decision: D-0026
+- Related decision: D-0026, D-0067
 
 ### Hyprland config structure
 - Omarchy approach: config is Lua, not the old `hyprland.conf` DSL. `config/hypr/
@@ -817,18 +821,22 @@ below are current as of that branch unless a component explicitly discusses v3
   the timezone (through the package's own file, D-0072), and the bar's icon
   states, click action and hotkey (`SUPER+CTRL+N`, D-0071). **REJECT** the
   Quickshell panel (D-0025) and the iwd/`impala`/systemd-networkd stack.
-  **DEFER** a first-run "set up Wi-Fi" notification (the bar already shows the
-  state), a "restart Wi-Fi" recovery action for `network-menu`, per-hardware
-  quirk scripts, and automatic captive-portal handling (connectivity check off,
+  **ADAPT** its per-hardware quirk scripts as two declarative maps and two
+  selectors instead: `system/hardware.txt` (PCI ID -> extra packages, D-0074) and
+  `system/quirks.txt` (DMI -> kernel parameter, D-0076), consulted by the installer,
+  no per-machine scripts. **DEFER** a first-run "set up Wi-Fi" notification (the
+  bar already shows the state), a "restart Wi-Fi" recovery action for
+  `network-menu`, and automatic captive-portal handling (connectivity check off,
   D-0070).
 - Our implementation: NetworkManager on the live ISO and the installed system;
   `gui/installer/wifi.py` and the Wi-Fi page; `copy_network_profiles` and
   `configure_regdom` in `install/configure-base-system`; Waybar's `network` and
-  `battery` modules; `network-menu`.
+  `battery` modules; `network-menu` (through `network-picker`, D-0077, and
+  `network-watch`, D-0075).
 - Reason: keeps everything Omarchy learned the hard way about the stack while
   staying with small standard tools rather than a bespoke shell, and without an
   iwd credential format to maintain alongside NetworkManager's.
-- Related decision: D-0068, D-0069, D-0070, D-0071, D-0072
+- Related decision: D-0068 to D-0077
 
 ### Bluetooth
 - Omarchy approach: a Waybar `bluetooth` module (icons for off, on, connected)

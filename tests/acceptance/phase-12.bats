@@ -22,15 +22,21 @@ setup() {
   assert_success
 }
 
-@test "this machine (VM) has no hibernation swap configured -- SWAP_SIZE stays opt-in" {
+@test "hibernation swap follows SWAP_SIZE: present on the Alienware, absent elsewhere (opt-in)" {
   # zram itself reports TYPE "partition" too (it's kernel swap accounting,
-  # not a real block device), so check by name instead: every active swap
-  # here should be zram, none a mapped LUKS device.
+  # not a real block device), so check by name: on a machine installed with
+  # SWAP_SIZE (the Alienware) one active swap is a mapped LUKS device; on the
+  # VM every active swap is zram.
   run swapon --noheadings --show=NAME
   assert_success
   run grep -v '^/dev/zram' <<<"$output"
-  assert_failure
-  assert_output ""
+  if [[ $(cat /sys/class/dmi/id/product_name 2>/dev/null) == "Alienware 14" ]]; then
+    assert_success
+    assert_output --regexp '^/dev/(mapper/cryptswap|dm-[0-9]+)$'
+  else
+    assert_failure
+    assert_output ""
+  fi
 }
 
 @test "iso: the live environment can actually find its own root (archiso HOOKS, gpt-auto-generator masked)" {

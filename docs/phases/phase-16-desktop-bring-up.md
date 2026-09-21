@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Status** | In progress |
+| **Status** | Complete (2026-09-21; one unattended fresh install from an ISO with the first-login fix still owed, on a second machine) |
 | **Driver** | Claude + user |
 | **Branch** | `phase/16-desktop-bring-up` |
 | **Started** | 2026-09-18 |
-| **Completed** | |
+| **Completed** | 2026-09-21 |
 
 ## Goal
 
@@ -142,12 +142,19 @@ Green confirmed: 2026-09-20 (`scripts/check` green; `phase-16.bats` 6/6)
       user-services keep-going, first-login theme render + verify,
       gitconfig escaping, `autostart.lua` path, `.git` bake-in reverted
 - [x] Green: `scripts/check`, `tests/acceptance/phase-16.bats`
-- [ ] Real hardware round 2 (new test tag): install, then confirm desktop
-      is themed, `ls ~` shows only the five XDG dirs (no `Projects`),
-      `sudo snapper -c root list` works, an SSH/TTY login has starship,
-      `/usr/local/share/autarchy/current` exists root-owned with `VERSION`
-- [ ] Close: `DECISIONS.md` (D-0067), `docs/omarchy-influences.md`,
+- [x] Real hardware round 2 (`local-5c8bcf1`, the Alienware): `ls ~` shows only
+      the five XDG dirs, the payload is root-owned with `VERSION`, links point
+      into it, snapper's root config works (`snapper -c root create` used by
+      dev-deploy), SDDM autologs in -- and the desktop was bare, because
+      `first-login` never ran (Hyprland ate the `[ -x ]` guard; fixed, see log).
+      After deploying the fix and running `first-login` once: themed, bar up,
+      all seven user units enabled and active, marker written.
+- [ ] **Owed, on a second machine:** one unattended fresh install from an ISO
+      that carries the fix, landing on the themed desktop with nothing typed.
+      The Alienware is the dev seat and is not reinstalled.
+- [x] Close: `DECISIONS.md` (D-0067), `docs/omarchy-influences.md`,
       `docs/roadmap.md`, `README.md` status refresh, merge to `main`
+      (together with Phase 17 -- its branch carries this phase's later commits)
 
 ## Implementation log
 
@@ -376,9 +383,9 @@ Green confirmed: 2026-09-20 (`scripts/check` green; `phase-16.bats` 6/6)
 
 ## Exit criteria
 
-- [ ] All acceptance tests pass
-- [ ] Static checks pass
-- [ ] `DECISIONS.md` updated
-- [ ] `docs/omarchy-influences.md` updated
-- [ ] `docs/roadmap.md` status updated
-- [ ] Branch merged to `main`
+- [x] All acceptance tests pass (`phase-16.bats` 9/9 on the Alienware)
+- [x] Static checks pass (`scripts/check`, 266 unit tests)
+- [x] `DECISIONS.md` updated (D-0067)
+- [x] `docs/omarchy-influences.md` updated (login entry: autologin adopted)
+- [x] `docs/roadmap.md` status updated
+- [x] Branch merged to `main` (via `phase/17-wifi-network-bar`)

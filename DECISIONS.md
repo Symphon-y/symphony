@@ -502,7 +502,7 @@ and the old entry is marked `Superseded by D-XXXX`.
 
 ## D-0026 — Session start: SDDM + uwsm
 
-- **Status:** Accepted (2026-09-14, Phase 4)
+- **Status:** Accepted (2026-09-14, Phase 4). _(Autologin clause reversed by D-0067.)_
 - **Decision:** A conventional graphical greeter (SDDM), configured for Wayland only,
   autologin into one uwsm-managed session — `/etc/sddm.conf.d/10-wayland.conf` sets
   `DisplayServer=wayland` and nothing else; no forced default session name. The
@@ -1067,7 +1067,11 @@ and the old entry is marked `Superseded by D-XXXX`.
 
 ## D-0050 — Package drift audit: `scripts/pkg-audit`
 
-- **Status:** Accepted (2026-09-15, Phase 8)
+- **Status:** Accepted (2026-09-15, Phase 8). _Amended 2026-09-21: a machine may keep
+  its own list at `packages/local/<hostname>.txt` (gitignored, outside every `*.txt`
+  glob the installer and ISO builder use) for software installed there on purpose and
+  nowhere else -- the dev seat's personal apps. `pkg-audit` counts it as declared;
+  nothing else reads it, and an acceptance test keeps it that way._
 - **Decision:** a standalone, unit-tested script checking package drift in both
   directions -- explicitly-installed-but-undeclared (`pacman -Qqe` vs.
   `packages/*.txt`), declared-but-not-present-at-all (checked against `pacman
@@ -1713,6 +1717,50 @@ and the old entry is marked `Superseded by D-XXXX`.
   bring-up after the installed system first boots to a TTY is explicitly
   out of scope here — that is Phase 16's job, not this one.
 
+## D-0067 — An installed machine is self-contained: a root-owned payload, no repo checkout, one first-login step (Phase 16)
+
+- **Status:** Accepted (2026-09-20, Phase 16; verified on the Alienware 2026-09-20/21)
+- **Decision:** `install/configure-base-system` copies the six directories that make up the
+  OS content (`home install migrations packages scripts system`, an allow-list) to
+  `/usr/local/share/autarchy/current` -- a real directory at a fixed path, `root:root`, with a
+  `VERSION` file naming the release -- and runs `install/link-home` from there, so every
+  `~/.config`/`~/.local/bin` entry is a stow link into the payload. The target gets no git
+  checkout and no `~/Projects`; `.git` is not baked into the ISO. The user's XDG directories
+  come from our own `/etc/xdg/user-dirs.defaults` (five directories; `xdg-user-dirs`' stock
+  defaults would also create `Projects`). SDDM autologs the user into the uwsm-managed Hyprland
+  session (reversing D-0026's deliberately conservative "no autologin": LUKS is the real gate).
+  What needs a live user session -- rendering the theme, enabling and verifying the user units
+  -- is one script, `install/first-login`, run from `autostart.lua` on every Hyprland start and
+  made a no-op by a marker file after its first success. Snapper's root config is written from
+  the package's template at install; root timers are enabled with `--root`.
+- **Alternatives considered:** A checkout at `~/Projects/autarchy` on the target (the original
+  plan) -- the user's own framing killed it: "Windows doesn't have a 'windows os' repo anywhere
+  either"; it also put `.git` in the ISO. `releases/<tag>/` behind a `current` symlink -- spiked:
+  GNU stow records links by the *resolved* stow dir, so a restow after an update aborts with
+  "existing target is not owned by stow"; replacing the directory's contents at the same path
+  restows cleanly. A `scripts/migrate` entry for first-login -- would change what "migration"
+  means to future authors; a dedicated one-shot with its own marker keeps both meanings clean.
+  Creating all of `xdg-user-dirs`' defaults and removing the unwanted ones (Omarchy) -- a
+  smaller allow-list file does the same with nothing to undo.
+- **Reasoning:** A fresh install must land on a working themed desktop with nothing typed --
+  Phase 16's exit signal. The parts the chroot cannot do (`systemctl --user`, matugen against the
+  user's wallpaper) run once in the session instead. Real hardware found the one bug that mattered:
+  the `autostart.lua` hook was written as `hl.exec_cmd("[ -x path ] && path")`, and Hyprland strips
+  a leading `[...]` from any exec command as its rule block, so the shell got a syntax error on
+  every login and nothing was brought up -- the desktop came up unthemed with no bar and no user
+  services on the first install, and stayed that way through three boots until the Hyprland log
+  was read from the machine itself. `test -x` fixes it; an acceptance test refuses the bracket.
+- **Consequences:** An installed machine has no way to update itself yet (`scripts/update` is
+  git-based) -- Phase 18's scope; until then the dev seat is updated by hand
+  (`docs/runbooks/dev-deploy.md`), which is the shape the update will take: snapshot, replace the
+  payload's contents at the same path, re-run the appliers from the payload. Every applier must
+  run *from the payload*, never from a checkout (stow's ownership rule). The full "zero manual
+  steps from a fresh install" signal has been observed on the mechanism's parts (payload,
+  links, XDG dirs, snapper, autologin on round 1; first-login and the services after the fix, on
+  the installed machine) but not yet on one unattended fresh install from an ISO carrying the
+  fix -- the Alienware is now the dev seat and is not reinstalled; that single check waits for a
+  second machine and is listed in Phase 16's tracking doc.
+
 ## D-0068 — One network stack: NetworkManager on the live ISO too (extends D-0014, D-0061)
 
 - **Status:** Accepted (2026-09-20, Phase 17)
@@ -1875,7 +1923,7 @@ and the old entry is marked `Superseded by D-XXXX`.
 - **Consequences:** An Intel card that is self-managed may ignore the hint —
   `iw reg get` on the Alienware confirms. The live session stays in the world
   domain, so it may miss some 5 GHz networks. D-0067 (Phase 16's installed-machine
-  layout) is written at that phase's close-out.
+  layout) has the details.
 
 ## D-0073 — A blocked or missing Wi-Fi radio is named and diagnosed on the installer page, never guessed
 

@@ -1,5 +1,12 @@
 # Runbook: Rebuild (post-first-boot)
 
+> **Since Phase 16 (D-0067) a machine installed from the release ISO has no
+> checkout and needs none of the linking below:** the installer copies the OS
+> content to `/usr/local/share/autarchy/current`, links the home from it and
+> runs `install/first-login` on the first desktop start. This runbook is for a
+> *development* machine that also carries the repo, and for the steps the
+> installer does not do (identity, auth, the personal Neovim config).
+
 Picks up exactly where `base-install.md` leaves off — a freshly booted system with
 the base install done (`install/configure-base-system` already run), logged in as
 the regular user. Everything from here on is what Phases 2–7 each did by hand, one

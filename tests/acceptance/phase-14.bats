@@ -92,8 +92,10 @@ setup() {
   # phase-12's tracking docs are accurate history of what was true when
   # they ran (established precedent, see docs/roadmap.md's Phase 13 entry),
   # and this phase's own tracking doc explains what it retired and why.
-  # Everything else -- scripts, other docs, other tests -- must be clean.
-  run bash -c "grep -rl 'autarchy-bootstrap' '$REPO_ROOT' --exclude-dir=.git --exclude-dir=phases | grep -v tests/acceptance/phase-14.bats"
+  # docs/roadmap.md's per-phase summaries are the same kind of history (its
+  # Phase 14 paragraph says what was retired). Everything else -- scripts,
+  # other docs, other tests -- must be clean.
+  run bash -c "grep -rl 'autarchy-bootstrap' '$REPO_ROOT' --exclude-dir=.git --exclude-dir=phases | grep -vE 'tests/acceptance/phase-14.bats|docs/roadmap.md'"
   assert_failure
   assert_output ""
 }

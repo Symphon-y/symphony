@@ -36,3 +36,12 @@ setup() {
   assert_output --partial "install/link-home"
   assert_output --partial "install/sync-system"
 }
+
+@test "packages: a machine's own list (packages/local/) is gitignored and outside every install-time glob" {
+  # scripts/pkg-audit reads packages/local/<hostname>.txt as declared-on-purpose;
+  # nothing that installs or builds an ISO may see it.
+  run git -C "$REPO_ROOT" check-ignore -q packages/local/anything.txt
+  assert_success
+  run grep -rn 'packages/local' "$REPO_ROOT/install" "$REPO_ROOT/iso" "$REPO_ROOT/scripts/build-iso"
+  assert_failure
+}

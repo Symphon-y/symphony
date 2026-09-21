@@ -60,6 +60,9 @@ first needs them, not in advance.
 
 ## Status
 
-Phase 1 (base install) complete. The lab VM on Unraid runs an encrypted Btrfs Arch base
-booted by systemd-boot, verified by 36 acceptance tests. Next: Phase 2, agent handoff
-and developer bootstrap. See [`docs/roadmap.md`](docs/roadmap.md).
+Phases 0-17 complete except Phase 12's hardware bonuses. A release ISO installs the
+whole system offline through a GTK4 guided installer (with an optional Wi-Fi step) and
+boots into a themed Hyprland desktop with a working network bar; the Alienware 14 it
+runs on is now the development seat (`docs/environment/alienware-14.md`). Next:
+Phase 18, a release payload and update pipeline for installed machines. See
+[`docs/roadmap.md`](docs/roadmap.md).

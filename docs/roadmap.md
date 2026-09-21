@@ -18,12 +18,12 @@ outlines; their scope is finalized in their own plan mode.
 | 9 | [Personal automation](phases/phase-09-personal-automation.md) | 6 | Claude | Scripts, systemd user services/timers, integrations | Complete (2026-09-16) |
 | 10 | [Installable release ISO](phases/phase-10-installable-release-iso.md) | 1, cross-cutting | Claude + user | A tag on `main` produces a bootable installer ISO via GitHub Actions, published as a GitHub Release; `scripts/update` gives already-installed machines a snapshotted update path | Complete (2026-09-16) |
 | 11 | [Default browser and web-app launching](phases/phase-11-default-browser.md) | 3 | Claude + user | A real default browser installed and declared; Phase 5's dormant web-app-launcher mechanism actually works | Complete (2026-09-16) |
-| 12 | [Offline release ISO + physical hardware migration (Alienware 14 / P39G)](phases/phase-12-alienware-migration.md) | 1, cross-cutting, 1–4 | Both | The release ISO installs the full `packages/*.txt` closure with zero network needed; boots and installs on real hardware; microcode, power management, Secure Boot/TPM revisited with a real machine; NVIDIA/nouveau attempted as an explicit bonus, not a requirement | In progress (Phase 14 confirmed the real-hardware install pipeline itself works — a from-scratch, zero-network install now boots to a logged-in base system; ground truth docs, `packages/alienware-14.txt`, Claude Code local handoff, `rebuild.md`, actual hibernate/resume verification, and GPU/AlienFX bonuses still open) |
+| 12 | [Offline release ISO + physical hardware migration (Alienware 14 / P39G)](phases/phase-12-alienware-migration.md) | 1, cross-cutting, 1–4 | Both | The release ISO installs the full `packages/*.txt` closure with zero network needed; boots and installs on real hardware; microcode, power management, Secure Boot/TPM revisited with a real machine; NVIDIA/nouveau attempted as an explicit bonus, not a requirement | In progress (Phase 14 confirmed the real-hardware install pipeline itself works — a from-scratch, zero-network install now boots to a logged-in base system; ground truth doc and local Claude Code done 2026-09-21, `packages/alienware-14.txt` superseded by D-0074; `rebuild.md` for the payload layout, actual hibernate/resume verification, and GPU/AlienFX bonuses still open) |
 | 13 | [Offline-capable release ISO](phases/phase-13-offline-release-iso.md) | 1, cross-cutting | Claude + user | The release ISO installs the full `packages/*.txt` closure with zero network needed, matching a purchased-OS-key install experience | Folded into Phase 12 (2026-09-17) — see that phase's restructuring note. This doc stays as an accurate record of what it built. |
 | 14 | [Bake the repo itself into the ISO](phases/phase-14-bake-repo-into-iso.md) | 1 | Claude | Live environment has `install/`/`system/`/`packages/*.txt` with zero GitHub access needed for the core install | Complete (2026-09-18) |
 | 15 | [Real GUI guided installer](phases/phase-15-gui-installer.md) | 1 | Claude + user | A real graphical wizard (`cage` + hand-written GTK4/libadwaita, not a TUI), auto-started on `tty1`, collects every field once (including both passwords, via file descriptor) and runs the install fully unattended | Complete (2026-09-18) |
-| 16 | [Fully automated desktop bring-up](phases/phase-16-desktop-bring-up.md) | 1, 6 | Claude + user | Reboot after install lands in a working, themed Hyprland desktop with zero manual steps, on a self-contained install (no repo checkout, `~/Projects` never created, XDG directories in place); ISOs can be built locally with `scripts/build-iso` | In progress (real-hardware round 2 under way) |
-| 17 | [Wi-Fi at install, and an interactive network bar](phases/phase-17-wifi-network-bar.md) | 1, 3 | Claude + user | An optional Wi-Fi step in the installer leaves the laptop online on first boot; the status bar shows network state and offers a picker (left-click) and full settings (right-click); battery indicator | In progress (implemented and tested; real-hardware verification pending) |
+| 16 | [Fully automated desktop bring-up](phases/phase-16-desktop-bring-up.md) | 1, 6 | Claude + user | Reboot after install lands in a working, themed Hyprland desktop with zero manual steps, on a self-contained install (no repo checkout, `~/Projects` never created, XDG directories in place); ISOs can be built locally with `scripts/build-iso` | Complete (2026-09-21) -- the mechanism verified on the Alienware (D-0067); one unattended fresh install from an ISO carrying the first-login fix still owed, on a second machine |
+| 17 | [Wi-Fi at install, and an interactive network bar](phases/phase-17-wifi-network-bar.md) | 1, 3 | Claude + user | An optional Wi-Fi step in the installer leaves the laptop online on first boot; the status bar shows network state and offers a picker (left-click) and full settings (right-click); battery indicator | Complete (2026-09-21) -- bar, picker, toasts, `dell_rbtn` blacklist and autoconnect verified on the Alienware (D-0068 to D-0077); the installer's Wi-Fi page cannot join on this laptop (no `wl` in the live ISO) and is smoke-test-verified |
 | 18 | Release payload and update pipeline | 1, cross-cutting | Claude + user | An installed machine (no repo on it) can check for and apply the latest release on demand: signed versioned payload, pre-update snapshot, rollback | Not started -- own plan mode; the repo is to become public |
 
 ## Decisions deferred to their phase's plan mode
@@ -182,7 +182,18 @@ outlines; their scope is finalized in their own plan mode.
   debugging" feature was explicitly deferred to its own future story,
   not squeezed into this phase's close.
 
-- **Phase 17:** in progress; see D-0068 to D-0074. Asked for an optional Wi-Fi
+- **Phase 16:** resolved; see D-0067. The plan's `~/Projects/autarchy` checkout
+  on the target was dropped mid-phase for a root-owned payload at
+  `/usr/local/share/autarchy/current` ("Windows doesn't have a 'windows os' repo
+  anywhere either"), SDDM autologin reversed part of D-0026, and one script
+  (`install/first-login`) does what the chroot can't. Real hardware then found
+  the bug that mattered: Hyprland parsed the hook's `[ -x ]` guard as exec rules,
+  so first-login never ran and the desktop came up bare -- diagnosed only once
+  Claude Code ran on the machine and read its Hyprland log. `scripts/build-iso`
+  (local builds; `sudo podman` on a podman host) and `iso/write-usb.ps1` came
+  out of the same phase. What is still owed: one unattended fresh install from
+  an ISO carrying the fix, on a machine other than the dev seat.
+- **Phase 17:** resolved; see D-0068 to D-0077. Asked for an optional Wi-Fi
   step in the installer and a taskbar where the Wi-Fi icon can be seen and used.
   Research (Omarchy's current line, Windows/macOS, Calamares, Arch and
   NetworkManager's own docs) first, then decisions asked directly: NetworkManager
@@ -198,7 +209,15 @@ outlines; their scope is finalized in their own plan mode.
   have shown the Wi-Fi password in plain text without `obscure = True` (D-0071).
   The real GTK page and the real Waybar were run headless, and each found or ruled
   out something the unit tests could not. Hardware verification on the Alienware
-  (radio, rfkill, glyphs, autoconnect after reboot) is still open.
+  then took three rounds and rewrote the diagnosis twice: the "hardware switch"
+  was a missing driver (Broadcom BCM4352 -> `broadcom-wl-dkms` by PCI ID,
+  D-0073/D-0074) plus a firmware airplane-mode slider (`dell_rbtn`, blacklisted by
+  DMI on the kernel command line, D-0076, proven on all three boot entries); the
+  picker that "saved but never connected" was `networkmanager_dmenu` asking for
+  SAE on a WPA2/WPA3 network the `wl` driver cannot do, fixed by a one-function
+  shim (D-0077) after the fuzzel hypothesis (D-0075) was refuted on the machine.
+  Bar, toasts, right-click editor, battery and autoconnect after reboot
+  user-confirmed on the laptop.
 
 ## Cross-cutting concerns (checked in every phase)
 

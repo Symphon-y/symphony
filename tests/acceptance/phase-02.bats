@@ -36,8 +36,16 @@ readonly MANAGED_SETTINGS=/etc/claude-code/managed-settings.json
 }
 
 @test "home config: every file under home/ is linked into the home directory" {
-  run "$REPO_ROOT/install/link-home" check
+  # From the payload on an installed machine: the links point there, not at
+  # a checkout (D-0067), and stow refuses to answer for a different stow dir.
+  run "$(os_root)/install/link-home" check
   assert_success
+}
+
+# The jump host (D-0021) is opt-in per machine: install/ssh-jump-host writes the
+# firewall rule and the keys. Where it was never run there is nothing to check.
+require_jump_host() {
+  [[ -e /etc/nftables.d/ssh-jump-host.nft ]] || skip "no SSH jump host configured on this machine (D-0021 is opt-in)"
 }
 
 @test "home config: ~/.claude is a real directory, so credentials never land in the repo" {
@@ -59,6 +67,7 @@ unrestricted_ssh_rules() {
 }
 
 @test "ssh: the server accepts keys only, never root, and forwards nothing" {
+  require_jump_host
   run sshd_effective_config
   assert_success
   assert_line "passwordauthentication no"
@@ -72,6 +81,7 @@ unrestricted_ssh_rules() {
 }
 
 @test "ssh: authorized keys are root-owned system config, not user-editable files" {
+  require_jump_host
   run sshd_effective_config
   assert_line "authorizedkeysfile /etc/ssh/authorized_keys/%u"
   local keys
@@ -81,6 +91,7 @@ unrestricted_ssh_rules() {
 }
 
 @test "ssh: every authorized key is restricted to a source address" {
+  require_jump_host
   local keys
   keys="/etc/ssh/authorized_keys/$(id -un)"
   # No key line without a from= restriction...
@@ -97,6 +108,7 @@ unrestricted_ssh_rules() {
 }
 
 @test "ssh: the firewall opens port 22 only to specific source addresses" {
+  require_jump_host
   run as_root nft list chain inet filter input
   assert_success
   assert_output --regexp 'saddr .* dport (22|ssh)'

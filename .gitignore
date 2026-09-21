@@ -10,6 +10,9 @@ secrets/
 # Machine-local overrides stay out of portable config
 *.local
 *.local.*
+# Per-machine package lists (scripts/pkg-audit): what one machine has on purpose
+# that the ISO never ships
+/packages/local/
 
 # Claude Code per-user settings
 .claude/settings.local.json

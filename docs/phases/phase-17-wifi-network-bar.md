@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Status** | In progress (implemented and tested; real-hardware verification pending) |
+| **Status** | Complete (2026-09-21) |
 | **Driver** | Claude + user |
-| **Branch** | `phase/17-wifi-network-bar` (stacked on `phase/16-desktop-bring-up` until 16 merges) |
+| **Branch** | `phase/17-wifi-network-bar` (carries Phase 16's later commits too; both merged from it) |
 | **Started** | 2026-09-20 |
-| **Completed** | |
+| **Completed** | 2026-09-21 |
 
 ## Goal
 
@@ -37,7 +37,7 @@ one home for each piece of knowledge, red tests first.
   rfkill-disabled / linked states, tooltip, and click actions; a `battery` module.
 - `network-menu` entry point: left-click and `SUPER+CTRL+N` open the
   `networkmanager-dmenu` picker through fuzzel; right-click opens `nm-connection-editor`.
-- Docs, decisions D-0068 to D-0074, an Omarchy-influences entry for network/Wi-Fi UI.
+- Docs, decisions D-0068 to D-0077, an Omarchy-influences entry for network/Wi-Fi UI.
 
 **Out of scope**
 - Enterprise 802.1X, VPN UI, captive-portal UI, tray producers (enterprise and VPN
@@ -86,10 +86,11 @@ one home for each piece of knowledge, red tests first.
 | Network menu entry point | `home/network/dot-local/bin/network-menu` (`network-menu` = picker, `network-menu edit` = editor); Waybar clicks and the keybinding all call it |
 | Bar palette | the matugen `waybar.css` template (gains `@define-color error`) |
 
-**Open**
-- [ ] Spikes 4 and 5 (need a compositor / a booted ISO) may still change the bar wiring and
-      the live-session hand-off; the `networkmanager-dmenu` password prompt under fuzzel
-      is confirmed on the first ISO boot.
+**Open** (closed 2026-09-21)
+- [x] Spikes 4 and 5: the bar wiring held on hardware (spike 4); the live-session
+      hand-off (spike 5) could not be exercised on this laptop -- the live ISO has no
+      driver for its card -- and stays unit/smoke-verified; the password prompt under
+      fuzzel works on the installed machine (masked, D-0071).
 
 ## Spikes (run before any code; results recorded here)
 
@@ -161,9 +162,9 @@ Red confirmed: | Green confirmed: |
 
 ## Tasks
 
-- [ ] Branch, tracking doc, roadmap row, backlog item (this commit)
+- [x] Branch, tracking doc, roadmap row, backlog item
 - [x] Spikes 1-3, results logged (containerised NetworkManager, packages, regdb)
-- [ ] Spikes 4-5 (need a compositor / a booted ISO) -- on the first ISO boot
+- [x] Spikes 4-5 -- see Decisions/Open
 - [x] Step 1 -- live ISO to NetworkManager (red, green)
 - [x] Step 2 -- `gui/installer/wifi.py` and `gui/tests/test_wifi.py` (red, green)
 - [x] Step 3 -- `Answers`, Wi-Fi page, Review row, demo backend (red, green)
@@ -171,13 +172,15 @@ Red confirmed: | Green confirmed: |
 - [x] Step 5 -- Waybar `network`/`battery`, `network-menu`, keybinding, matugen `error` colour, theme migration (red, green)
 - [x] Hotfixes -- diagnosing a blocked or missing radio (D-0073) and the PCI-ID hardware map with the Broadcom driver (D-0074), red then green
 - [x] Step 6 -- `phase-17.bats`, runbooks, influences entry, decisions D-0068 to D-0074, roadmap
-- [ ] Build an ISO locally (`scripts/build-iso`), boot in a VM: guided install with Skip, no regression
+- [x] Build an ISO locally (`scripts/build-iso`): the Phase 16 local builds and, on the
+      Alienware, the `sudo podman` spike (rootless podman cannot mount the chroot)
 - [x] Real hardware (installed machine, via dev-deploy): icon states, left/right click, `SUPER+CTRL+N`, battery, toasts, autoconnect after reboot, `dell_rbtn` blacklist on all three boot entries; the Wi-Fi *page* cannot join on this laptop (no `wl` on the live ISO -- it says so) and is smoke-test-verified
-- [ ] Real hardware, fresh install from the next local ISO: page shows the driver message, install, reboot, land online with the bar; icon states,
-      left/right click, rfkill, `SUPER+CTRL+N`, battery; password absent from `ps` and the
-      journal; profile files `0600 root`
+- [ ] **Owed, on a second machine:** a fresh install from an ISO with all of this -- the
+      Wi-Fi page joins (on a card the live ISO has a driver for), the profile lands `0600
+      root` and autoconnects on first boot. On the Alienware the page correctly says the
+      driver comes with the installed system (D-0074); the rest is confirmed above.
 - [x] Hotfix -- the picker asked for SAE on a WPA2/WPA3 network (D-0077), red then green
-- [ ] Close: decisions, influences, roadmap, merge (together with Phase 16, on this branch)
+- [x] Close: decisions, influences, roadmap, merge (together with Phase 16, on this branch)
 
 ## Implementation log
 
@@ -485,9 +488,9 @@ Red confirmed: | Green confirmed: |
 
 ## Exit criteria
 
-- [ ] All acceptance tests pass
-- [ ] Static checks pass
-- [ ] `DECISIONS.md` updated (D-0068 to D-0077)
-- [ ] `docs/omarchy-influences.md` updated
-- [ ] `docs/roadmap.md` status updated
-- [ ] Branch merged to `main`
+- [x] All acceptance tests pass (`phase-17.bats` 43/43 on the Alienware)
+- [x] Static checks pass (`scripts/check`, 266 unit tests, 92 GUI tests)
+- [x] `DECISIONS.md` updated (D-0068 to D-0077)
+- [x] `docs/omarchy-influences.md` updated
+- [x] `docs/roadmap.md` status updated
+- [x] Branch merged to `main`

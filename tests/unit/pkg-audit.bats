@@ -103,3 +103,30 @@ fixture() {
   assert_success
   assert_output --partial "no drift"
 }
+
+@test "a package in this machine's own list (packages/local/<hostname>.txt) is not reported as undeclared" {
+  fixture base.txt "git"
+  mkdir -p "$PKGS/local"
+  fixture "local/$(</etc/hostname).txt" "discord"
+  STUB_EXPLICIT="git discord" run "$SCRIPT" --packages-dir "$PKGS"
+  assert_success
+  assert_output --partial "no drift"
+}
+
+@test "another machine's local list does not declare anything here" {
+  fixture base.txt "git"
+  mkdir -p "$PKGS/local"
+  fixture "local/elsewhere.txt" "discord"
+  STUB_EXPLICIT="git discord" run "$SCRIPT" --packages-dir "$PKGS"
+  assert_failure
+  assert_output --partial "discord"
+}
+
+@test "a package in the local list that is not installed is reported as missing, like any declared package" {
+  fixture base.txt "git"
+  mkdir -p "$PKGS/local"
+  fixture "local/$(</etc/hostname).txt" "discord"
+  STUB_EXPLICIT="git" run "$SCRIPT" --packages-dir "$PKGS"
+  assert_failure
+  assert_output --partial "discord"
+}

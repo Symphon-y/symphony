@@ -29,7 +29,16 @@ fi
 
 installed=$(pacman -Qqe | sort)
 present=$(pacman -Qq | sort)
+# Every list under packages/*.txt ships in the ISO; packages/local/<hostname>.txt
+# (gitignored, out of the *.txt globs everything else uses) holds what is installed
+# on this one machine on purpose -- personal apps on the dev seat. It counts as
+# declared here and is read by nothing that builds or installs. Named by
+# /etc/hostname, the file the installer writes (no hostname binary is assumed).
+local_list="$packages_dir/local/$(</etc/hostname).txt"
 declared=$(scripts/pkglist "$packages_dir"/*.txt)
+if [[ -f $local_list ]]; then
+  declared=$(printf '%s\n%s\n' "$declared" "$(scripts/pkglist "$local_list")" | grep . | sort -u)
+fi
 # Hardware-specific packages (packages/hardware/, Phase 17) apply only to machines with
 # that hardware: they satisfy "declared" when installed, but are never "missing" when not.
 hardware_declared=""
