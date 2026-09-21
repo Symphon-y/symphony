@@ -154,8 +154,11 @@ to check by device name instead)
       zero-network install completing to a rebootable, logged-in base
       system with hibernation-capable `SWAP_SIZE` wired up (D-0064,
       D-0065) -- see that phase's tracking doc for the full chain.
-- [ ] `packages/alienware-14.txt`; verify base system boots + networks
-- [ ] Install Claude Code locally; hand off driving to a local session
+- [x] ~~`packages/alienware-14.txt`~~ superseded by D-0074's PCI-ID-keyed
+      `system/hardware.txt` + `packages/hardware/broadcom-wl.txt` (Phase 17);
+      base system boots and networks (Wi-Fi via `wl`, confirmed 2026-09-20)
+- [x] Install Claude Code locally; hand off driving to a local session
+      (2026-09-20: this and every later entry is written from the machine)
 - [ ] `docs/runbooks/rebuild.md` for the full stack
 - [ ] Verify hibernation for real; enable + verify `power-profiles-daemon`
 - [ ] Bonus: `nouveau` attempt; AlienFX attempt

@@ -365,6 +365,8 @@ and the old entry is marked `Superseded by D-XXXX`.
 ## D-0021 — On-demand SSH from Unraid as the copy/paste jump host
 
 - **Status:** Accepted (2026-09-13, Phase 2). Supersedes the SSH clause of D-0015.
+  _(Retired as the driver seat 2026-09-20: Claude Code now runs locally on the
+  Alienware, Phase 12's access model; the mechanism stays available for a VM.)_
 - **Decision:** sshd starts on demand, not at boot, reached only from Unraid's LAN
   address. `install/ssh-jump-host <address>` writes both the firewall rule
   (`/etc/nftables.d/ssh-jump-host.nft`) and root-owned `authorized_keys`, with every key
