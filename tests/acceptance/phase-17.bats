@@ -205,6 +205,20 @@ bar_json() {
   assert_success
 }
 
+@test "menu: the picker is reached through network-picker, which prefers wpa-psk on transition networks (D-0077)" {
+  # Upstream networkmanager_dmenu hard-codes sae for any WPA3-capable AP; the wl
+  # driver cannot do SAE, so the Alienware's picker saved profiles that never
+  # connected. network-menu must never call the upstream script directly.
+  local shim="$REPO_ROOT/home/network/dot-local/bin/network-picker"
+  [[ -x $shim ]] || git -C "$REPO_ROOT" ls-files -s -- home/network/dot-local/bin/network-picker | grep -q '^100755'
+  run grep -E '^\s*network-picker' "$REPO_ROOT/home/network/dot-local/bin/network-menu"
+  assert_success
+  run grep -E '^\s*networkmanager_dmenu' "$REPO_ROOT/home/network/dot-local/bin/network-menu"
+  assert_failure
+  run grep -F '"wpa-psk"' "$shim"
+  assert_success
+}
+
 @test "packages: the network picker and the settings window are in the inventory" {
   run "$REPO_ROOT/scripts/pkglist" "$REPO_ROOT"/packages/*.txt
   assert_success
@@ -321,6 +335,13 @@ bar_json() {
   assert_success
   run grep -F 'Amended by D-0075' "$REPO_ROOT/DECISIONS.md"
   assert_success
+}
+
+@test "docs: DECISIONS.md records D-0077 (the picker's key management), and D-0075 points at it" {
+  run grep -E '^## D-0077 ' "$REPO_ROOT/DECISIONS.md"
+  assert_success
+  run grep -F 'D-0077' "$REPO_ROOT/DECISIONS.md"
+  assert_output --partial 'Extended by D-0077'
 }
 
 @test "quirks: the Alienware 14's dell_rbtn blacklist is keyed to its DMI, not to every machine" {

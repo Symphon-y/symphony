@@ -10,7 +10,7 @@ setup() {
   BIN="$BATS_TEST_TMPDIR/bin"
   mkdir -p "$BIN"
   local tool
-  for tool in networkmanager_dmenu nm-connection-editor; do
+  for tool in network-picker networkmanager_dmenu nm-connection-editor; do
     # shellcheck disable=SC2016 # the stub body expands when the stub runs, not here
     printf '#!/usr/bin/env bash\necho "${0##*/}${*:+ $*}" >>"$STUB_LOG"\n' >"$BIN/$tool"
   done
@@ -32,8 +32,11 @@ calls() {
   assert_success
   run calls
   assert_line --index 0 "nmcli -t -f UUID connection show"
-  assert_line --index 1 "networkmanager_dmenu"
+  assert_line --index 1 "network-picker"
   assert_line --index 2 "network-watch [u-1 u-2 ]"
+  # The upstream picker is reached only through network-picker (D-0077); it is
+  # stubbed here so a regression can't open the real one mid-test.
+  refute_line "networkmanager_dmenu"
 }
 
 @test "'edit' opens the full network settings (nm-connection-editor), with no watcher" {
@@ -52,7 +55,7 @@ calls() {
 }
 
 @test "the exit status of the picker is passed through, and it is still watched" {
-  printf '#!/usr/bin/env bash\nexit 7\n' >"$BIN/networkmanager_dmenu"
+  printf '#!/usr/bin/env bash\nexit 7\n' >"$BIN/network-picker"
   run "$SCRIPT"
   assert_failure 7
   run calls
@@ -64,5 +67,5 @@ calls() {
   run "$SCRIPT"
   assert_success
   run calls
-  assert_output "networkmanager_dmenu"
+  assert_output "network-picker"
 }

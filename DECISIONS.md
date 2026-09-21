@@ -1973,7 +1973,7 @@ and the old entry is marked `Superseded by D-XXXX`.
 
 ## D-0075 — The network picker's password prompt is fixed at its source, and its outcome is reported (amends D-0071)
 
-- **Status:** Accepted (2026-09-20, Phase 17)
+- **Status:** Accepted (2026-09-20, Phase 17). Extended by D-0077, which found the cause left open here.
 - **Decision:** `~/.config/fuzzel/fuzzel.ini` no longer sets `[dmenu] exit-immediately-if-empty`
   (the matugen template drops it; a migration re-renders machines themed before). A new
   `network-watch` script runs after the picker: `network-menu` snapshots the saved profiles'
@@ -2012,4 +2012,48 @@ and the old entry is marked `Superseded by D-XXXX`.
   30 s after each pick (about one call a second). It reads device and profile state only and
   never a passphrase. It deletes a newly created profile on any failed first attempt, including
   a non-password failure such as an out-of-range access point; the user re-enters the password.
-  The cause of the failed connection on the Alienware is not yet established (see Reasoning).
+  The cause of the failed connection on the Alienware was established once Claude Code ran on the
+  machine and could read its journal: D-0077.
+
+## D-0077 — The picker asks for WPA2-PSK on a WPA2/WPA3 transition network, through a shim, not a fork (extends D-0075)
+
+- **Status:** Accepted (2026-09-20, Phase 17)
+- **Decision:** `network-menu` runs `network-picker`, a small Python script that loads
+  `/usr/bin/networkmanager_dmenu` as a module and rebinds one function, `create_wifi_profile`:
+  after upstream builds the profile, a `key-mgmt` of `sae` is changed to `wpa-psk` whenever the
+  access point also offers PSK (`ap_security()` says `WPA1` or `WPA2`); `sae` stays for a
+  WPA3-only network. Everything else -- the fuzzel list, the obscured passphrase prompt, MAC
+  pinning, the D-Bus hand-off that keeps the password out of `argv` (D-0069) -- is upstream's,
+  untouched. The shim fails closed (a message and a non-zero exit, never the unpatched picker) if
+  the upstream script loses any of the three names it relies on. `scripts/check` now sorts the
+  files under `home/*/dot-local/bin` by shebang so a Python script there is syntax-checked
+  rather than handed to shellcheck.
+- **Alternatives considered:** An own fuzzel + `nmcli device wifi connect` picker -- the password
+  would be on `nmcli`'s command line, which D-0069 forbids, and it was rejected in D-0075 for that
+  reason; `nmcli --ask` with the password on stdin would avoid `argv` but means rewriting the
+  list, the prompt and the actions upstream already has. Waiting for an upstream release --
+  leaves this laptop connecting by hand; the issue is worth filing, but the fix must ship in the
+  ISO now. A NetworkManager configuration that forces PSK -- there is none; `key-mgmt` is
+  per-profile. Having `network-watch` repair a failed `sae` profile -- it would need the
+  passphrase to re-add it, which D-0069 forbids the script to touch. Gating the downgrade on the
+  driver (`wl` only) -- more logic for no gain: a WPA2 profile works on every card, and a
+  transition network is by definition one that still accepts WPA2.
+- **Reasoning:** From the machine's own NetworkManager journal: the picker *did* add and
+  activate the 5 GHz network (`connection-add-activate`), with `key_mgmt SAE`; the supplicant
+  could not select that key management with `wl`, association timed out after 25 s, the
+  activation failed as `ssid-not-found`, the profile stayed saved, and autoconnect repeated the
+  same failure on every boot (12 attempts, 0 successes). The 2.4 GHz network worked only because
+  its profile had been made by `nmcli --ask`, which lets the daemon complete the profile and
+  chooses `wpa-psk`. `/usr/bin/networkmanager_dmenu:1275` sets `sae` for any AP whose security
+  string contains `WPA3`; `nmcli -f WIFI-PROPERTIES device show` on the BCM4352 lists no WPA3 at
+  all. So the rule the shim applies is the one `nmcli` and the installer page
+  (`gui/installer/wifi.py` `classify_security`: transition -> psk) already use. Verified against
+  the real libnm: upstream's profile for a `psk sae` AP is `sae`, the patched one is `wpa-psk`,
+  `verify()` passes and the PSK is intact.
+- **Consequences:** WPA3 is not used on transition-mode networks from the picker, on any card; a
+  WPA3-only network is unaffected. The shim depends on three upstream names (`ap_security`,
+  `create_wifi_profile`, `main`) and on `main()` sitting behind an `if __name__ == "__main__"`
+  guard; a package update that changes them stops the picker with a clear message instead of
+  regressing silently, and `tests/unit/network-picker.bats` pins the behaviour against a fake
+  upstream. `network-watch`'s failure toast still says "check the password"; with the SAE
+  case gone that is the common cause again.

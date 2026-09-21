@@ -4,9 +4,17 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
+# Everything below is shell unless its shebang says otherwise: a Python script
+# living among the shell ones (home/network/dot-local/bin/network-picker) is
+# syntax-checked with the GUI's Python instead of handed to shellcheck.
 shell_files=()
+python_files=()
 while IFS= read -r file; do
-  shell_files+=("$file")
+  if [[ $(head -n1 "$file") == '#!/usr/bin/env python3' ]]; then
+    python_files+=("$file")
+  else
+    shell_files+=("$file")
+  fi
 done < <(
   find scripts install -type f | sort
   find home -path '*/dot-local/bin/*' -type f | sort
@@ -37,8 +45,14 @@ done < <(find .github/workflows -name '*.yml' 2>/dev/null)
 echo "==> identifiers"
 scripts/check-identifiers
 
-echo "==> gui: python syntax"
+echo "==> python syntax"
 find gui -name '*.py' -print0 | xargs -0 python3 -m py_compile
+# ast.parse, not py_compile: the latter always writes a __pycache__ beside the
+# file, which would then be stow-linked into ~/.local/bin and shellchecked.
+python3 -c 'import ast, sys
+for path in sys.argv[1:]:
+    with open(path, encoding="utf-8") as f:
+        ast.parse(f.read(), path)' "${python_files[@]}"
 
 echo "==> gui: unit tests"
 python3 -m unittest discover -s gui/tests -t gui

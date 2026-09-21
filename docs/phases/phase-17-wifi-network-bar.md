@@ -175,7 +175,8 @@ Red confirmed: | Green confirmed: |
 - [ ] Real hardware: Wi-Fi page on the Alienware, install, reboot, land online; icon states,
       left/right click, rfkill, `SUPER+CTRL+N`, battery; password absent from `ps` and the
       journal; profile files `0600 root`
-- [ ] Close: decisions, influences, roadmap, merge (after Phase 16 merges)
+- [x] Hotfix -- the picker asked for SAE on a WPA2/WPA3 network (D-0077), red then green
+- [ ] Close: decisions, influences, roadmap, merge (together with Phase 16, on this branch)
 
 ## Implementation log
 
@@ -419,6 +420,40 @@ Red confirmed: | Green confirmed: |
   (2) the cold-boot test: `module_blacklist=dell_rbtn` in `/etc/kernel/cmdline` + `mkinitcpio -P` +
   reboot: is `dell_rbtn` gone from `lsmod` and WIFI-HW `enabled` with no manual step, on all three boot entries?
 
+### 2026-09-20 (from the machine: Claude Code now runs on the Alienware)
+- **Problem 3 established (D-0077).** The journal answered it in one read: the picker *did*
+  `connection-add-activate` the 5 GHz network, with `key_mgmt SAE`; the supplicant could not
+  select it on `wl`, association timed out, the activation failed as `ssid-not-found` and
+  autoconnect retried the same failure on every boot (12 attempts, none succeeded). The 2.4 GHz
+  profile that works is `wpa-psk` -- made by `nmcli --ask`, which lets the daemon choose.
+  `/usr/bin/networkmanager_dmenu:1275` hard-codes `sae` for any AP advertising WPA3, transition
+  mode included, and NetworkManager's `WIFI-PROPERTIES` for the BCM4352 lists no WPA3 at all.
+  Not fuzzel (D-0075's fix stays as a latent defect), not the password, not `network-menu`.
+  A second, unrelated failure in the same journal -- `psk mismatch` then `no secrets: No agents
+  were available` -- is the expected shape of a wrong saved password in a session with no secret
+  agent; `network-watch`'s "forget the network" toast is the right answer to it.
+- **Fixed, red first:** `home/network/dot-local/bin/network-picker` loads the upstream script as
+  a module and rebinds `create_wifi_profile` so a network that also offers PSK gets `wpa-psk`
+  (`sae` only when it is the sole offer -- nmcli's rule and `classify_security`'s);
+  `network-menu` calls it; 8 bats tests against a fake upstream (transition, WPA3-only,
+  WPA2-only, WPA1+WPA3, open, argv pass-through, fail-closed on a renamed function, missing
+  script); the real libnm path checked by hand (upstream `sae` -> patched `wpa-psk`, `verify()`
+  true, PSK intact). `scripts/check` splits `dot-local/bin` by shebang so the Python script is
+  parsed with `ast` (not `py_compile`, which leaves a `__pycache__` that stow would link and
+  shellcheck would choke on -- it did, once). A red test briefly launched the *real* picker
+  because the upstream stub had been renamed; the menu tests now stub both names and assert the
+  upstream is never called directly.
+- **Why there was no bar to click:** Phase 16's `first-login` had never run on this machine
+  (Hyprland ate the `[ -x ]` guard as exec rules -- see that phase's log). The bar, the theme
+  and `fuzzel.ini` all arrive with the deploy of this checkout (`docs/runbooks/dev-deploy.md`).
+- **`dell_rbtn` today:** loaded, but *unblocked* on this boot (the three earlier boots were
+  hard-blocked; the user pressed Fn+F2 and power-cycled the EC in between, unsure which counted).
+  The slider is firmware state that persists across boots and can be toggled; the blacklist stays
+  the right defence, its cold-boot proof still owed.
+- **Kernel warnings from `wl`** at every boot ("Unpatched return thunk in use", a `memcpy`
+  field-spanning write in `wl_cfg80211_hybrid.c`), kernel tainted `P S W IOE`. Known
+  broadcom-wl-dkms noise on current kernels; Wi-Fi works. Recorded for the hardware doc.
+
 ## VM → physical hardware notes
 
 - A VM has no real radio: the unit tests use a fake command runner and recorded
@@ -433,7 +468,7 @@ Red confirmed: | Green confirmed: |
 
 - [ ] All acceptance tests pass
 - [ ] Static checks pass
-- [ ] `DECISIONS.md` updated (D-0068 to D-0076)
+- [ ] `DECISIONS.md` updated (D-0068 to D-0077)
 - [ ] `docs/omarchy-influences.md` updated
 - [ ] `docs/roadmap.md` status updated
 - [ ] Branch merged to `main`

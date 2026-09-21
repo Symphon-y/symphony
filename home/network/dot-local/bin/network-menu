@@ -7,9 +7,10 @@
 # change. Same shape as power-menu and clipboard-menu.
 #
 #   network-menu        the network picker: networkmanager-dmenu through fuzzel
-#                       (~/.config/networkmanager-dmenu/config.ini), then network-watch
-#                       reports whether the connection worked (D-0075) -- the picker
-#                       itself exits as soon as NetworkManager accepts the request
+#                       (~/.config/networkmanager-dmenu/config.ini), run via network-picker
+#                       so a WPA2/WPA3 network gets a WPA2 profile (D-0077), then
+#                       network-watch reports whether the connection worked (D-0075) --
+#                       the picker itself exits as soon as NetworkManager accepts the request
 #   network-menu edit   full network settings: nm-connection-editor -- hidden
 #                       networks, VPN, static addresses, 802.1X, which the picker
 #                       does not do
@@ -27,7 +28,7 @@ pick() {
   local before status=0 watch=1
   before=$(nmcli -t -f UUID connection show 2>/dev/null) || watch=0
 
-  networkmanager_dmenu || status=$?
+  network-picker || status=$?
   if ((watch)); then
     printf '%s\n' "$before" | network-watch
   fi

@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+# Target: ~/.local/bin/network-picker (linked by install/link-home)
+#
+# networkmanager_dmenu with one rule replaced (Phase 17, D-0077).
+#
+# Upstream builds a new Wi-Fi profile client-side and, for any access point
+# that advertises WPA3, sets key-mgmt=sae -- including WPA2/WPA3 *transition*
+# networks, which is what home routers ship today. A card whose driver cannot
+# do SAE (the Alienware's Broadcom BCM4352 on `wl`) then never associates:
+# NetworkManager saves the profile, waits 25 s, fails with "ssid-not-found",
+# and autoconnect retries the same failure on every boot. That was "the picker
+# saves but never connects". `nmcli device wifi connect` on the same network
+# works because the daemon completes the profile and prefers wpa-psk.
+#
+# So: load the upstream script as a module, keep everything it does (fuzzel,
+# the obscured passphrase prompt, MAC pinning, D-0069's secrecy), and rebind
+# only create_wifi_profile so that a network offering PSK gets wpa-psk; sae is
+# used only when it is the sole offer. That is nmcli's rule, and the installer
+# page's (gui/installer/wifi.py classify_security: "WPA2+WPA3 transition ->
+# psk"). Cost: WPA3 is not used on transition networks, on any card. Not an
+# own picker (rejected, D-0075), and not a fork of the package.
+#
+# The upstream script is not a Python package, so it is loaded by path. If it
+# ever renames what this relies on, fail closed with a message rather than run
+# the unpatched picker and reintroduce the bug silently.
+import importlib.machinery
+import importlib.util
+import os
+import sys
+
+UPSTREAM = os.environ.get("NETWORK_PICKER_UPSTREAM", "/usr/bin/networkmanager_dmenu")
+REQUIRED = ("ap_security", "create_wifi_profile", "main")
+
+
+def offers_psk(security):
+    """True when upstream's ap_security() string says PSK is on offer.
+
+    ap_security() joins " WPA1" (WPA flags), " WPA2" (RSN PSK), " WPA3"
+    (RSN SAE), " 802.1X", " OWE"; "WPA2 WPA3" is a transition network.
+    """
+    return "WPA1" in security or "WPA2" in security
+
+
+def load_upstream(path):
+    loader = importlib.machinery.SourceFileLoader("networkmanager_dmenu", path)
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[loader.name] = module
+    loader.exec_module(module)
+    missing = [name for name in REQUIRED if not callable(getattr(module, name, None))]
+    if missing:
+        raise SystemExit(
+            f"network-picker: {path} has no {', '.join(missing)} -- "
+            "upstream changed; refusing to run it unpatched"
+        )
+    return module
+
+
+def patch(upstream):
+    original = upstream.create_wifi_profile
+
+    def create_wifi_profile(nm_ap, password, adapter):
+        profile = original(nm_ap, password, adapter)
+        security = profile.get_setting_wireless_security()
+        if (
+            security is not None
+            and security.get_key_mgmt() == "sae"
+            and offers_psk(upstream.ap_security(nm_ap))
+        ):
+            security.set_property("key-mgmt", "wpa-psk")
+        return profile
+
+    upstream.create_wifi_profile = create_wifi_profile
+
+
+def main():
+    if not os.path.isfile(UPSTREAM):
+        raise SystemExit(f"network-picker: {UPSTREAM} not found")
+    upstream = load_upstream(UPSTREAM)
+    patch(upstream)
+    upstream.main()
+
+
+if __name__ == "__main__":
+    main()
