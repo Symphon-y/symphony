@@ -333,6 +333,34 @@ Green confirmed: 2026-09-20 (`scripts/check` green; `phase-16.bats` 6/6)
   item (validate the swap size in the GUI, the terminal fallback and
   `install-base-system`'s preflight) rather than fixed here.
 
+### 2026-09-20 (round 2, from the machine itself: first-login never ran)
+- **Driver seat moved.** Claude Code now runs locally on the Alienware
+  (`alien`, installed from `local-5c8bcf1`) with the same no-`sudo` rule, so
+  the machine's own journal and files are read directly instead of relayed.
+- **The desktop was up but not brought up.** `ls ~` was correct (five XDG dirs,
+  no `Projects`), the payload was root-owned with `VERSION`, `link-home` had
+  linked everything -- and yet no theme, no bar, every user service
+  `disabled`, no `~/.config/{fuzzel,mako}`, no `colors.css`, no
+  `first-login-done` marker. Hyprland's own log had the cause on every login:
+  `[executor] Executing  && /usr/local/share/autarchy/current/install/first-login`
+  followed by `Applied rule arguments for exec`. Hyprland reads a leading
+  `[...]` on any exec command as its *rule block* and strips it, so the
+  `[ -x path ] && path` guard added after the original verification (which
+  had tested the bracket-free form) handed the shell a syntax error, silently.
+  This also answers Phase 17's open question of why `fuzzel.ini` was never
+  rendered on this machine, and why the user saw "no way to connect from the
+  GUI" -- there was no bar.
+- **Fixed, red first:** `tests/acceptance/phase-16.bats` now refuses any
+  `exec_cmd("[` in the Hyprland Lua config; `autostart.lua` uses `test -x`.
+- **Also fixed:** `tests/unit/network-watch.bats` "without notify-send" failed
+  on this machine because `PATH="$bin:$PATH"` fell through to the real
+  `/usr/bin/notify-send` (present on every installed autarchy machine, absent
+  only in CI's container); the test now gives the script a private PATH.
+- Round 2's remaining checks (snapper on real Btrfs, `xdg-user-dirs-update`
+  under `runuser`, SDDM autologin, `first-login` on a fresh install) are
+  proven by the next locally built ISO; until then the fix is exercised here
+  by deploying the checkout over the payload (`docs/runbooks/dev-deploy.md`).
+
 ## VM → physical hardware notes
 
 - Every script-level behavior is bats-verified against stubs (no real

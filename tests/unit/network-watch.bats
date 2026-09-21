@@ -50,8 +50,9 @@ calls() {
 }
 
 # The saved profiles before the picker ran, as network-menu passes them (UUID per line).
+# WATCH_PATH, when set, is the script's whole PATH (bats itself keeps the real one).
 watch() {
-  printf '%s\n' "$@" | "$SCRIPT"
+  printf '%s\n' "$@" | env ${WATCH_PATH:+PATH="$WATCH_PATH"} "$SCRIPT"
 }
 
 @test "connects: says Connecting, then Connected, and deletes nothing" {
@@ -170,7 +171,17 @@ watch() {
 }
 
 @test "without notify-send it still works, saying so on stderr instead of staying silent" {
+  # Removing the stub is not enough on an installed machine: PATH would fall
+  # through to the real /usr/bin/notify-send (libnotify is always present
+  # there, only CI's container lacks it). The script needs nothing else from
+  # PATH but bash and the stubs (and the nmcli stub its few coreutils), so
+  # give it exactly that.
   rm "$BATS_TEST_TMPDIR/bin/notify-send"
+  local tool
+  for tool in bash cat head sed wc; do
+    ln -s "$(command -v "$tool")" "$BATS_TEST_TMPDIR/bin/$tool"
+  done
+  export WATCH_PATH="$BATS_TEST_TMPDIR/bin"
   printf 'connecting (prepare)\nconnected\n' >"$STATES"
   echo 'u-new:wlp10s0:HomeNet' >"$ACTIVE"
   echo 'u-new:802-11-wireless:HomeNet' >"$PROFILES"

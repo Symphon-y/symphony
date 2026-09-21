@@ -63,6 +63,16 @@ setup() {
   assert_success
 }
 
+@test "no Hyprland exec command starts with a bracket (Hyprland would parse it as exec rules)" {
+  # Found on the Alienware (Phase 16 round 2): `hl.exec_cmd("[ -x path ] && path")`
+  # never ran first-login. Hyprland strips a leading `[...]` from every exec
+  # command as its rule block (`[workspace 2 silent] cmd`), so the shell got
+  # ` && path` -- a syntax error -- on every login, silently. A `test -x` guard
+  # does the same job without the bracket.
+  run grep -rnE 'exec_cmd\(\s*"\s*\[' "$REPO_ROOT"/home/hypr/dot-config/hypr/*.lua
+  assert_failure
+}
+
 @test "iso/write-usb.ps1 keeps its safety checks: USB-only, not the system disk, typed confirmation, checksum, read-back" {
   # Can't be run here (Windows-only, needs a real disk); these are the guards a
   # later edit must not quietly drop.

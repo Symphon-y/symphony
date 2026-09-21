@@ -28,4 +28,11 @@
 -- The path is where install_payload puts the OS content on an installed
 -- machine. The -x guard makes this a silent no-op anywhere that layout
 -- doesn't exist (a dev checkout, whose services are already enabled).
-hl.exec_cmd("[ -x /usr/local/share/autarchy/current/install/first-login ] && /usr/local/share/autarchy/current/install/first-login")
+--
+-- `test -x`, never `[ -x ... ]`: Hyprland reads a leading `[...]` on any exec
+-- command as its rule block (`[workspace 2 silent] cmd`) and strips it, so the
+-- bracket form handed the shell ` && /usr/local/.../first-login` -- a syntax
+-- error -- on every login, and the desktop came up unthemed with no bar and no
+-- user services (Alienware, Phase 16 round 2). tests/acceptance/phase-16.bats
+-- guards against the bracket coming back.
+hl.exec_cmd("test -x /usr/local/share/autarchy/current/install/first-login && /usr/local/share/autarchy/current/install/first-login")
