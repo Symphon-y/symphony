@@ -443,6 +443,12 @@ Red confirmed: | Green confirmed: |
   shellcheck would choke on -- it did, once). A red test briefly launched the *real* picker
   because the upstream stub had been renamed; the menu tests now stub both names and assert the
   upstream is never called directly.
+- **D-0077 confirmed on the hardware** (after deploying the checkout, `local-ac75631`, and
+  deleting the dead `sae` profile): left-click on the icon and `SUPER+CTRL+N` both open the
+  picker; picking `Accio Internet_5G` logged `connection-add-activate` with
+  `key_mgmt WPA-PSK WPA-PSK-SHA256`, the 4-way handshake completed and the device activated on
+  5500 MHz. The saved profile is `wpa-psk`, `psk-flags=0`, no `permissions=`, autoconnect on;
+  the journal has no trace of the passphrase.
 - **Why there was no bar to click:** Phase 16's `first-login` had never run on this machine
   (Hyprland ate the `[ -x ]` guard as exec rules -- see that phase's log). The bar, the theme
   and `fuzzel.ini` all arrive with the deploy of this checkout (`docs/runbooks/dev-deploy.md`).
