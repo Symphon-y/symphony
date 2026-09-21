@@ -145,7 +145,7 @@ to check by device name instead)
       identical commit that had already passed once. Fixed on its own
       branch, stress-tested 30x locally, merged separately (unrelated to
       the ISO/hardware work).
-- [ ] User: ground truth on real hardware, BIOS steps
+- [x] Ground truth on real hardware: `docs/environment/alienware-14.md` (2026-09-21; the BIOS steps that mattered -- Function Key Behavior, Wireless -- are recorded there and in D-0073/D-0076)
 - [x] User: boot the offline ISO, `autarchy-install`, `install-base-system`
       with real `SWAP_SIZE` -- done via Phase 14's real-hardware
       verification loop (`autarchy-bootstrap` itself was retired by that
