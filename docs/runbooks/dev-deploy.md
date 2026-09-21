@@ -31,9 +31,11 @@ rev="local-$(git rev-parse --short HEAD)"
 # 1. Recoverable first (D-0011/D-0062): a Btrfs snapshot named after the commit.
 sudo snapper -c root create -d "pre dev-deploy $rev"
 
-# 2. Replace the payload's content with the checkout's (same six directories
-#    install_payload copies: see install/configure-base-system PAYLOAD_CONTENT).
-sudo rsync -a --delete home install migrations packages scripts system \
+# 2. Replace the payload's content with the checkout's (same six directories,
+#    same rm + cp -a as install_payload in install/configure-base-system;
+#    rsync is not in the package inventory).
+sudo rm -rf /usr/local/share/autarchy/current/{home,install,migrations,packages,scripts,system}
+sudo cp -a home install migrations packages scripts system \
   /usr/local/share/autarchy/current/
 echo "$rev" | sudo tee /usr/local/share/autarchy/current/VERSION
 sudo chown -R root:root /usr/local/share/autarchy
