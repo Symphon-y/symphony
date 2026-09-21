@@ -56,7 +56,10 @@ hand (`install/install-packages`, from the payload) until Phase 18 does it.
 The Alienware's first install (`local-5c8bcf1`) predates the `autostart.lua`
 fix, so `install/first-login` had never run there (Phase 16 round 2). Once the
 fixed payload is deployed it runs on the next Hyprland start; to bring the
-desktop up without logging out, run it once by hand, from the payload:
+desktop up without logging out, run it once by hand, from the payload,
+**in place of** step 3's `enable-user-services` (it renders the theme first,
+then enables the services -- the other order starts Waybar before
+`colors.css` exists, which fails once and is restarted by systemd):
 
 ```bash
 /usr/local/share/autarchy/current/install/first-login
