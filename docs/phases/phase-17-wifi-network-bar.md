@@ -448,7 +448,12 @@ Red confirmed: | Green confirmed: |
   picker; picking `Accio Internet_5G` logged `connection-add-activate` with
   `key_mgmt WPA-PSK WPA-PSK-SHA256`, the 4-way handshake completed and the device activated on
   5500 MHz. The saved profile is `wpa-psk`, `psk-flags=0`, no `permissions=`, autoconnect on;
-  the journal has no trace of the passphrase.
+  the journal has no trace of the passphrase. User-confirmed on the desktop: the
+  Connecting/Connected toasts appeared, the hover tooltip shows the network details,
+  right-click opens `nm-connection-editor`, the battery indicator is there. Still to see:
+  `format-disabled` on an rfkill block, autoconnect after a reboot (the cold-boot test below
+  covers it), and the Nerd Font glyphs -- the user reads the bar, so those are confirmed by
+  the same look.
 - **Why there was no bar to click:** Phase 16's `first-login` had never run on this machine
   (Hyprland ate the `[ -x ]` guard as exec rules -- see that phase's log). The bar, the theme
   and `fuzzel.ini` all arrive with the deploy of this checkout (`docs/runbooks/dev-deploy.md`).
