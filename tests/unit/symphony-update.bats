@@ -40,6 +40,7 @@ make_installed_payload() {
   for tool in install/sync-system install/link-home install/enable-user-services install/enable-root-services install/install-packages scripts/migrate scripts/hwpkglist home/hardware/dot-local/bin/symphony-hardware; do
     # shellcheck disable=SC2016 # stub body expands when the stub runs
     mkdir -p "$dir/$(dirname "$tool")"
+    # shellcheck disable=SC2016 # stub body expands when the stub runs
     printf '#!/usr/bin/env bash\nd=$(dirname "$0"); while [[ ! -e $d/VERSION ]]; do d=$(dirname "$d"); done\necho "%s${*:+ $*} from $(cat "$d/VERSION")" >>"$STUB_LOG"\n' "${tool##*/}" >"$dir/$tool"
     chmod +x "$dir/$tool"
   done
@@ -59,6 +60,7 @@ make_release() {
     mkdir -p "$repo/$(dirname "$tool")"
     # The release's stubs must find VERSION wherever the payload lands (current/ after
     # the swap, or previous/ after a rollback): walk up from $0 to the dir holding it.
+    # shellcheck disable=SC2016 # stub body expands when the stub runs
     printf '#!/usr/bin/env bash\nd=$(dirname "$0"); while [[ ! -e $d/VERSION ]]; do d=$(dirname "$d"); done\necho "%s${*:+ $*} from $(cat "$d/VERSION")" >>"$STUB_LOG"\n' "${tool##*/}" >"$repo/$tool"
     chmod +x "$repo/$tool"
   done
