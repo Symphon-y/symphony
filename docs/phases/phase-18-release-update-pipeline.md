@@ -111,9 +111,9 @@ Red confirmed: 2026-09-21 · Green confirmed: |
       briefly reintroduced the personal one and were re-authored); `gh repo rename`,
       force-push, visibility public; verified unauthenticated
 - [x] Close: D-0078 to D-0081, influences, roadmap, merge
-- [ ] **After the merge, on `main`:** tag `2026.09.22`; on the Alienware
-      `symphony-update apply --yes` (replaces `local-*`), `rollback`, `apply` -- the
-      full-release proof, which needs the tag to be on `main` (recorded in the log)
+- [x] **After the merge, on `main`:** tag `2026.09.22`; on the Alienware
+      `symphony-update apply --yes` (replaced `local-300af86`), `rollback` (back to it),
+      `apply` (to `2026.09.22` again); `check` says up to date -- the full-release proof
 
 ## Implementation log
 
@@ -190,6 +190,15 @@ Red confirmed: 2026-09-21 · Green confirmed: |
 - Backlog: `symphony-update` could `hyprctl reload` after the swap when a Hyprland session
   is present (the config-error overlay during the swap window is expected but ugly);
   the 19 merged `phase/*` branches on the public remote are deleted at close.
+
+### 2026-09-22 (the first release, taken)
+- Merged to `main` (`f57f85f`), the 19 merged `phase/*` branches deleted from the public
+  remote, CI green, tag `2026.09.22`: the payload job signed and published first, the
+  asset downloads unauthenticated (200). On the Alienware: `check` named the release and
+  the `--yes` it would need; `apply --yes` downloaded, verified against
+  `/etc/symphony/release.pub`, snapshotted, swapped and re-applied; `rollback` put
+  `local-300af86` back; `apply --yes` took `2026.09.22` again; `check`: up to date.
+  49 links resolve, the desktop stayed up throughout. `previous/` holds `local-300af86`.
 
 ## VM → physical hardware notes
 
