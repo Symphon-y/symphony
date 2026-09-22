@@ -84,12 +84,14 @@ setup() {
   assert_output --partial "usage"
 }
 
-@test "scripts/update: exists, is executable, and supports check and apply" {
-  local script="$REPO_ROOT/scripts/update"
+@test "the updater exists, is executable, and supports check, apply, rollback and version (Phase 18 replaced scripts/update)" {
+  local script="$REPO_ROOT/home/update/dot-local/bin/autarchy-update"
   assert [ -x "$script" ]
   run "$script" bogus-subcommand
   assert_failure
   assert_output --partial "usage"
+  assert_output --partial "rollback"
+  assert [ ! -e "$REPO_ROOT/scripts/update" ]
 }
 
 @test "docs: base-install.md documents both the release-ISO path and the manual fallback" {

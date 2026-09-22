@@ -321,28 +321,15 @@ EOF
   assert_line "configure-base-system $VARS $TARGET resume=/dev/mapper/cryptswap"
 }
 
-# --- seed_release_marker (Phase 12) ----------------------------------------
+# --- release marker (Phase 12; retired in Phase 18) ------------------------
 
-@test "release marker: no-ops when not booted from a release ISO (default)" {
-  run_confirmed
-  assert_success
-  assert [ ! -e "$TARGET/home/alice/.local/state/autarchy/current-release" ]
-}
-
-@test "release marker: no-ops when the live ISO marker says 'unreleased'" {
-  echo "unreleased" >"$AUTARCHY_LIVE_RELEASE_FILE"
-  run_confirmed
-  assert_success
-  assert [ ! -e "$TARGET/home/alice/.local/state/autarchy/current-release" ]
-}
-
-@test "release marker: seeds the new user's state dir with the ISO's release tag" {
+@test "no per-user release marker is seeded: the payload's VERSION is the installed release (D-0079)" {
   echo "2026.09.16" >"$AUTARCHY_LIVE_RELEASE_FILE"
   run_confirmed
   assert_success
-  assert_equal "$(cat "$TARGET/home/alice/.local/state/autarchy/current-release")" "2026.09.16"
+  assert [ ! -e "$TARGET/home/alice/.local/state/autarchy/current-release" ]
   run calls
-  assert_line "arch-chroot $TARGET chown -R alice:alice /home/alice/.local"
+  refute_line "arch-chroot $TARGET chown -R alice:alice /home/alice/.local"
 }
 
 # scripts/hwpkglist answers from the PCI bus and is tested on its own; here it is a stub.

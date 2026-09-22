@@ -90,12 +90,12 @@ Files: `tests/unit/build-payload.bats`, `tests/unit/autarchy-update.bats`,
 | installer: no `current-release` marker seeded; `files.txt` installs the key 0644 | One source of truth for the release; verification works on a fresh install |
 | acceptance: workflow `payload` job before the ISO job, minisign, prerelease on suffixed tags; `release.pub` is a minisign key; `scripts/update` gone; `LICENSE`; runbook documents the subcommands; decisions present | The pipeline and its record hold together |
 
-Red confirmed: | Green confirmed: |
+Red confirmed: 2026-09-21 · Green confirmed: |
 
 ## Tasks
 
 - [x] Branch, tracking doc, roadmap row
-- [ ] Red: the tests above
+- [x] Red: the tests above (2026-09-21: 50 failing, 12 acceptance + 38 unit)
 - [ ] `scripts/build-payload`; public key + `files.txt`; `minisign` in the inventory
 - [ ] `home/update/`: `autarchy-update`, `update-notify` moved in
 - [ ] Installer: `seed_release_marker` removed
