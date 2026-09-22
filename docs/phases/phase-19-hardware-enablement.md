@@ -144,6 +144,18 @@ Red confirmed: 2026-09-22 · Green confirmed: |
   yay like the three existing AUR packages. Not a venv (invisible to pacman and
   `pkg-audit`), not a fork.
 
+### 2026-09-22 (wallpaper: the palette moved, the picture did not)
+- Mounting an SMB share of Samsung Frame photos and running `wallpaper-random <dir>`
+  re-themed everything (bar, terminal, GTK, AlienFX zones -- the phase's own new
+  hardware) while the screen kept the payload's `default.png`. hyprpaper 0.8.4 renders
+  only what its config declares and ignores the runtime IPC `wallpaper-set` had used
+  since Phase 6; each request was probed and recorded in **D-0085**. `wallpaper-set` now
+  writes the config and restarts the service; `link-home` seeds one for a fresh home; a
+  migration replaces the old stow link; the repo's unused tracked `current.png` is gone.
+- The test that should have caught it asserted a side effect (`colors.css` re-rendered)
+  rather than the outcome (the picture on screen). It now asserts `listactive` names the
+  file just set, and a static test forbids `hyprctl hyprpaper` in the tree.
+
 ## VM → physical hardware notes
 
 - Everything here is verified on the Alienware: the codec pins, the HID controller, the

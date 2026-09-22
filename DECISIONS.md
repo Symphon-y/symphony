@@ -864,6 +864,9 @@ and the old entry is marked `Superseded by D-XXXX`.
 
 ## D-0042 — hyprpaper's config and IPC syntax corrected (amends D-0028)
 
+_(The IPC half is superseded by D-0085: hyprpaper 0.8.4 removed the string protocol,
+and `wallpaper-set` drives the config file instead.)_
+
 - **Status:** Accepted (2026-09-14, Phase 6)
 - **Decision:** `hyprpaper.conf` rewritten to the current block-based config syntax
   (`wallpaper { monitor = *; path = ...; fit_mode = cover; }`); `wallpaper-set` uses
@@ -2280,3 +2283,40 @@ and the old entry is marked `Superseded by D-XXXX`.
   this entry is the record of when. Phase docs and decisions before this one were
   renamed too -- the alternative, a mixed record, reads worse. The GitHub repository is
   renamed by `gh repo rename`, which keeps redirects from the old slug.
+
+## D-0085 — hyprpaper is driven by its config file, rewritten and reloaded by `wallpaper-set` (amends D-0042)
+
+- **Status:** Accepted (2026-09-22, Phase 19)
+- **Decision:** `wallpaper-set` writes `~/.config/hypr/hyprpaper.conf` with the chosen
+  image's resolved path and restarts `hyprpaper.service` (only when it is running), then
+  renders the palette. The config is a *generated* file, no longer stow-linked from the
+  payload: `install/link-home` seeds one for a fresh home (pointing at `current.png`,
+  the only path that exists before a choice is made) and never overwrites it; a
+  migration replaces the old stow link on installed machines. `current.png` stays as the
+  stable "what is the wallpaper" answer for anything that asks without parsing a config
+  (`install/first-login` renders from it before any service is up). The repo's tracked
+  `home/hyprpaper/.../current.png` symlink -- never read, ignored by stow, overwritten at
+  runtime -- is deleted.
+- **Alternatives considered:** keep the config pointing at `current.png` and only restart
+  the service -- fewer moving parts, but `hyprctl hyprpaper listactive`, the config and
+  the journal would then disagree about what is showing, and a stale service shows a
+  stale image with no hint why. Replace hyprpaper with `swww`/`swaybg` for a working IPC
+  -- a new dependency and a reversal of D-0031 for a bug this specific. Keep using the
+  IPC -- it is gone (below).
+- **Reasoning:** hyprpaper 0.8.4 renders only what its config declares and resolves that
+  path once at startup. Its old string IPC was replaced by Hyprwire, and the requests
+  `wallpaper-set` used are dead: probed on the machine, `preload`, `listloaded`, `unload`
+  and `reload` answer `error: invalid hyprpaper request`, while `wallpaper <mon>,<path>`
+  is *accepted and silently ignored* (a nonexistent path does answer `bad path`, so the
+  request is parsed, then dropped). The script's own comment recorded verifying that IPC
+  live -- true when written (Phase 6, an older hyprpaper on the VM), false after the
+  upgrade. Found when a wallpaper picked from an SMB share of photos re-themed the bar,
+  the terminal and the AlienFX zones while the screen kept showing the payload's
+  `default.png`; `systemctl --user restart hyprpaper` put the picture up at once.
+- **Consequences:** ~200 ms of black while hyprpaper restarts, which is also the only
+  moment a wrong path shows up as an error. The choice now survives a login without the
+  symlink being involved at all. The lesson is recorded in the test: Phase 6's
+  live-session test asserted that `colors.css` had been re-rendered -- a side effect --
+  and so passed for weeks with the picture frozen; it now asserts that
+  `hyprctl hyprpaper listactive` names the file just set, and a static test forbids
+  `hyprctl hyprpaper` anywhere in the tree.

@@ -63,23 +63,45 @@ setup() {
   assert_output --partial "path ="
 }
 
+@test "wallpaper: hyprpaper.conf is generated, not a stow link (D-0085)" {
+  # wallpaper-set rewrites it with the chosen image; a link into the payload would be
+  # restored by every restow, freezing the picture.
+  assert [ ! -L "$HOME/.config/hypr/hyprpaper.conf" ]
+  run grep -qi generated "$HOME/.config/hypr/hyprpaper.conf"
+  assert_success
+}
+
+@test "wallpaper: nothing drives hyprpaper over its runtime IPC any more (D-0085)" {
+  # 0.8.4 accepts `hyprctl hyprpaper wallpaper ...` and silently ignores it.
+  run grep -rn 'hyprctl hyprpaper' "$REPO_ROOT/home" "$REPO_ROOT/install" "$REPO_ROOT/scripts"
+  assert_failure
+}
+
 # --- live-session (user, from Unraid's console, after logging into Hyprland) -------
 
 @test "live-session: hyprpaper has an active wallpaper" {
-  # listactive reports the resolved real path (current.png's symlink target), not the
-  # symlink name itself -- confirmed by actually running it.
+  # listactive reports the resolved real path, which may be anywhere the user keeps
+  # images (an SMB mount, say) -- so only that there is one.
   run hyprctl hyprpaper listactive
   assert_success
-  assert_output --partial "backgrounds/"
+  refute_output ""
+  assert_output --partial ": /"
 }
 
-@test "live-session: wallpaper-set pushes a new wallpaper live and re-renders themed templates" {
-  local test_img="$HOME/.local/share/backgrounds/current.png"
-  local before after
+@test "live-session: wallpaper-set changes the picture on screen, not only the palette" {
+  # The palette alone is not the outcome: for a while this passed while hyprpaper kept
+  # showing the payload's default.png, because the IPC it used had gone away (D-0085).
+  # Assert what the user sees -- hyprpaper is showing the file we just set.
+  local before after chosen
+  chosen=$(realpath "$HOME/.local/share/backgrounds/current.png")
   before=$(stat -c %Y "$HOME/.config/waybar/colors.css" 2>/dev/null || echo 0)
   sleep 1
-  run wallpaper-set "$test_img"
+  run wallpaper-set "$chosen"
   assert_success
   after=$(stat -c %Y "$HOME/.config/waybar/colors.css" 2>/dev/null || echo 0)
   assert [ "$after" -gt "$before" ]
+  run hyprctl hyprpaper listactive
+  assert_output --partial "$chosen"
+  run cat "$HOME/.config/hypr/hyprpaper.conf"
+  assert_output --partial "path = $chosen"
 }

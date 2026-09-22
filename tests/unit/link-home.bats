@@ -41,6 +41,34 @@ link_all() {
   done < <(find "$REPO_COPY/home" -type f)
 }
 
+# --- seeding (a fresh home has no wallpaper and no hyprpaper config) ----------------
+
+@test "apply seeds current.png and hyprpaper.conf so the first login has a wallpaper" {
+  mkdir -p "$REPO_COPY/home/hyprpaper/dot-local/share/backgrounds"
+  : >"$REPO_COPY/home/hyprpaper/dot-local/share/backgrounds/default.png"
+  run "$SCRIPT" apply
+  assert_success
+  assert [ -L "$HOME/.local/share/backgrounds/current.png" ]
+  assert_equal "$(readlink -f "$HOME/.local/share/backgrounds/current.png")" \
+    "$REPO_COPY/home/hyprpaper/dot-local/share/backgrounds/default.png"
+  run cat "$HOME/.config/hypr/hyprpaper.conf"
+  assert_output --partial "wallpaper {"
+  assert_output --partial "path = $HOME/.local/share/backgrounds/current.png"
+}
+
+@test "apply never overwrites a wallpaper or a config the user already has" {
+  mkdir -p "$REPO_COPY/home/hyprpaper/dot-local/share/backgrounds" "$HOME/.local/share/backgrounds" "$HOME/.config/hypr"
+  : >"$REPO_COPY/home/hyprpaper/dot-local/share/backgrounds/default.png"
+  : >"$BATS_TEST_TMPDIR/chosen.jpg"
+  ln -s "$BATS_TEST_TMPDIR/chosen.jpg" "$HOME/.local/share/backgrounds/current.png"
+  echo "# mine" >"$HOME/.config/hypr/hyprpaper.conf"
+  run "$SCRIPT" apply
+  assert_success
+  assert_equal "$(readlink -f "$HOME/.local/share/backgrounds/current.png")" "$BATS_TEST_TMPDIR/chosen.jpg"
+  run cat "$HOME/.config/hypr/hyprpaper.conf"
+  assert_output "# mine"
+}
+
 @test "fails with usage when no command is given" {
   run "$SCRIPT"
   assert_failure 2
