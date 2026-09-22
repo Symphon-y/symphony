@@ -5,6 +5,11 @@
 # the user can drop their own images alongside the generated default) and hands it to
 # wallpaper-set. `find -type f` naturally skips current.png, since that's always a
 # symlink, not a regular file.
+#
+# The one currently showing is excluded, so a small directory still changes every time:
+# with four images a uniform pick repeats about a quarter of the time, which reads as
+# "the wallpaper is stuck" rather than as chance. A directory holding only the current
+# wallpaper sets it again rather than failing -- re-rendering the palette is harmless.
 set -euo pipefail
 
 dir=${1:-"$HOME/.local/share/backgrounds"}
@@ -14,6 +19,15 @@ mapfile -t images < <(find "$dir" -maxdepth 1 -type f \( -iname '*.png' -o -inam
 if [[ ${#images[@]} -eq 0 ]]; then
   echo "wallpaper-random: no images found in $dir" >&2
   exit 1
+fi
+
+current=""
+[[ -e $HOME/.local/share/backgrounds/current.png ]] &&
+  current=$(realpath "$HOME/.local/share/backgrounds/current.png")
+
+if ((${#images[@]} > 1)) && [[ -n $current ]]; then
+  mapfile -t candidates < <(printf '%s\n' "${images[@]}" | grep -vxF "$current" || true)
+  ((${#candidates[@]})) && images=("${candidates[@]}")
 fi
 
 wallpaper-set "${images[RANDOM % ${#images[@]}]}"
