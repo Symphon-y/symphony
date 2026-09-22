@@ -30,6 +30,11 @@ calls() {
   cat "$STUB_LOG"
 }
 
+# The colour the written theme asks the controller for.
+colour() {
+  python3 -c "import json; print(json.load(open('$HOME/.config/alienfx/symphony.json'))['Boot'][0]['loop'][0]['colours'][0])"
+}
+
 @test "writes a theme with every Alienware 14 zone in the primary colour, and applies it" {
   run "$SCRIPT"
   assert_success
@@ -44,7 +49,7 @@ print(t['AC Charged'][0]['loop'][0]['colours'][0])
 print(sorted(k for k in t if k!='speed'))
 "
   assert_line --index 0 "['Alien Head', 'Left Keyboard', 'Logo', 'Middle-left Keyboard', 'Middle-right Keyboard', 'Right Keyboard', 'Status LEDs', 'Touchpad']"
-  assert_line --index 1 "[4, 10, 13]"
+  assert_line --index 1 "[0, 9, 13]"
   assert_line --index 2 "['AC Charged', 'AC Charging', 'AC Sleep', 'Battery Critical', 'Battery On', 'Battery Sleep', 'Boot']"
 }
 
@@ -52,8 +57,49 @@ print(sorted(k for k in t if k!='speed'))
   printf 'PRIMARY=#ffffff\n' >"$HOME/.config/symphony/theme.env"
   run "$SCRIPT"
   assert_success
-  run python3 -c "import json; print(json.load(open('$HOME/.config/alienfx/symphony.json'))['Boot'][0]['loop'][0]['colours'][0])"
+  run colour
   assert_output "[15, 15, 15]"
+}
+
+@test "a pastel palette colour loses its white floor, so the LED shows the hue instead of a wash" {
+  # Material You's dark-scheme primaries are pastels: #f9bb72's lowest channel is 114
+  # of 255, and an LED with 16 levels and a diffuser renders that white floor as pale
+  # pink, not amber (seen on the Alienware). Stretching each channel so the lowest
+  # reaches zero keeps the hue and the brightness and drops the wash.
+  printf 'PRIMARY=#f9bb72\n' >"$HOME/.config/symphony/theme.env"
+  run "$SCRIPT"
+  assert_success
+  run colour
+  assert_output "[15, 8, 0]"
+}
+
+@test "each hue keeps its own character once the floor is gone" {
+  local hex expected
+  # green pastel -> green; lavender -> its blue hue; warm amber -> gold
+  for hex in "#b0d18b:[6, 12, 0]" "#c1c1ff:[0, 0, 15]" "#ae885d:[10, 5, 0]"; do
+    printf 'PRIMARY=%s\n' "${hex%%:*}" >"$HOME/.config/symphony/theme.env"
+    expected=${hex#*:}
+    run "$SCRIPT"
+    assert_success
+    run colour
+    assert_output "$expected"
+  done
+}
+
+@test "a grey palette (a monochrome wallpaper) stays grey rather than being forced to a hue" {
+  printf 'PRIMARY=#808080\n' >"$HOME/.config/symphony/theme.env"
+  run "$SCRIPT"
+  assert_success
+  run colour
+  assert_output "[8, 8, 8]"
+}
+
+@test "black does not divide by zero" {
+  printf 'PRIMARY=#000000\n' >"$HOME/.config/symphony/theme.env"
+  run "$SCRIPT"
+  assert_success
+  run colour
+  assert_output "[0, 0, 0]"
 }
 
 @test "no theme colour yet (first login before a render): silent, exit 0, nothing applied" {

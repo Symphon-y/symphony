@@ -40,11 +40,35 @@ fi
 primary=$(sed -n 's/^PRIMARY=#\?\([0-9A-Fa-f]\{6\}\).*/\1/p' "$THEME_ENV" | head -n1)
 [[ -n $primary ]] || exit 0
 
+r=$((16#${primary:0:2}))
+g=$((16#${primary:2:2}))
+b=$((16#${primary:4:2}))
+
+# Remove the white floor. Material You's dark-scheme primaries are pastels -- this
+# palette's amber #f9bb72 has 114 of 255 in its lowest channel -- and an LED with 16
+# levels behind a diffuser renders that floor as a pale wash: on the Alienware the
+# amber came out pink while hyprlock's outline (same colour, a real display) read gold.
+# Stretching each channel so the lowest reaches zero keeps the hue and the brightness
+# and drops the wash; a grey palette (a monochrome wallpaper) has no hue to keep and
+# stays grey. A display-space correction, like gamma -- the palette is still the one
+# source of truth (D-0084).
+low=$r
+((g < low)) && low=$g
+((b < low)) && low=$b
+high=$r
+((g > high)) && high=$g
+((b > high)) && high=$b
+if ((high > low)); then
+  r=$(((r - low) * high / (high - low)))
+  g=$(((g - low) * high / (high - low)))
+  b=$(((b - low) * high / (high - low)))
+fi
+
 # The controller takes 4 bits per channel (0-15); the palette gives 8. Rounded,
 # not truncated: 255 -> 15 either way, but 0xa7 is nearer 10 than 9.
-r=$(((16#${primary:0:2} + 8) / 17))
-g=$(((16#${primary:2:2} + 8) / 17))
-b=$(((16#${primary:4:2} + 8) / 17))
+r=$(((r + 8) / 17))
+g=$(((g + 8) / 17))
+b=$(((b + 8) / 17))
 
 # The Alienware 14's zones, as verified by zonescan (packages/aur/alienfx's patch).
 zones='["Left Keyboard", "Middle-left Keyboard", "Middle-right Keyboard", "Right Keyboard", "Alien Head", "Logo", "Touchpad", "Status LEDs"]'

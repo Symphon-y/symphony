@@ -156,6 +156,23 @@ Red confirmed: 2026-09-22 · Green confirmed: |
   rather than the outcome (the picture on screen). It now asserts `listactive` names the
   file just set, and a static test forbids `hyprctl hyprpaper` in the tree.
 
+### 2026-09-22 (the lights were pink when the screen said gold)
+- With the wallpaper following again, the AlienFX zones still read pink while hyprlock's
+  outline -- the *same* palette colour -- read golden brown. Probed the hardware first:
+  a pure-green theme lit green, so the channel order is right. The cause is the colour
+  itself. Material You's dark-scheme primaries are pastels: `#f9bb72` has 114 of 255 in
+  its lowest channel, and an LED with 16 levels per channel behind a diffuser renders
+  that white floor as a wash. A real display shows the same value as amber; the LED
+  cannot.
+- Fixed in `alienfx-theme` by removing the white floor before quantising (stretch each
+  channel so the lowest reaches zero: hue and brightness kept, wash gone) --
+  `#f9bb72` -> `[15,8,0]` gold, `#b0d18b` -> `[6,12,0]` green, `#c1c1ff` -> `[0,0,15]`
+  blue. A grey palette (a monochrome wallpaper) has no hue to keep and stays grey; black
+  does not divide by zero. Five tests, red first. This is a display-space correction
+  like gamma, not a second colour source: the palette remains the one source of truth
+  (D-0037), which is why `source_color` -- the photo's own `#ae885d` -- was not wired in
+  as a second input.
+
 ## VM → physical hardware notes
 
 - Everything here is verified on the Alienware: the codec pins, the HID controller, the
