@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/alienfx-theme (linked by install/link-home)
+#
+# alienfx-theme: paint every AlienFX zone in the theme's primary colour (Phase 19,
+# D-0084). The colour is the palette matugen rendered from the wallpaper
+# (~/.config/symphony/theme.env, one home for it); the tool is alienfx, driving the
+# USB HID controller. Writes ~/.config/alienfx/symphony.json -- the tool's own theme
+# format, every power state the same fixed colour -- and applies it.
+#
+# Quiet by design where it does not apply: no colour yet (first login before the
+# first render), no alienfx (a machine without the controller never gets the
+# package), or the tool failing (device unplugged, no access) -- the caller
+# (wallpaper-set, the login unit) must never fail because of lighting.
+set -euo pipefail
+
+readonly THEME_ENV="$HOME/.config/symphony/theme.env"
+readonly THEME_DIR="$HOME/.config/alienfx"
+readonly THEME="$THEME_DIR/symphony.json"
+
+[[ -r $THEME_ENV ]] || exit 0
+command -v alienfx >/dev/null || exit 0
+
+primary=$(sed -n 's/^PRIMARY=#\?\([0-9A-Fa-f]\{6\}\).*/\1/p' "$THEME_ENV" | head -n1)
+[[ -n $primary ]] || exit 0
+
+# The controller takes 4 bits per channel (0-15); the palette gives 8. Rounded,
+# not truncated: 255 -> 15 either way, but 0xa7 is nearer 10 than 9.
+r=$(((16#${primary:0:2} + 8) / 17))
+g=$(((16#${primary:2:2} + 8) / 17))
+b=$(((16#${primary:4:2} + 8) / 17))
+
+# The Alienware 14's zones, as verified by zonescan (packages/aur/alienfx's patch).
+zones='["Left Keyboard", "Middle-left Keyboard", "Middle-right Keyboard", "Right Keyboard", "Alien Head", "Logo", "Status LEDs"]'
+block="{\"zones\": $zones, \"loop\": [{\"type\": \"fixed\", \"colours\": [[$r, $g, $b]]}]}"
+
+mkdir -p "$THEME_DIR"
+{
+  echo '{'
+  echo '  "speed": 200,'
+  local_states=("Boot" "AC Sleep" "AC Charged" "AC Charging" "Battery Sleep" "Battery On" "Battery Critical")
+  for i in "${!local_states[@]}"; do
+    sep=","
+    ((i == ${#local_states[@]} - 1)) && sep=""
+    echo "  \"${local_states[$i]}\": [$block]$sep"
+  done
+  echo '}'
+} >"$THEME"
+
+alienfx --theme symphony || echo "alienfx-theme: alienfx failed (no device, or no access?)" >&2
+exit 0

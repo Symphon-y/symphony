@@ -1,0 +1,47 @@
+diff --git i/alienfx/core/controller_m14xr3.py w/alienfx/core/controller_m14xr3.py
+index 32f5cac..5ef3b2b 100644
+--- i/alienfx/core/controller_m14xr3.py
++++ w/alienfx/core/controller_m14xr3.py
+@@ -43,17 +43,16 @@ class AlienFXControllerM14XR3(alienfx_controller.AlienFXController):
+     MIN_SPEED = 50
+     
+     # Zone codes
++    # Verified with `alienfx --zonescan` on an Alienware 14 (2014, 0x187c:0x0525):
++    # the four keyboard zones, the alien head, the logo and the top status
++    # indicator respond; no speaker, touchpad, power-button or HDD zones exist.
+     LEFT_KEYBOARD = 0x0001
+     MIDDLE_LEFT_KEYBOARD = 0x0002
+     MIDDLE_RIGHT_KEYBOARD = 0x0004
+     RIGHT_KEYBOARD = 0x0008
+-    RIGHT_SPEAKER = 0x0020
+-    LEFT_SPEAKER = 0x0040
++    ALIEN_HEAD = 0x0080
+     LOGO = 0x0100
+-    TOUCH_PAD = 0x0200
+     STATUS_LEDS = 0x0800
+-    POWER_BUTTON = 0x2000
+-    HDD_LEDS = 0x4000
+ 
+     # Reset codes
+     RESET_ALL_LIGHTS_OFF = 3
+@@ -82,19 +81,13 @@ class AlienFXControllerM14XR3(alienfx_controller.AlienFXController):
+             self.ZONE_MIDDLE_LEFT_KEYBOARD: self.MIDDLE_LEFT_KEYBOARD,
+             self.ZONE_MIDDLE_RIGHT_KEYBOARD: self.MIDDLE_RIGHT_KEYBOARD,
+             self.ZONE_RIGHT_KEYBOARD: self.RIGHT_KEYBOARD,
+-            self.ZONE_RIGHT_SPEAKER: self.RIGHT_SPEAKER,
+-            self.ZONE_LEFT_SPEAKER: self.LEFT_SPEAKER,
++            self.ZONE_ALIEN_HEAD: self.ALIEN_HEAD,
+             self.ZONE_LOGO: self.LOGO,
+-            self.ZONE_TOUCH_PAD: self.TOUCH_PAD,
+             self.ZONE_STATUS_LEDS: self.STATUS_LEDS,
+-            self.ZONE_POWER_BUTTON: self.POWER_BUTTON,
+-            self.ZONE_HDD_LEDS: self.HDD_LEDS
+         }
+         
+         # zones that have special behaviour in the different power states
+         self.power_zones = [
+-            self.ZONE_POWER_BUTTON,
+-            self.ZONE_HDD_LEDS,
+             self.ZONE_STATUS_LEDS
+         ]
+         

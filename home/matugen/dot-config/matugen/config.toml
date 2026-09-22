@@ -49,3 +49,7 @@ output_path = "~/.config/gtk-3.0/gtk.css"
 [templates.gtk4]
 input_path = "./templates/gtk4.css"
 output_path = "~/.config/gtk-4.0/gtk.css"
+
+[templates.theme_env]
+input_path = "./templates/theme.env"
+output_path = "~/.config/symphony/theme.env"

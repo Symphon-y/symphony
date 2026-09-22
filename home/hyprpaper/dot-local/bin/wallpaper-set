@@ -32,3 +32,7 @@ hyprctl hyprpaper wallpaper ",$path,cover"
 # --source-color-index 0 (most dominant color) skips matugen's interactive
 # source-color prompt, which would otherwise hang a keybind-triggered run with no TTY.
 matugen --config "$HOME/.config/matugen/config.toml" image "$path" --source-color-index 0
+
+# Hardware that shows the theme colour (AlienFX, Phase 19): repaint from the fresh
+# palette. A no-op wherever there is no such hardware; never fails this script.
+command -v alienfx-theme >/dev/null && alienfx-theme || true

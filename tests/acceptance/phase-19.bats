@@ -56,7 +56,7 @@ setup() {
 
 @test "alienfx: our PKGBUILD (upstream's AUR one is uninstallable), a uaccess udev rule, a theme script and a user unit" {
   assert [ -e "$REPO_ROOT/packages/aur/alienfx/PKGBUILD" ]
-  run grep -E "python-pkg_resources" "$REPO_ROOT/packages/aur/alienfx/PKGBUILD"
+  run grep -E "^depends=.*python-pkg_resources" "$REPO_ROOT/packages/aur/alienfx/PKGBUILD"
   assert_failure
   run grep -E 'TAG\+="uaccess"' "$REPO_ROOT/system/hardware/60-alienfx.rules"
   assert_success

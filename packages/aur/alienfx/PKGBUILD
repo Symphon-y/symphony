@@ -1,0 +1,38 @@
+# Maintainer: symphony (github.com/Symphon-y/symphony) -- our own PKGBUILD, Phase 19, D-0084.
+# Upstream's AUR package (alienfx 2.4.3-4) depends on python-pkg_resources, a name Arch no
+# longer has, so it cannot install; and its Alienware 14 (M14x R3) zone map lists zones
+# the laptop does not have and lacks the alien head. This builds upstream from a pinned
+# commit with the dependency corrected and the zone map from a real `alienfx --zonescan`
+# (patch beside this file), until upstream takes both.
+pkgname=alienfx
+pkgver=2.5.0
+_commit=bc573d99bb4beec84e8e5fd9f8763db952945caf
+pkgrel=1
+pkgdesc="CLI and GUI utility to control the lighting of Alienware computers (symphony build: fixed deps, Alienware 14 zone map)"
+arch=('any')
+url="https://github.com/trackmastersteve/alienfx"
+license=('GPL-3.0-or-later')
+depends=('python' 'python-pyusb')
+optdepends=(
+  'gtk3: alienfx-gtk'
+  'python-gobject: alienfx-gtk'
+  'python-cairo: alienfx-gtk'
+)
+makedepends=('python-setuptools' 'git')
+source=("git+$url.git#commit=$_commit"
+        '0001-m14xr3-zone-map-from-zonescan.patch')
+sha256sums=('SKIP'
+            'SKIP')
+
+prepare() {
+  cd "$srcdir/$pkgname"
+  patch -Np1 -i "$srcdir/0001-m14xr3-zone-map-from-zonescan.patch"
+}
+
+package() {
+  cd "$srcdir/$pkgname"
+  python setup.py install --root="$pkgdir" --optimize=1
+  # Upstream's udev rule makes the device world-writable (MODE 666); symphony ships
+  # its own uaccess rule for the controller it knows (system/hardware/60-alienfx.rules).
+  rm -rf "$pkgdir/etc/udev"
+}
