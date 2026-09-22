@@ -83,14 +83,14 @@ Files: `tests/unit/hwmatch.bats`, `tests/unit/symphony-hardware.bats`,
 | `build-offline-repo` builds an AUR package from `packages/hardware/` | The ISO carries it |
 | acceptance: grammar, wiring into installer/first-login/updater, udev `uaccess`, decisions | Holds together |
 
-Red confirmed: | Green confirmed: |
+Red confirmed: 2026-09-22 · Green confirmed: |
 
 ## Tasks
 
 - [x] Branch, tracking doc, roadmap row
 - [x] Spike A (sound): soft-mixer off -> hardware pins unmute, tone audible
 - [x] Spike B (AlienFX): upstream `alienfx` drives `187c:0525`; zone map recorded
-- [ ] Red tests
+- [x] Red tests (2026-09-22: 53 failing)
 - [ ] `scripts/hwmatch`, new `hardware.txt` grammar, `quirks.txt` folded, wrappers
 - [ ] `symphony-hardware`; wired into installer, first-login, updater
 - [ ] Sound: rule removed, packages, migration; deployed and verified
