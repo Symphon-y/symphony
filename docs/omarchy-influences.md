@@ -71,7 +71,7 @@ assumed.
 | Language / tool version management | 5 | 7 | ADAPT (mise; D-0046) |
 | Containers | 5 | 7 | REJECT Docker; rootless Podman (D-0047) |
 | Package selection | all | 8 | ADAPT idea; REJECT custom repo/mirror (D-0050) |
-| Update and migration mechanism | cross-cutting | 8 | ADAPT migrations (D-0051); REJECT channels/mirror |
+| Update and migration mechanism | cross-cutting | 8, 18 | ADAPT migrations (D-0051), snapshot-then-update and a daily availability check (D-0078, D-0079); REJECT channels/mirror and the pacman guard |
 
 ## Entries
 
@@ -1039,17 +1039,22 @@ below are current as of that branch unless a component explicitly discusses v3
   provides declarative drift-checking for system files; a timestamped-migration layer
   would sit alongside it for one-time changes that aren't just "make this file match,"
   the way `omarchy-migrate` complements Omarchy's own package-based file deployment.
-- Our decision: **ADAPT** the migration-script + completion-marker pattern; **REJECT**
-  the custom repo/mirror/channel infrastructure
+- Our decision: **ADAPT** the migration-script + completion-marker pattern, the
+  snapshot-then-update shape, and the daily "update available" check; **REJECT**
+  the custom repo/mirror/channel infrastructure and the pacman guard
 - Our implementation: `migrations/<unix-timestamp>-<slug>.sh` + `scripts/migrate
   check|apply` (D-0051), completion markers under
   `~/.local/state/autarchy/migrations/`. Shipped with one real first migration
   (removing an unintended `yay-debug` package `scripts/pkg-audit` found), not an
   empty directory — a migration needing root calls `sudo` itself, and the user
   runs `apply`, never Claude. The pacman-guard idea was not adopted at all —
-  no direct-`pacman`-blocking mechanism exists or is planned.
+  no direct-`pacman`-blocking mechanism exists or is planned. Since Phase 18 the
+  OS content itself updates through `autarchy-update` (D-0078/D-0079): a signed
+  payload tarball on a GitHub Release -- not a package from a repo -- verified
+  with minisign, snapshotted, swapped in at the same path, then the appliers and
+  migrations; `update-notify` toasts a new release daily (D-0059).
 - Reason: the channel/mirror infrastructure solves a distribution-scale problem (many
   machines pulling from one feed) this project doesn't have; the migration pattern
   solves a real problem (one-time changes, applied exactly once, resumable) that Phase
   8 explicitly needed an answer for.
-- Related decision: D-0017, D-0051
+- Related decision: D-0017, D-0051, D-0078, D-0079

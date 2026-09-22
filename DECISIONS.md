@@ -1288,7 +1288,9 @@ and the old entry is marked `Superseded by D-XXXX`.
 
 ## D-0059 — Update visibility: `checkupdates` + notification, never auto-applying
 
-- **Status:** Accepted (2026-09-15, Phase 9)
+- **Status:** Accepted (2026-09-15, Phase 9). _Amended 2026-09-21 (Phase 18): the same
+  daily timer, now in `home/update/`, also asks GitHub's `releases/latest` once and
+  toasts a newer autarchy release once per tag; still never applies (D-0079)._
 - **Decision:** `home/update-notify/` — a `systemd --user` timer (daily) running
   a script that calls `checkupdates --change` (`pacman-contrib`, already
   installed) and sends a desktop notification only when the set of pending
@@ -1398,7 +1400,8 @@ and the old entry is marked `Superseded by D-XXXX`.
 
 ## D-0062 — `scripts/update` takes an unconditional pre-update snapshot (extends D-0011)
 
-- **Status:** Accepted (2026-09-16, Phase 10)
+- **Status:** Accepted (2026-09-16, Phase 10). _`scripts/update` retired 2026-09-21;
+  `autarchy-update` keeps the rule for every `apply` and `rollback` (D-0079)._
 - **Decision:** `scripts/update apply` runs `snapper -c root create`
   unconditionally, before touching anything, then reapplies the repo's
   existing appliers in order (`install/install-packages`, `sudo install/
@@ -2144,3 +2147,100 @@ and the old entry is marked `Superseded by D-XXXX`.
   regressing silently, and `tests/unit/network-picker.bats` pins the behaviour against a fake
   upstream. `network-watch`'s failure toast still says "check the password"; with the SAE
   case gone that is the common cause again.
+
+## D-0078 — A release is a signed payload tarball on a GitHub Release, verified with minisign against a key the system ships
+
+- **Status:** Accepted (2026-09-21, Phase 18)
+- **Decision:** A date-shaped tag on `main` makes CI build `autarchy-<tag>-payload.tar.zst`
+  -- the six payload directories (`home install migrations packages scripts system`, the
+  allow-list `install/configure-base-system` defines, read from there by
+  `scripts/build-payload`) plus `VERSION` -- sign it with minisign, and publish it with
+  its `.minisig` and `.sha256` on the GitHub Release for that tag, before the ISO job
+  adds the ISO. The public key is committed at `system/autarchy/release.pub` and installed
+  to `/etc/autarchy/release.pub` on every machine; `minisign` and `zstd` are in
+  `packages/base.txt`. The secret key exists only in the repository secrets
+  `MINISIGN_SECRET_KEY`/`MINISIGN_PASSWORD`, created once by the maintainer with
+  `scripts/setup-signing` (never by CI). CI verifies its own signature against the shipped
+  key, so a mismatch fails the release, not an update. A tag with a suffix is a
+  pre-release; `releases/latest` (GitHub's newest non-prerelease) is what machines follow.
+  `build-payload` archives from the commit (`git archive`), creates any of the six
+  directories git tracks no file for, and pins mtime, owner and order: the same commit
+  packs to the same bytes.
+- **Alternatives considered:** A pacman package in a project repo/mirror with channels
+  (Omarchy) -- REJECTed in D-0050/D-0061 for the mirror it needs; not revisited. GitHub
+  artifact attestation -- verification needs `gh`, Sigstore and the network, and trusts
+  GitHub's identity rather than the maintainer's; minisign verifies offline with one small
+  tool. sha256 alone -- integrity against a corrupt download, no authenticity. Generating
+  the key in CI -- whoever holds the key can sign a payload every install trusts; that is
+  the maintainer, on their own machine, with the secret copied up once.
+- **Reasoning:** An installed machine has no repo (D-0067); it needs a versioned, verifiable
+  artefact, and a Release is where the ISO already goes. Verified with the real thing on
+  the Alienware: CI's signature for `2026.09.22-test1` verifies against the installed key,
+  a flipped byte fails, and the CI tarball is byte-identical to a local build of the
+  same commit -- so the release can be audited by anyone with the repo.
+- **Consequences:** A fork signs with its own key and its installs trust that key because
+  the installer copies it from the fork's repo; `scripts/setup-signing` refuses to run
+  twice, because a new key orphans every release signed with the old one. Losing the
+  secret key means a new key and a migration to ship it. The public repo is a
+  precondition for unauthenticated downloads (D-0080). A payload does not carry
+  `system/quirks.txt`'s kernel parameters to an installed machine; that change ships as a
+  migration.
+
+## D-0079 — One updater, `autarchy-update`, replaces the git-based `scripts/update`; the payload's `VERSION` is the installed release
+
+- **Status:** Accepted (2026-09-21, Phase 18). Supersedes D-0062's script (the rule
+  stays) and the dev-deploy runbook.
+- **Decision:** `home/update/dot-local/bin/autarchy-update check | apply [--yes | --from
+  DIR] | rollback | version`, in every install. `apply` refuses while pacman holds its
+  lock, on a `local-*` build without `--yes`, and on a downgrade without `--yes`; downloads
+  the three assets over https only (`--proto '=https' --tlsv1.2`), verifies the signature
+  then the checksum -- nothing on the machine is touched before both pass -- takes
+  `snapper -c root create`, unpacks beside the current payload, `chown -R root:root`, and
+  swaps with two renames at the same physical path (`current` -> `previous`, staging ->
+  `current`; stow records links by resolved path, D-0067), then runs `install-packages`
+  (plus `hwpkglist`), `sync-system`, `link-home`, `enable-user-services`,
+  `enable-root-services` and `migrate` *from the new payload*. `rollback` swaps `previous`
+  back and re-runs the appliers; migrations are one-way (D-0051) and it says so.
+  `apply --from DIR` stages a checkout's working tree the same way, versioned
+  `local-<sha>`, uncommitted changes included with a warning -- the dev seat's deploy.
+  The installed release is `/usr/local/share/autarchy/current/VERSION`; the per-user
+  `~/.local/state/autarchy/current-release` marker is no longer seeded and a migration
+  removes it. When GitHub has no non-prerelease (`releases/latest` is 404) `check` and
+  `apply` say "no release published yet" rather than failing.
+- **Alternatives considered:** Keep `scripts/update` for a checkout-only machine beside
+  the new one -- no machine has that shape any more, and two update paths is two to
+  test. A `current` symlink to `releases/<tag>/` -- rejected in D-0067 (stow). Undoing
+  migrations on rollback -- they are not reversible by design; the pre-update snapshot
+  is the real undo. Applying automatically from the timer -- D-0059's rule stands.
+- **Reasoning:** The steps are the ones `dev-deploy.md` had the user run by hand, with
+  verification in front and the swap made atomic-enough (two renames) instead of
+  `rm -rf` + `cp`. Proven on the Alienware: the old manual deploy installed the updater
+  once; `apply --from` then deployed the same checkout through its own pipeline (snapshot,
+  swap, 49 links restowed, services up) and a second run took today's fixes.
+- **Consequences:** `previous/` doubles the payload's disk use (small). Every applier
+  must run from the payload, never a checkout; the tests assert which payload each ran
+  from. `update-notify` moved into `home/update/` (one package owns "updates"). A
+  full-release `apply`/`rollback`/`apply` on the Alienware is the last proof, after the
+  first real tag.
+
+## D-0080 — The repository is public
+
+- **Status:** Accepted (2026-09-21, Phase 18)
+- **Decision:** `Symphon-y/autarchy` is public under the MIT license (`LICENSE`), so
+  release assets download without authentication and the project can be read, forked
+  and audited. Before flipping visibility: the tree was already clean of identifiers
+  (D-0022's scanner) and the history's diffs were grepped for emails, keys and tokens;
+  the 37 commits authored with a personal address were rewritten to the GitHub noreply
+  address with `git filter-repo --mailmap` (run by the user), and the ten pre-Phase-18
+  releases and tags -- ISOs of a state that cannot update -- were deleted first. The
+  updater's `AUTARCHY_RELEASE_REPO` names the repo in one place.
+- **Alternatives considered:** Stay private and download with `gh release download`
+  (needs `gh auth` on every install; not what a from-USB install has). Accept the
+  personal author addresses -- they would be public forever; a rewrite before going
+  public costs one force-push and re-clone. A stricter license -- the point is that
+  someone forks it and signs their own.
+- **Reasoning:** The roadmap has said since Phase 10 that the repo becomes public with
+  the update pipeline; a signed, reproducible payload is what makes that safe to offer.
+- **Consequences:** Every clone before the rewrite is stale (re-clone). Secrets stay in
+  repository secrets and `~/.gitconfig.local`-style untracked files, as before; the
+  identifier scanner keeps running in CI. Anyone can file issues; nothing obliges a reply.
