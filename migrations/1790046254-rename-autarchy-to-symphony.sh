@@ -35,17 +35,25 @@ if [[ -e $SHARE/$OLD && -e $SHARE/$NEW ]]; then
   exit 1
 fi
 
+# Merge OLD into NEW (which sync-system and migrate may already have created,
+# since they run before this), then remove OLD. cp -a keeps modes and owners.
+merge_dir() {
+  local old=$1 new=$2 as_root=${3:-}
+  [[ -e $old ]] || return 0
+  ${as_root:+sudo} cp -a "$old/." "$new/" 2>/dev/null || {
+    ${as_root:+sudo} mkdir -p "$new"
+    ${as_root:+sudo} cp -a "$old/." "$new/"
+  }
+  ${as_root:+sudo} rm -rf "$old"
+}
+
 moved=0
 if [[ -e $SHARE/$OLD ]]; then
   sudo mv "$SHARE/$OLD" "$SHARE/$NEW"
   moved=1
 fi
-if [[ -e $ETC/$OLD && ! -e $ETC/$NEW ]]; then
-  sudo mv "$ETC/$OLD" "$ETC/$NEW"
-fi
-if [[ -e $STATE/$OLD && ! -e $STATE/$NEW ]]; then
-  mv "$STATE/$OLD" "$STATE/$NEW"
-fi
+merge_dir "$ETC/$OLD" "$ETC/$NEW" root
+merge_dir "$STATE/$OLD" "$STATE/$NEW"
 
 # The renamed drop-ins are installed by sync-system; the old ones must not
 # stay beside them, or both apply. mkinitcpio's is part of the initramfs build.
@@ -58,8 +66,19 @@ for dir in "${DROPINS[@]}"; do
 done
 ((removed)) && sudo mkinitcpio -P
 
-# Every stow link in the home resolves into the payload; restow from its new path.
-if ((moved)); then
+# Every stow link in the home resolves into the payload. stow will not relink
+# what it sees as another stow dir's links (the old path), so drop those first
+# -- only links whose target is under the old root -- then apply from the new.
+# Done whenever such links exist (not only when this run moved the root), so
+# an interrupted run finishes on the next.
+stale=0
+while IFS= read -r -d '' link; do
+  if [[ $(readlink "$link") == *"/share/$OLD/"* ]]; then
+    rm -f "$link"
+    stale=1
+  fi
+done < <(find "$HOME" -path "$HOME/.cache" -prune -o -type l -print0 2>/dev/null)
+if ((moved || stale)); then
   (cd "$SHARE/$NEW/current" && install/link-home apply)
 fi
 exit 0

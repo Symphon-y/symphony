@@ -65,8 +65,10 @@ calls() {
   assert_success
   run calls
   assert_line "sudo mv $ROOT/usr/local/share/autarchy $ROOT/usr/local/share/symphony"
-  assert_line "sudo mv $ROOT/etc/autarchy $ROOT/etc/symphony"
-  refute_output --partial "sudo mv $HOME"
+  assert_line "sudo cp -a $ROOT/etc/autarchy/. $ROOT/etc/symphony/"
+  assert_line "sudo rm -rf $ROOT/etc/autarchy"
+  refute_output --partial "sudo cp -a $HOME"
+  refute_output --partial "sudo rm -rf $HOME"
 }
 
 @test "removes the four old-name drop-ins, so the renamed ones sync-system installs are not doubled" {
@@ -83,6 +85,37 @@ calls() {
 @test "restows the home from the payload's NEW path, so every link resolves there" {
   run "$SCRIPT"
   assert_success
+  run calls
+  assert_line "link-home apply from $ROOT/usr/local/share/symphony/current"
+}
+
+@test "merges into a new-name dir the appliers already created (sync-system, migrate run first), keeping the old contents" {
+  # sync-system has installed the renamed key; migrate has mkdir'd its new state dir.
+  mkdir -p "$ROOT/etc/symphony" "$HOME/.local/state/symphony/migrations"
+  echo "key" >"$ROOT/etc/symphony/release.pub"
+  run "$SCRIPT"
+  assert_success
+  assert [ -e "$HOME/.local/state/symphony/first-login-done" ]
+  assert [ -e "$HOME/.local/state/symphony/migrations/1-old.sh" ]
+  assert [ ! -e "$ROOT/etc/autarchy" ]
+  assert [ ! -e "$HOME/.local/state/autarchy" ]
+}
+
+@test "drops the home's links into the old payload root before restowing, so they are relinked rather than skipped as conflicts" {
+  ln -s "$ROOT/usr/local/share/autarchy/current/home/x/dot-config/thing" "$HOME/.local/bin/thing"
+  ln -s "/somewhere/else" "$HOME/.local/bin/other"
+  run "$SCRIPT"
+  assert_success
+  assert [ ! -L "$HOME/.local/bin/thing" ]
+  assert [ -L "$HOME/.local/bin/other" ]
+}
+
+@test "an interrupted run finishes on the next: root already moved, links still stale -> relinked" {
+  mv "$ROOT/usr/local/share/autarchy" "$ROOT/usr/local/share/symphony"
+  ln -s "$ROOT/usr/local/share/autarchy/current/home/x/dot-config/thing" "$HOME/.local/bin/thing"
+  run "$SCRIPT"
+  assert_success
+  assert [ ! -L "$HOME/.local/bin/thing" ]
   run calls
   assert_line "link-home apply from $ROOT/usr/local/share/symphony/current"
 }
