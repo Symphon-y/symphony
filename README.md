@@ -69,8 +69,8 @@ first needs them, not in advance.
   ships a signed payload; the machine verifies it before touching anything and
   takes a Btrfs snapshot first. `autarchy-update rollback` goes back one.
   Details: `docs/runbooks/update.md`.
-- **Own it:** fork, change `home/`, `system/` and `packages/`, tag -- CI builds your
-  ISO and your signed payload (your own minisign key in the repository secrets).
+- **Own it:** fork, run `scripts/setup-signing` once (your own signing key), change
+  `home/`, `system/` and `packages/`, tag -- CI builds your ISO and your signed payload.
 
 ## Status
 

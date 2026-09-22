@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# setup-signing: the maintainer's one-time step that makes releases signable
+# (Phase 18, D-0078). Every installed machine verifies a release payload against
+# the public key the repo ships (system/autarchy/release.pub -> /etc/autarchy/
+# release.pub); this makes that key exist, and puts its secret half where CI
+# signs with it.
+#
+# Usage: scripts/setup-signing            (asks for a password, twice)
+#
+# What it does, and where each half goes:
+#   minisign -G            -> $KEYDIR/autarchy.key (secret, mode 600, never in the
+#                             repo) and $KEYDIR/autarchy.pub
+#   the public key         -> system/autarchy/release.pub, to be committed
+#   the secret key + the   -> the repository secrets MINISIGN_SECRET_KEY and
+#   password                  MINISIGN_PASSWORD, via `gh secret set` on stdin
+#
+# This is per project, not per machine: a fork signs with its own key, and its
+# installs trust that key because the installer copies it from the fork's repo.
+# Deliberately not automated in CI -- whoever holds the secret key can sign a
+# payload every autarchy machine will trust, and that should be the maintainer,
+# not a runner. Refuses to run twice: a new key would orphan every release signed
+# with the old one (installed machines would reject them).
+set -euo pipefail
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+readonly REPO_ROOT
+readonly KEYDIR="${KEYDIR:-$HOME/.minisign}"
+readonly SECRET="$KEYDIR/autarchy.key"
+readonly PUBLIC="$KEYDIR/autarchy.pub"
+readonly SHIPPED="$REPO_ROOT/system/autarchy/release.pub"
+
+die() {
+  printf 'setup-signing: %s\n' "$*" >&2
+  exit 1
+}
+
+command -v minisign >/dev/null || die "minisign not found (pacman -S minisign)"
+command -v gh >/dev/null || die "gh not found"
+[[ ! -e $SECRET ]] || die "$SECRET already exists -- a second key would orphan every release signed with the first"
+
+# The password is read from the terminal (or stdin when piped), never from argv,
+# and handed to minisign and gh on stdin the same way.
+read -rsp "Password for the signing key: " password
+echo
+read -rsp "Again: " again
+echo
+[[ $password == "$again" ]] || die "passwords do not match"
+
+mkdir -p "$KEYDIR"
+chmod 700 "$KEYDIR"
+umask 077
+printf '%s\n%s\n' "$password" "$password" | minisign -G -p "$PUBLIC" -s "$SECRET"
+chmod 600 "$SECRET"
+
+mkdir -p "$(dirname "$SHIPPED")"
+cp "$PUBLIC" "$SHIPPED"
+chmod 644 "$SHIPPED"
+
+gh secret set MINISIGN_SECRET_KEY <"$SECRET"
+printf '%s' "$password" | gh secret set MINISIGN_PASSWORD
+
+cat <<EOF
+setup-signing: done
+  secret key    $SECRET (keep it; back it up with the LUKS header, D-0052)
+  public key    $SHIPPED
+  secrets       MINISIGN_SECRET_KEY, MINISIGN_PASSWORD set on the repository
+
+Next: git add system/autarchy/release.pub && git commit, then tag a release.
+EOF

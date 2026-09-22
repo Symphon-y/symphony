@@ -118,3 +118,11 @@ setup() {
     assert_success
   done
 }
+
+@test "release: the one-time signing setup is a script, and it never puts a secret key in the repo" {
+  assert [ -x "$REPO_ROOT/scripts/setup-signing" ]
+  run grep -F 'gh secret set MINISIGN_SECRET_KEY' "$REPO_ROOT/scripts/setup-signing"
+  assert_success
+  run git -C "$REPO_ROOT" ls-files -- '*.key' 'system/autarchy/'
+  assert_output "system/autarchy/release.pub"
+}

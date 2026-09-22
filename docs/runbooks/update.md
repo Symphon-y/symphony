@@ -98,6 +98,13 @@ A tag on `main` shaped like a date -- `2026.09.22`, or `2026.09.22-test1` for a
 pre-release that `check` will not offer -- makes `.github/workflows/release-iso.yml`
 build and sign the payload, create the Release, then build and upload the ISO.
 The signing key lives only in the repository secrets `MINISIGN_SECRET_KEY` and
-`MINISIGN_PASSWORD`; the matching public key is `system/autarchy/release.pub`.
-The workflow verifies its own signature against that file, so a key mismatch
-fails the release, never an update.
+`MINISIGN_PASSWORD`; the matching public key is `system/autarchy/release.pub`,
+which every install carries at `/etc/autarchy/release.pub`. The workflow verifies
+its own signature against that file, so a key mismatch fails the release, never
+an update.
+
+**Once per project** (the maintainer, or whoever forks this): `scripts/setup-signing`
+generates the keypair under `~/.minisign/`, copies the public half
+into `system/autarchy/release.pub`, and stores the secret half and its password as
+the two repository secrets through `gh`. Nothing on any installed machine needs
+doing -- the installer ships the public key.
