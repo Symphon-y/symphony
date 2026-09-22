@@ -103,7 +103,7 @@ resolve_hardware_packages() {
   fi
 }
 
-# Which kernel parameters this machine's firmware quirks need (system/quirks.txt, e.g.
+# Which kernel parameters this machine's firmware quirks need (system/hardware.txt, e.g.
 # module_blacklist=dell_rbtn on the Alienware 14). Resolved up front for the same reason as
 # the hardware packages: a broken map stops the install before the disk is touched.
 resolve_kernel_params() {

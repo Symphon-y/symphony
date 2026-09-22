@@ -185,7 +185,7 @@ configure_boot() {
     [[ -n $swap_uuid ]] || die "cannot read the UUID of $swap_device"
     cmdline+=" rd.luks.name=$swap_uuid=$swap_mapper resume=$SYMPHONY_RESUME_DEVICE resumeflags=x-systemd.device-timeout=30s"
   fi
-  # Firmware quirks chosen by DMI (system/quirks.txt, resolved by install-base-system,
+  # Firmware quirks chosen by DMI (system/hardware.txt, resolved by install-base-system,
   # D-0076): parameters the kernel enforces itself, e.g. module_blacklist=dell_rbtn. On the
   # command line they reach every unified kernel image, with no initramfs step of their own.
   if [[ -n ${SYMPHONY_KERNEL_PARAMS:-} ]]; then
