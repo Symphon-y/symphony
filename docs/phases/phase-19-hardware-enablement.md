@@ -88,8 +88,8 @@ Red confirmed: | Green confirmed: |
 ## Tasks
 
 - [x] Branch, tracking doc, roadmap row
-- [ ] Spike A (sound): soft-mixer off -> hardware pins unmute, tone audible
-- [ ] Spike B (AlienFX): `alienfx` from the AUR drives `187c:0525`
+- [x] Spike A (sound): soft-mixer off -> hardware pins unmute, tone audible
+- [x] Spike B (AlienFX): upstream `alienfx` drives `187c:0525`; zone map recorded
 - [ ] Red tests
 - [ ] `scripts/hwmatch`, new `hardware.txt` grammar, `quirks.txt` folded, wrappers
 - [ ] `symphony-hardware`; wired into installer, first-login, updater
@@ -117,6 +117,32 @@ Red confirmed: | Green confirmed: |
   `install/user/hardware/<vendor>/*.sh`): per-vendor shell scripts run at ISO
   finalisation and on demand. The "apply on demand, rerunnable" idea is taken; the
   scripts-per-quirk shape is not (D-0074).
+
+### 2026-09-22 (spikes, on the Alienware, before any code)
+- **Spike A -- sound: confirmed.** With `51-alsa-soft-mixer.conf` moved aside and
+  WirePlumber's `default-routes` state cleared, PipeWire unmuted the speaker pin on
+  restart (node 0x14 `Amp-Out vals [0x00 0x00]`; the two headphone pins stay muted while
+  nothing is plugged in, which is right) and `speaker-test` was audible. The fix is
+  removing our own rule; no driver, no codec quirk. `alsa-utils` was installed for the
+  test and stays (it ships in this phase).
+- **Spike B -- AlienFX: confirmed, with a corrected zone map.** The AUR `alienfx` package
+  is uninstallable (it depends on `python-pkg_resources`, a name Arch no longer has; upstream
+  `setup.py` needs only `pyusb`), so the spike ran upstream `2.5.0` from a throwaway venv.
+  `--zonescan` found `0x187c/0x0525` and, prompt by prompt, the real zones of the
+  Alienware 14: keyboard left/middle-left/middle-right/right `0x0001/0x0002/0x0004/0x0008`,
+  alien head `0x0080`, logo `0x0100`, top indicator `0x0800`. Upstream's
+  `controller_m14xr3.py` (marked "needs the correct zone codes") lacks the alien head and
+  lists speaker/touchpad/status/power/HDD zones this laptop does not have. Access needed
+  root: libusb detaches the HID driver and claims the interface, which a `chmod` on the
+  device node does not grant -- the shipped fix is a udev rule with `TAG+="uaccess"`.
+  Ubuntu's ACPI-side features (`--led-state`, HDMI passthrough) report "not present"
+  here and are unrelated.
+- **Packaging decision from the spike:** carry our own PKGBUILD at
+  `packages/aur/alienfx/` -- upstream 2.5.0 pinned by commit, `python-setuptools` in
+  place of the dead dependency, and the Alienware 14 zone map as a patch beside it until
+  upstream takes it (issue to file) -- built by `iso/build-offline-repo` and installed by
+  yay like the three existing AUR packages. Not a venv (invisible to pacman and
+  `pkg-audit`), not a fork.
 
 ## VM → physical hardware notes
 
