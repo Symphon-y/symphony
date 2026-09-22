@@ -3,8 +3,12 @@
 #
 # Picks a random image from a directory (default: ~/.local/share/backgrounds, where
 # the user can drop their own images alongside the generated default) and hands it to
-# wallpaper-set. `find -type f` naturally skips current.png, since that's always a
-# symlink, not a regular file.
+# wallpaper-set.
+#
+# Symlinks count (`find -L`): the default directory holds nothing else -- default.png
+# links into the payload -- so a plain `-type f` found nothing there and SUPER+CTRL+W
+# silently did nothing. current.png is skipped by name instead: it is the pointer at
+# whatever is showing, not a wallpaper of its own.
 #
 # The one currently showing is excluded, so a small directory still changes every time:
 # with four images a uniform pick repeats about a quarter of the time, which reads as
@@ -14,10 +18,15 @@ set -euo pipefail
 
 dir=${1:-"$HOME/.local/share/backgrounds"}
 
-mapfile -t images < <(find "$dir" -maxdepth 1 -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' -o -iname '*.bmp' \))
+mapfile -t images < <(find -L "$dir" -maxdepth 1 -type f ! -name current.png \
+  \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' -o -iname '*.bmp' \) 2>/dev/null)
 
+# Reached from a keybinding as often as from a shell, and a keybinding has nowhere to
+# print: say it on screen too, or the key just looks dead (it did).
 if [[ ${#images[@]} -eq 0 ]]; then
   echo "wallpaper-random: no images found in $dir" >&2
+  command -v notify-send >/dev/null &&
+    notify-send -a wallpaper -u normal "No wallpapers found" "Nothing to choose from in $dir"
   exit 1
 fi
 

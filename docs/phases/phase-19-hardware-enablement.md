@@ -173,6 +173,16 @@ Red confirmed: 2026-09-22 · Green confirmed: |
   (D-0037), which is why `source_color` -- the photo's own `#ae885d` -- was not wired in
   as a second input.
 
+### 2026-09-22 (SUPER+CTRL+W looked dead)
+- The binding was loaded (`hyprctl binds`: modmask 68 = SUPER+CTRL, key W) and correct.
+  `wallpaper-random` with no argument searches `~/.local/share/backgrounds`, which holds
+  *only symlinks* -- `default.png` into the payload, `current.png` at whatever is showing
+  -- and `find -type f` skips symlinks, so it found nothing, exited 1, and Hyprland's
+  `exec_cmd` threw the message away. `find -L ... ! -name current.png` fixes the search
+  (the pointer is skipped by name now, not by accident of being a link), and a failure
+  raises a mako toast: a keybinding has nowhere to print, which is exactly why the key
+  looked dead rather than broken. Five tests, red first.
+
 ## VM → physical hardware notes
 
 - Everything here is verified on the Alienware: the codec pins, the HID controller, the
