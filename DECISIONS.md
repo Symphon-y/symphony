@@ -2244,3 +2244,39 @@ and the old entry is marked `Superseded by D-XXXX`.
 - **Consequences:** Every clone before the rewrite is stale (re-clone). Secrets stay in
   repository secrets and `~/.gitconfig.local`-style untracked files, as before; the
   identifier scanner keeps running in CI. Anyone can file issues; nothing obliges a reply.
+
+## D-0081 — The project's name is a plain token, renamed by a script, never a variable (autarchy → symphony)
+
+- **Status:** Accepted (2026-09-21, Phase 18)
+- **Decision:** The name appears literally everywhere it is needed -- commands
+  (`symphony-update`), the payload path (`/usr/local/share/symphony`), `SYMPHONY_*`
+  variables, systemd drop-in filenames, the ISO label, release asset names, the repo slug
+  -- and is changed by `scripts/rename OLD NEW`: every tracked path carrying the token is
+  `git mv`ed and the token is replaced in every tracked text file in its three forms
+  (lower, Capitalised, UPPER), exact-token only, binaries skipped, `scripts/check` run at
+  the end, committed by the user. A file that must know both names (the migration that
+  moves an installed machine, and its test) carries `# rename: keep` and is neither edited
+  nor moved. The rename from `autarchy` to `symphony` was done with it on 2026-09-21,
+  before the repository went public, as one 103-file commit.
+- **Alternatives considered:** A `NAME` variable substituted at build and install time --
+  cannot reach archiso's `profiledef.sh`, systemd unit and drop-in names, or the path GNU
+  stow has resolved into every symlink without a template layer over the whole tree, and
+  would make every installed machine's paths depend on a variable. Keeping the old name
+  -- the user's call; it did not fit. Renaming by hand -- 700 occurrences and 13 paths is
+  exactly what a script is for, and it stays re-runnable if this name does not stick either.
+- **Reasoning:** The user asked, mid-way through going public, how hard a rename is and
+  whether the name should be a single point of truth. Measured, the lift is mechanical;
+  a variable would buy cheap renames by making the whole tree more complex forever. A
+  script makes the rename cheap without that.
+- **Consequences:** An installed machine moves by a migration
+  (`migrations/*-rename-autarchy-to-symphony.sh`): the payload root, `/etc/<name>`, the
+  user's state dir, the four old drop-ins removed and `mkinitcpio -P`, then a restow from
+  the payload's new path. Its ordering relies on the updater's: the old `autarchy-update
+  apply --from` swaps the renamed payload in at the old path and runs migrations from it;
+  this one moves the root, and `scripts/migrate` (already computing its state dir under
+  the new name) records the marker in the moved dir; the next command is
+  `symphony-update`. `packages/local/<host>.txt` is gitignored and is moved by hand. The
+  docs' history now says "symphony" for things that were called autarchy at the time;
+  this entry is the record of when. Phase docs and decisions before this one were
+  renamed too -- the alternative, a mixed record, reads worse. The GitHub repository is
+  renamed by `gh repo rename`, which keeps redirects from the old slug.

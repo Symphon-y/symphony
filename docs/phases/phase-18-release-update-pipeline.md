@@ -149,6 +149,24 @@ Red confirmed: 2026-09-21 · Green confirmed: |
   `releases/latest` is a 404, which read as "could not fetch". Red (2 tests) then green:
   a 404 is "no release published yet", plainly, for `check` and `apply` both.
 
+### 2026-09-21 (the rename)
+- With history rewritten locally and nothing force-pushed yet, the user asked how hard a
+  rename is and whether the name should become a variable. Measured (~490 code, ~240 docs,
+  13 paths, 28 `AUTARCHY_*` vars, plus archiso/systemd/stow/asset names no variable can
+  reach); recommended and agreed: no runtime indirection, one re-runnable script.
+  **D-0081.** Name chosen: `symphony`.
+- Red: `tests/unit/rename.bats` (12) and `tests/unit/migration-rename.bats` (7). The
+  script's first real run refused itself: the migration test contained both names, which
+  the "NEW already in use" guard caught -- so a `# rename: keep` marker opts a file out
+  (content *and* path; the first version only covered content and moved the migration
+  to `rename-symphony-to-symphony.sh`, caught by its own test glob). `\b` was wrong for
+  the token (sed counts `_` as a word character), so the boundary is an explicit class.
+- `scripts/rename autarchy symphony`: 103 files, 13 paths, `scripts/check` green (323).
+  The old token survives only in the migration, its test and `scripts/rename`'s example.
+- Not covered by the script, by design: the gitignored `packages/local/alien.txt` (moved
+  by hand on the dev seat), the GitHub slug (`gh repo rename`), and the installed
+  machine (the migration, run by the old `autarchy-update apply --from` one last time).
+
 ## VM → physical hardware notes
 
 - The whole pipeline is exercised on the Alienware itself: `apply --from` first (the
