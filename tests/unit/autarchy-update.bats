@@ -143,10 +143,12 @@ installed_version() {
   assert_output --partial "usage"
 }
 
-@test "version prints the installed payload's VERSION" {
+@test "version prints the installed payload's VERSION, newline-terminated" {
   run "$SCRIPT" version
   assert_success
   assert_output "local-abc1234"
+  run bash -c "'$SCRIPT' version | od -c | tail -n2 | head -n1"
+  assert_output --partial '\n'
 }
 
 @test "check: a newer release is reported with what changed in packages/ and migrations/" {

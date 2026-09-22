@@ -48,7 +48,9 @@ log() {
 
 installed_version() {
   [[ -r $CURRENT/VERSION ]] || die "no payload at $CURRENT -- is this an installed machine?"
-  tr -d '[:space:]' <"$CURRENT/VERSION"
+  local v
+  v=$(tr -d '[:space:]' <"$CURRENT/VERSION")
+  echo "$v"
 }
 
 # A release tag is date-shaped (2026.09.22); anything else (local-<sha>, unreleased)
