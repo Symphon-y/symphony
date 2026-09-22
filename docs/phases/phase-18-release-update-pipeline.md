@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Status** | In progress |
+| **Status** | Complete (2026-09-22) |
 | **Driver** | Claude + user |
 | **Branch** | `phase/18-release-update-pipeline` |
 | **Started** | 2026-09-21 |
-| **Completed** | |
+| **Completed** | 2026-09-22 |
 
 ## Goal
 
@@ -101,10 +101,19 @@ Red confirmed: 2026-09-21 · Green confirmed: |
 - [x] Installer: `seed_release_marker` removed; migration for the old marker
 - [x] Workflow: `payload` job (build, sign, release, upload); ISO job after it -- `2026.09.22-test1` signed and verified
 - [x] Retire `scripts/update`, `update.bats`, `dev-deploy.md`; rewrite `update.md`; README
-- [ ] Green: `scripts/check`; on the Alienware: `apply --from`, a test tag, a real tag,
-      `apply`, `rollback`, `apply`
-- [ ] Public: LICENSE; old releases/tags deleted; history rewrite; force-push; visibility
-- [ ] Close: D-0078 to D-0080, influences, roadmap, merge
+- [x] Green: `scripts/check` (323); on the Alienware: `apply --from` (three times, the
+      last through the renamed layout), the test tag `2026.09.22-test1` signed and
+      verified against the shipped key
+- [x] Rename autarchy -> symphony: `scripts/rename`, the migration, D-0081; the dev seat
+      migrated (one interrupted run, fixed and finished)
+- [x] Public: LICENSE; old releases/tags deleted; history rewritten to the noreply
+      address (206 commits; `~/.gitconfig.local` switched too, after five new commits
+      briefly reintroduced the personal one and were re-authored); `gh repo rename`,
+      force-push, visibility public; verified unauthenticated
+- [x] Close: D-0078 to D-0081, influences, roadmap, merge
+- [ ] **After the merge, on `main`:** tag `2026.09.22`; on the Alienware
+      `symphony-update apply --yes` (replaces `local-*`), `rollback`, `apply` -- the
+      full-release proof, which needs the tag to be on `main` (recorded in the log)
 
 ## Implementation log
 
@@ -167,6 +176,21 @@ Red confirmed: 2026-09-21 · Green confirmed: |
   by hand on the dev seat), the GitHub slug (`gh repo rename`), and the installed
   machine (the migration, run by the old `autarchy-update apply --from` one last time).
 
+### 2026-09-22 (public, and the order of the last proof)
+- `symphony-update apply --from` deployed `local-300af86` through the renamed layout:
+  snapshot, swap, 49 links, seven user units and three root timers enabled, the rename
+  migration marked. Then `gh repo rename symphony`, `git push --force --all`, visibility
+  public -- verified from outside (200 unauthenticated; the old slug redirects; GitHub's
+  API shows only the noreply author). `git-filter-repo` was a one-off tool and is removed
+  after (pkg-audit flagged it, correctly).
+- The full-release proof (`check` sees a release, `apply --yes`, `rollback`, `apply`)
+  needs a real tag, and a release is cut from `main` -- so it happens right after this
+  branch merges, not before. `check` already handles the no-release state ("no release
+  published yet"), confirmed against the real 404.
+- Backlog: `symphony-update` could `hyprctl reload` after the swap when a Hyprland session
+  is present (the config-error overlay during the swap window is expected but ugly);
+  the 19 merged `phase/*` branches on the public remote are deleted at close.
+
 ## VM → physical hardware notes
 
 - The whole pipeline is exercised on the Alienware itself: `apply --from` first (the
@@ -176,9 +200,9 @@ Red confirmed: 2026-09-21 · Green confirmed: |
 
 ## Exit criteria
 
-- [ ] All acceptance tests pass
-- [ ] Static checks pass
-- [ ] `DECISIONS.md` updated
-- [ ] `docs/omarchy-influences.md` updated
-- [ ] `docs/roadmap.md` status updated
-- [ ] Branch merged to `main`
+- [x] All acceptance tests pass (`phase-18.bats` 15/15; full suite on the Alienware at close)
+- [x] Static checks pass (`scripts/check`, 323 unit tests)
+- [x] `DECISIONS.md` updated (D-0078 to D-0081; D-0059, D-0062 amended)
+- [x] `docs/omarchy-influences.md` updated
+- [x] `docs/roadmap.md` status updated
+- [x] Branch merged to `main`

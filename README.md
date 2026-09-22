@@ -74,9 +74,9 @@ first needs them, not in advance.
 
 ## Status
 
-Phases 0-17 complete except Phase 12's hardware bonuses. A release ISO installs the
+Phases 0-18 complete except Phase 12's hardware bonuses. A release ISO installs the
 whole system offline through a GTK4 guided installer (with an optional Wi-Fi step) and
 boots into a themed Hyprland desktop with a working network bar; the Alienware 14 it
 runs on is now the development seat (`docs/environment/alienware-14.md`). Phase 18
-(in progress) adds the signed release payload and `symphony-update`. See
+added the signed release payload, `symphony-update`, and the public repository. See
 [`docs/roadmap.md`](docs/roadmap.md).

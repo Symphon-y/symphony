@@ -24,7 +24,7 @@ outlines; their scope is finalized in their own plan mode.
 | 15 | [Real GUI guided installer](phases/phase-15-gui-installer.md) | 1 | Claude + user | A real graphical wizard (`cage` + hand-written GTK4/libadwaita, not a TUI), auto-started on `tty1`, collects every field once (including both passwords, via file descriptor) and runs the install fully unattended | Complete (2026-09-18) |
 | 16 | [Fully automated desktop bring-up](phases/phase-16-desktop-bring-up.md) | 1, 6 | Claude + user | Reboot after install lands in a working, themed Hyprland desktop with zero manual steps, on a self-contained install (no repo checkout, `~/Projects` never created, XDG directories in place); ISOs can be built locally with `scripts/build-iso` | Complete (2026-09-21) -- the mechanism verified on the Alienware (D-0067); one unattended fresh install from an ISO carrying the first-login fix still owed, on a second machine |
 | 17 | [Wi-Fi at install, and an interactive network bar](phases/phase-17-wifi-network-bar.md) | 1, 3 | Claude + user | An optional Wi-Fi step in the installer leaves the laptop online on first boot; the status bar shows network state and offers a picker (left-click) and full settings (right-click); battery indicator | Complete (2026-09-21) -- bar, picker, toasts, `dell_rbtn` blacklist and autoconnect verified on the Alienware (D-0068 to D-0077); the installer's Wi-Fi page cannot join on this laptop (no `wl` in the live ISO) and is smoke-test-verified |
-| 18 | [Release payload and update pipeline](phases/phase-18-release-update-pipeline.md) | 1, cross-cutting | Claude + user | An installed machine (no repo on it) can check for and apply the latest release on demand: signed versioned payload, pre-update snapshot, rollback; the repo is public | In progress |
+| 18 | [Release payload and update pipeline](phases/phase-18-release-update-pipeline.md) | 1, cross-cutting | Claude + user | An installed machine (no repo on it) can check for and apply the latest release on demand: signed versioned payload, pre-update snapshot, rollback; the repo is public | Complete (2026-09-22) -- `symphony-update`, minisign-signed payloads from CI, the project renamed to symphony (D-0081) and made public |
 
 ## Decisions deferred to their phase's plan mode
 
@@ -193,6 +193,14 @@ outlines; their scope is finalized in their own plan mode.
   (local builds; `sudo podman` on a podman host) and `iso/write-usb.ps1` came
   out of the same phase. What is still owed: one unattended fresh install from
   an ISO carrying the fix, on a machine other than the dev seat.
+- **Phase 18:** resolved; see D-0078 to D-0081. A release is a signed payload
+  tarball on a GitHub Release (minisign; the public key ships in every install), and
+  `symphony-update` replaces the git-based `scripts/update` for every machine, the dev
+  seat included (`apply --from`). Verified on the Alienware with the real CI-signed
+  artefact (byte-identical to a local build; a flipped byte fails). Mid-phase the user
+  asked about the name; the answer was a re-runnable `scripts/rename`, not a variable,
+  and `autarchy` became `symphony` before the repo went public with its history
+  rewritten to the noreply address.
 - **Phase 17:** resolved; see D-0068 to D-0077. Asked for an optional Wi-Fi
   step in the installer and a taskbar where the Wi-Fi icon can be seen and used.
   Research (Omarchy's current line, Windows/macOS, Calamares, Arch and
