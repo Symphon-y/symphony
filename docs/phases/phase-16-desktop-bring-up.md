@@ -383,7 +383,7 @@ Green confirmed: 2026-09-20 (`scripts/check` green; `phase-16.bats` 6/6)
 
 ## Exit criteria
 
-- [x] All acceptance tests pass (`phase-16.bats` 9/9 on the Alienware)
+- [x] All acceptance tests pass (full suite 204/204 on the Alienware, 2026-09-21)
 - [x] Static checks pass (`scripts/check`, 266 unit tests)
 - [x] `DECISIONS.md` updated (D-0067)
 - [x] `docs/omarchy-influences.md` updated (login entry: autologin adopted)

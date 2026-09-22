@@ -305,6 +305,13 @@ Red confirmed: | Green confirmed: |
 
 ## Backlog (recorded, not in this phase)
 
+- **`pacman-filesdb-refresh.service` fails when its timer fires before Wi-Fi is up**
+  (seen on the Alienware's first boot of the day: `Could not resolve host`), leaving
+  the system `degraded` until the next run. The unit has no network ordering and
+  `NetworkManager-wait-online` is masked (D-0068). Fix candidates: a drop-in with
+  `After=network-online.target` plus unmasking wait-online for that unit only, or
+  `Restart=on-failure` with a delay. Belongs with Phase 9's timers.
+
 - **Validate the hibernation swap size.** Found on hardware round 2 of Phase 16: a
   malformed swap size typed on the Disk page reached `sgdisk`, which failed with
   "Could not create partition 2 ... Unable to set partition 2's name to cryptswap" --
@@ -488,7 +495,7 @@ Red confirmed: | Green confirmed: |
 
 ## Exit criteria
 
-- [x] All acceptance tests pass (`phase-17.bats` 43/43 on the Alienware)
+- [x] All acceptance tests pass (full suite 204/204 on the Alienware, 2026-09-21)
 - [x] Static checks pass (`scripts/check`, 266 unit tests, 92 GUI tests)
 - [x] `DECISIONS.md` updated (D-0068 to D-0077)
 - [x] `docs/omarchy-influences.md` updated
