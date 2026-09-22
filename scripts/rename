@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# rename: change the project's name everywhere, mechanically (D-0081).
+#
+# Usage: scripts/rename OLD NEW      (lowercase names; e.g. rename autarchy symphony)
+#
+# The name is a plain token, not a variable: it lives in paths stow has resolved,
+# in archiso's ISO label, in systemd drop-in filenames, in release asset names --
+# places no runtime variable reaches. So a rename is a one-shot edit of the tree,
+# done by this script so it is complete and repeatable: every tracked path that
+# carries the token is `git mv`ed, and the token is replaced in every tracked
+# text file in its three forms (lower, Capitalised, UPPER), exact-token only --
+# the letters inside another word are left alone. Binary files are skipped.
+# Runs scripts/check at the end. Commits nothing: review the diff, then commit.
+#
+# What this cannot do: rename the GitHub repository (gh repo rename), move an
+# installed machine's paths (that is a migration, shipped with the rename), or
+# re-sign anything (the key is not named).
+set -euo pipefail
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+readonly REPO_ROOT
+
+die() {
+  printf 'rename: %s\n' "$*" >&2
+  exit 1
+}
+
+usage() {
+  echo "usage: rename OLD NEW" >&2
+  exit 2
+}
+
+(($# == 2)) || usage
+old=$1 new=$2
+
+[[ $old =~ ^[a-z][a-z0-9-]*$ && $new =~ ^[a-z][a-z0-9-]*$ ]] ||
+  die "names must be lowercase letters, digits and hyphens, starting with a letter"
+[[ $old != "$new" ]] || die "OLD and NEW are the same"
+[[ -z $(git -C "$REPO_ROOT" status --porcelain) ]] ||
+  die "the working tree has uncommitted changes -- a rename must be one clean commit"
+
+capitalise() {
+  printf '%s%s' "${1:0:1}" "${1:1}" | sed 's/^./\U&/'
+}
+old_cap=$(capitalise "$old") new_cap=$(capitalise "$new")
+old_up=${old^^} new_up=${new^^}
+# The UPPER form as an identifier: hyphens become underscores (AUTARCHY_STATE).
+old_up=${old_up//-/_} new_up=${new_up//-/_}
+
+# Exact-token match: not preceded or followed by a letter or digit, so '-' and
+# '_' are boundaries ("autarchy-update", "AUTARCHY_STATE" match; "bautarchyx"
+# does not). Not \b: sed counts '_' as a word character. Captures the
+# neighbours so a substitution can put them back.
+token() {
+  printf '(^|[^A-Za-z0-9])%s([^A-Za-z0-9]|$)' "$1"
+}
+subst() { # OLD NEW -> a sed expression replacing the exact token
+  printf 's/%s/\\1%s\\2/g' "$(token "$1")" "$2"
+}
+
+cd "$REPO_ROOT"
+
+# Anything to do? (tracked text files containing any form, or paths carrying it)
+mapfile -t files < <(git grep -I -l -E "$(token "$old")|$(token "$old_cap")|$(token "$old_up")" -- . || true)
+mapfile -t paths < <(git ls-files | grep -E "(^|/)[^/]*${old}[^/]*(/|$)" | awk -F/ -v t="$old" '{
+  # every directory or file component along the path that carries the token
+  p = ""
+  for (i = 1; i <= NF; i++) { p = (i == 1 ? $i : p "/" $i); if (index($i, t)) print p }
+}' | sort -u || true)
+if ((${#files[@]} == 0 && ${#paths[@]} == 0)); then
+  echo "rename: nothing to rename -- '$old' does not appear in the tree"
+  exit 0
+fi
+
+# NEW must not already be a name in use, or two things would merge into one.
+if git grep -I -q -E "$(token "$new")|$(token "$new_cap")|$(token "$new_up")" -- . 2>/dev/null; then
+  die "'$new' already appears in the tree -- refusing to merge two names"
+fi
+
+# Paths first, deepest first, so a directory move never invalidates a pending one.
+moved=0
+while IFS= read -r path; do
+  [[ -e $path ]] || continue
+  dir=$(dirname "$path") base=$(basename "$path")
+  git mv "$path" "$dir/${base//$old/$new}"
+  moved=$((moved + 1))
+done < <(printf '%s\n' "${paths[@]}" | awk '{ print gsub("/", "/"), $0 }' | sort -rn | cut -d' ' -f2-)
+
+# Then content, longest/most specific form first.
+mapfile -t files < <(git grep -I -l -E "$(token "$old")|$(token "$old_cap")|$(token "$old_up")" -- . || true)
+if ((${#files[@]})); then
+  # Twice: two adjacent tokens ("autarchy autarchy") share the boundary character,
+  # and one pass consumes it; a second pass gets the rest.
+  sed -i -E \
+    -e "$(subst "$old_up" "$new_up")" -e "$(subst "$old_up" "$new_up")" \
+    -e "$(subst "$old_cap" "$new_cap")" -e "$(subst "$old_cap" "$new_cap")" \
+    -e "$(subst "$old" "$new")" -e "$(subst "$old" "$new")" \
+    "${files[@]}"
+fi
+
+echo "rename: $old -> $new: ${#files[@]} files changed, $moved paths moved"
+echo "==> scripts/check"
+scripts/check
+echo "rename: done -- review 'git status' and 'git diff', then commit"
