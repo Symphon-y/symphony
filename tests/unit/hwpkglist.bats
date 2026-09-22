@@ -1,5 +1,6 @@
 #!/usr/bin/env bats
-# Unit tests for scripts/hwpkglist: which extra packages this machine's hardware needs.
+# Unit tests for scripts/hwpkglist: which extra packages this machine's hardware needs
+# (since Phase 19 a wrapper over scripts/hwmatch --kind packages; the map uses hwmatch's grammar).
 # The PCI bus, the hardware map and the package lists are all fixtures here; the last
 # tests run it against the repo's real map and lists.
 
@@ -29,7 +30,7 @@ list() {
 }
 
 @test "prints the packages of the list mapped to a device that is present" {
-  printf '14e4:43b1  broadcom-wl  # Broadcom BCM4352\n' >"$MAP"
+  printf 'pci:14e4:43b1  packages=broadcom-wl  # Broadcom BCM4352\n' >"$MAP"
   list broadcom-wl "broadcom-wl-dkms  # the driver" "linux-headers  # DKMS builds against these"
   pci 0000:03:00.0 14e4 43b1
   run "$SCRIPT"
@@ -38,7 +39,7 @@ list() {
 }
 
 @test "prints nothing when the device is not on the bus" {
-  printf '14e4:43b1  broadcom-wl\n' >"$MAP"
+  printf 'pci:14e4:43b1  packages=broadcom-wl\n' >"$MAP"
   list broadcom-wl broadcom-wl-dkms
   pci 0000:00:02.0 8086 0416
   run "$SCRIPT"
@@ -47,7 +48,7 @@ list() {
 }
 
 @test "only the lists of devices that are present" {
-  printf '14e4:43b1  broadcom-wl\n10de:1234  nvidia-thing\n' >"$MAP"
+  printf 'pci:14e4:43b1  packages=broadcom-wl\npci:10de:1234  packages=nvidia-thing\n' >"$MAP"
   list broadcom-wl broadcom-wl-dkms
   list nvidia-thing nvidia
   pci 0000:03:00.0 14e4 43b1
@@ -56,7 +57,7 @@ list() {
 }
 
 @test "a package two present devices both need is printed once, sorted" {
-  printf '14e4:43b1  a\n14e4:43a0  b\n' >"$MAP"
+  printf 'pci:14e4:43b1  packages=a\npci:14e4:43a0  packages=b\n' >"$MAP"
   list a zzz shared
   list b shared aaa
   pci 0000:03:00.0 14e4 43b1
@@ -66,7 +67,7 @@ list() {
 }
 
 @test "comments and blank lines in the map are ignored" {
-  printf '# a comment\n\n14e4:43b1  broadcom-wl   # trailing note\n   \n' >"$MAP"
+  printf '# a comment\n\npci:14e4:43b1  packages=broadcom-wl   # trailing note\n   \n' >"$MAP"
   list broadcom-wl broadcom-wl-dkms
   pci 0000:03:00.0 14e4 43b1
   run "$SCRIPT"
@@ -75,7 +76,7 @@ list() {
 
 @test "a machine with no PCI bus at all is fine and prints nothing" {
   rmdir "$SYS/bus/pci/devices"
-  printf '14e4:43b1  broadcom-wl\n' >"$MAP"
+  printf 'pci:14e4:43b1  packages=broadcom-wl\n' >"$MAP"
   list broadcom-wl broadcom-wl-dkms
   run "$SCRIPT"
   assert_success
@@ -90,7 +91,7 @@ list() {
 }
 
 @test "a map entry naming a list that does not exist fails, and prints no packages (never a partial install)" {
-  printf '14e4:43b1  no-such-list\n' >"$MAP"
+  printf 'pci:14e4:43b1  packages=no-such-list\n' >"$MAP"
   pci 0000:03:00.0 14e4 43b1
   run "$SCRIPT"
   assert_failure
@@ -98,14 +99,14 @@ list() {
 }
 
 @test "a malformed map line fails and names the line" {
-  printf 'not-an-id  broadcom-wl\n' >"$MAP"
+  printf 'not-an-id  packages=broadcom-wl\n' >"$MAP"
   run "$SCRIPT"
   assert_failure
   assert_output --partial "hardware.txt:1"
 }
 
 @test "an entry with no list name fails" {
-  printf '14e4:43b1\n' >"$MAP"
+  printf 'pci:14e4:43b1\n' >"$MAP"
   run "$SCRIPT"
   assert_failure
   assert_output --partial "hardware.txt:1"

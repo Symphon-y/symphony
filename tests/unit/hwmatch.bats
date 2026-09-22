@@ -140,15 +140,17 @@ entry() {
   assert_output $'packages\tcommon'
 }
 
-@test "--kind KIND prints only that kind's values, bare" {
+@test "--kind KIND prints only that kind's values, bare; packages are expanded to package names" {
   pci 0000:0a:00.0 14e4 43b1
-  list broadcom-wl x
+  list broadcom-wl broadcom-wl-dkms linux-headers
   entry 'pci:14e4:43b1  packages=broadcom-wl cmdline=foo=1'
   run "$SCRIPT" --kind cmdline
   assert_success
   assert_output "foo=1"
   run "$SCRIPT" --kind packages
-  assert_output "broadcom-wl"
+  assert_line "broadcom-wl-dkms"
+  assert_line "linux-headers"
+  refute_line "broadcom-wl"
 }
 
 @test "--all lists every entry with whether it is present (for check/report)" {

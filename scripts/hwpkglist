@@ -1,71 +1,8 @@
 #!/usr/bin/env bash
-# hwpkglist: print the extra packages this machine's hardware needs (Phase 17).
+# hwpkglist: the extra packages this machine's hardware needs -- `scripts/hwmatch
+# --kind packages` under the name install-base-system and symphony-update call
+# (Phase 17, D-0074; one parser since Phase 19, D-0082).
 #
 # Usage: scripts/hwpkglist
-#
-# system/hardware.txt maps a PCI vendor:device ID to a package list under
-# packages/hardware/. This prints, sorted and de-duplicated, the packages of every list
-# whose device is on the PCI bus right now -- so a machine only gets, say, the proprietary
-# Broadcom driver if it has the chip that needs it. The lists are ordinary package lists,
-# read by scripts/pkglist (the only parser for that format).
-#
-# Like pkglist it fails closed: a malformed map line or an unknown list prints nothing and
-# exits 1, so a broken map can't yield a partial install.
-#
-# SYMPHONY_SYS, SYMPHONY_HARDWARE_MAP and SYMPHONY_HARDWARE_PACKAGES override the sysfs
-# root, the map and the lists directory (tests).
 set -euo pipefail
-
-# Byte-order sorting, so output is identical on every machine.
-export LC_ALL=C
-
-REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-readonly REPO_ROOT
-readonly SYS="${SYMPHONY_SYS:-/sys}"
-readonly MAP="${SYMPHONY_HARDWARE_MAP:-$REPO_ROOT/system/hardware.txt}"
-readonly LISTS="${SYMPHONY_HARDWARE_PACKAGES:-$REPO_ROOT/packages/hardware}"
-
-die() {
-  printf 'hwpkglist: %s\n' "$*" >&2
-  exit 1
-}
-
-# The vendor:device IDs on the PCI bus, as sysfs prints them (lowercase hex). A machine with
-# no PCI bus, or an unreadable one, simply has none.
-present_ids() {
-  local dir vendor device
-  for dir in "$SYS"/bus/pci/devices/*; do
-    [[ -r $dir/vendor && -r $dir/device ]] || continue
-    vendor=$(<"$dir/vendor")
-    device=$(<"$dir/device")
-    printf '%s:%s\n' "${vendor#0x}" "${device#0x}"
-  done
-}
-
-main() {
-  [[ -e $MAP ]] || return 0
-
-  local present line id list extra n=0 selected=()
-  present=$(present_ids)
-  while IFS= read -r line || [[ -n $line ]]; do
-    n=$((n + 1))
-    line=${line%%#*}
-    id="" list="" extra=""
-    read -r id list extra <<<"$line"
-    [[ -n $id ]] || continue
-    if [[ ! $id =~ ^[0-9a-f]{4}:[0-9a-f]{4}$ || -z $list || -n $extra ]]; then
-      die "$MAP:$n: expected '<vendor:device> <list>' (lowercase hex)"
-    fi
-    # Checked for every entry, present or not: a typo shouldn't wait for the right
-    # hardware to turn up.
-    [[ -e $LISTS/$list.txt ]] || die "$MAP:$n: no package list $LISTS/$list.txt"
-    if grep -qx "$id" <<<"$present"; then
-      selected+=("$LISTS/$list.txt")
-    fi
-  done <"$MAP"
-
-  ((${#selected[@]} > 0)) || return 0
-  "$REPO_ROOT/scripts/pkglist" "${selected[@]}"
-}
-
-main "$@"
+exec "$(dirname "${BASH_SOURCE[0]}")/hwmatch" --kind packages

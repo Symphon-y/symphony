@@ -1,14 +1,36 @@
-# PCI devices that need packages the general inventory (packages/*.txt) does not carry.
+# What specific hardware needs, keyed by how the hardware identifies itself.
 #
-# Format: <vendor:device>  <list>   # what the device is
+# Format: <key> <value>... [# comment]      -- parsed only by scripts/hwmatch
 #
-# <list> names packages/hardware/<list>.txt, an ordinary package list (one package per
-# line with a "# why" comment, parsed only by scripts/pkglist). scripts/hwpkglist adds the
-# lists of the devices that are on the PCI bus at install time to what pacstrap installs,
-# so a machine only gets, say, a proprietary driver if it has the chip that needs it;
-# iso/build-offline-repo bakes every list into the offline repo so that works with no
-# network. The installer's Wi-Fi page reads the note to say what an adapter needs.
+#   key     pci:VVVV:DDDD   PCI vendor:device (lowercase hex, as sysfs prints it)
+#           usb:VVVV:PPPP   USB idVendor:idProduct
+#           dmi:<glob>      a shell glob over /sys/class/dmi/id/modalias -- the machine
+#                           model; a space in a DMI value is written `*` (fields end at
+#                           whitespace)
+#           hda:VVVV...:SSSS...  an HDA codec's vendor id and subsystem id
+#   value   packages=<list>    packages/hardware/<list>.txt, installed where the hardware is
+#           cmdline=<param>    a kernel parameter on the boot line (install time; on every UKI)
+#           modprobe=<file>    system/modprobe/<file> -> /etc/modprobe.d
+#           files=<manifest>   system/hardware/<manifest>, extra sync-system entries
+#           service=<unit>     a systemd unit to enable (user unit if the payload ships it)
 #
-# Lowercase hex, as sysfs prints it (lspci -nn shows the pair in brackets).
+# Applied by symphony-hardware at install, at first login (user units), after every
+# update, and on demand; `symphony-hardware scan` names hardware nothing here covers.
+# Every value is checked to exist on every machine, so a typo never waits for the right
+# hardware. Why declarative data and not per-vendor scripts: D-0074, D-0082.
 
-14e4:43b1  broadcom-wl  # Broadcom BCM4352 802.11ac
+# --- Alienware 14 (2014, P39G) ----------------------------------------------------
+
+# Broadcom BCM4352 802.11ac (Dell DW1550): no open driver; the proprietary wl via
+# DKMS, built against both installed kernels (D-0074).
+pci:14e4:43b1  packages=broadcom-wl
+
+# The BIOS reports an airplane-mode slider through ACPI; dell_rbtn turns it into a
+# hard-blocked rfkill that software cannot clear, and udev reloads the module on
+# every boot. Kept out of the kernel entirely (D-0076).
+dmi:*:svnAlienware:pnAlienware*14:*  cmdline=module_blacklist=dell_rbtn
+
+# AlienFX lighting controller ("Alienware M14x"), a USB HID device the kernel's
+# alienware-wmi does not cover on this firmware. Driven from userspace by alienfx;
+# the udev rule gives the seat user access; the unit paints the theme colour (D-0084).
+usb:187c:0525  packages=alienfx files=alienfx.txt service=alienfx-theme.service

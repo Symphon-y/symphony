@@ -2,10 +2,13 @@
 # sync-system: copy the root-owned files listed in system/files.txt (plus the target
 # machine's own system/hosts/<hostname>/files.txt) into a root filesystem.
 #
-# Usage: install/sync-system [--root DIR] apply|check
+# Usage: install/sync-system [--root DIR] [--manifest FILE] apply|check
 #   apply       install every file whose content, mode, or owner differs
 #   check       report drift without changing anything; exit 1 if any file differs
 #   --root DIR  work on DIR instead of / (for example /mnt during installation)
+#   --manifest FILE  work on FILE's entries only, not system/files.txt and the host's
+#               (symphony-hardware installs a hardware entry's files this way, Phase 19);
+#               sources are relative to system/, like the base manifest
 #
 # Files are copied, never symlinked: a link into this user-owned repository would let
 # the user account change system configuration without sudo. Sudoers files are
@@ -25,7 +28,7 @@ die() {
 }
 
 usage() {
-  echo "usage: sync-system [--root DIR] apply|check" >&2
+  echo "usage: sync-system [--root DIR] [--manifest FILE] apply|check" >&2
   exit 2
 }
 
@@ -53,6 +56,10 @@ read_manifest() {
 # system/hosts/, that machine's own manifest (engineering rule 14: machine-specific
 # config stays separate from portable config).
 manifest_entries() {
+  if [[ -n $ONLY_MANIFEST ]]; then
+    read_manifest "$ONLY_MANIFEST" "" || return 1
+    return 0
+  fi
   read_manifest "$MANIFEST" "" || return 1
 
   local hostname
@@ -135,7 +142,7 @@ apply() {
 }
 
 main() {
-  ROOT=""
+  ROOT="" ONLY_MANIFEST=""
   local command=""
   while (($#)); do
     case $1 in
@@ -143,6 +150,12 @@ main() {
         (($# >= 2)) || usage
         # "/" becomes "" so targets never start with "//".
         ROOT=${2%/}
+        shift 2
+        ;;
+      --manifest)
+        (($# >= 2)) || usage
+        [[ -f $2 ]] || die "no such manifest: $2"
+        ONLY_MANIFEST=$2
         shift 2
         ;;
       apply | check)

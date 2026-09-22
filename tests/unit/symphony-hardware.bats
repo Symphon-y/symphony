@@ -34,7 +34,18 @@ setup() {
 make_stubs() {
   local bin="$BATS_TEST_TMPDIR/bin"
   mkdir -p "$bin"
-  printf '#!/usr/bin/env bash\necho "sudo $*" >>"$STUB_LOG"\nexec "$@"\n' >"$bin/sudo"
+  # sudo runs the command as-is; `install -o root -g root` cannot chown as a user, so
+  # the ownership flags are dropped (that they were asked for is in the log).
+  cat >"$bin/sudo" <<'EOF'
+#!/usr/bin/env bash
+echo "sudo $*" >>"$STUB_LOG"
+if [[ $1 == install ]]; then
+  args=()
+  while (($#)); do case $1 in -o|-g) shift 2 ;; *) args+=("$1"); shift ;; esac; done
+  exec "${args[@]}"
+fi
+exec "$@"
+EOF
   printf '#!/usr/bin/env bash\necho "systemctl $*" >>"$STUB_LOG"\n' >"$bin/systemctl"
   printf '#!/usr/bin/env bash\necho "mkinitcpio $*" >>"$STUB_LOG"\n' >"$bin/mkinitcpio"
   # The payload's appliers, as stubs.
@@ -55,7 +66,8 @@ pci() {
   mkdir -p "$dir"
   echo "0x$2" >"$dir/vendor"
   echo "0x$3" >"$dir/device"
-  echo "pci:v0000$2d0000$3sv00000000sd00000000bc02sc80i00" >"$dir/modalias"
+  echo "${PCI_CLASS:-0x028000}" >"$dir/class"
+  echo "pci:v0000${2^^}d0000${3^^}sv00000000sd00000000bc02sc80i00" >"$dir/modalias"
   [[ -n ${4:-} ]] && mkdir -p "$dir/driver" # a bound driver is a `driver` symlink/dir
   return 0
 }
@@ -143,7 +155,7 @@ list() {
   run "$SCRIPT" apply
   assert_success
   run calls
-  assert_line "sudo $PAYLOAD/install/sync-system --manifest $PAYLOAD/system/hardware/alienfx.txt apply"
+  assert_line "sudo $PAYLOAD/install/sync-system --root $ROOT --manifest $PAYLOAD/system/hardware/alienfx.txt apply"
 }
 
 @test "apply: a service= is enabled as a user unit when it is one, else as a system unit via sudo" {
@@ -226,6 +238,14 @@ list() {
   assert_output --partial "pci:v000010DEd00000FE4"
   assert_output --partial "usb:v187Cp0525"
   refute_output --partial "14E4d000043B1"
+}
+
+@test "scan: a PCI bridge with no driver (host bridge, class 06xx) is wiring, not an unhandled device" {
+  PCI_CLASS=0x060000 pci 0000:00:00.0 8086 0c04
+  run "$SCRIPT" scan
+  assert_success
+  refute_output --partial "8086:0c04"
+  assert_output --partial "nothing unhandled"
 }
 
 @test "scan: reports firmware the kernel failed to load, from the journal" {

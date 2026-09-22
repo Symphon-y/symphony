@@ -1,0 +1,207 @@
+#!/usr/bin/env bash
+# hwmatch: which entries of system/hardware.txt describe this machine, and what they
+# ask for (Phase 19, D-0082). The one parser of that file.
+#
+# Usage: scripts/hwmatch                 <kind>\t<value> for every value of every present entry
+#        scripts/hwmatch --kind KIND     just that kind's values, bare; for `packages` the
+#                                        lists are expanded to package names (scripts/pkglist)
+#        scripts/hwmatch --all           present|absent \t <key> \t <values> for every entry
+#
+# A map line is `<key> <value>... [# comment]`. The key names hardware:
+#   pci:VVVV:DDDD           a PCI vendor:device, lowercase hex (sysfs)
+#   usb:VVVV:PPPP           a USB idVendor:idProduct
+#   dmi:<glob>              a shell glob over /sys/class/dmi/id/modalias (the machine model)
+#   hda:VVVVVVVV:SSSSSSSS   an HDA codec's vendor id and subsystem id (/proc/asound/card*/codec#*)
+# Each value says what that hardware needs, and every value is checked to exist so a
+# typo does not wait for the right machine to turn up:
+#   packages=<list>    packages/hardware/<list>.txt (scripts/pkglist's format)
+#   cmdline=<param>    a kernel parameter, written into the boot line at install time
+#   modprobe=<file>    system/modprobe/<file>, installed to /etc/modprobe.d
+#   files=<manifest>   system/hardware/<manifest>, extra sync-system entries
+#   service=<unit>     a systemd unit to enable (user unit if the payload ships it, else system)
+#
+# Fails closed like pkglist: a malformed line, an unknown kind or a missing target
+# prints nothing and exits 1, so a broken map can never yield a partial install.
+# Output is sorted and de-duplicated in byte order, identical on every machine.
+#
+# SYMPHONY_SYS, SYMPHONY_PROC, SYMPHONY_HARDWARE_MAP, SYMPHONY_HARDWARE_PACKAGES and
+# SYMPHONY_SYSTEM_DIR override the roots and files (tests; the installer's chroot).
+set -euo pipefail
+
+export LC_ALL=C
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+readonly REPO_ROOT
+readonly SYS="${SYMPHONY_SYS:-/sys}"
+readonly PROC="${SYMPHONY_PROC:-/proc}"
+readonly MAP="${SYMPHONY_HARDWARE_MAP:-$REPO_ROOT/system/hardware.txt}"
+readonly LISTS="${SYMPHONY_HARDWARE_PACKAGES:-$REPO_ROOT/packages/hardware}"
+readonly SYSTEM_DIR="${SYMPHONY_SYSTEM_DIR:-$REPO_ROOT/system}"
+
+# A kernel parameter: a name, optionally =value, no whitespace or shell metacharacters.
+readonly PARAM_PATTERN='^[A-Za-z_][A-Za-z0-9_.-]*(=[A-Za-z0-9_.,:/@%+-]+)?$'
+readonly NAME_PATTERN='^[A-Za-z0-9][A-Za-z0-9_.@-]*$'
+
+die() {
+  printf 'hwmatch: %s\n' "$*" >&2
+  exit 1
+}
+
+usage() {
+  echo "usage: hwmatch [--kind KIND | --all]" >&2
+  exit 2
+}
+
+# --- what this machine is ------------------------------------------------------------
+
+present_pci() {
+  local dir vendor device
+  for dir in "$SYS"/bus/pci/devices/*; do
+    [[ -r $dir/vendor && -r $dir/device ]] || continue
+    vendor=$(<"$dir/vendor")
+    device=$(<"$dir/device")
+    printf 'pci:%s:%s\n' "${vendor#0x}" "${device#0x}"
+  done
+}
+
+present_usb() {
+  local dir
+  for dir in "$SYS"/bus/usb/devices/*; do
+    [[ -r $dir/idVendor && -r $dir/idProduct ]] || continue
+    printf 'usb:%s:%s\n' "$(<"$dir/idVendor")" "$(<"$dir/idProduct")"
+  done
+}
+
+present_hda() {
+  local file vendor subsystem
+  for file in "$PROC"/asound/card*/codec#*; do
+    [[ -r $file ]] || continue
+    vendor=$(sed -n 's/^Vendor Id: 0x\([0-9a-f]*\).*/\1/p' "$file" | head -n1)
+    subsystem=$(sed -n 's/^Subsystem Id: 0x\([0-9a-f]*\).*/\1/p' "$file" | head -n1)
+    [[ -n $vendor && -n $subsystem ]] && printf 'hda:%s:%s\n' "$vendor" "$subsystem"
+  done
+  return 0
+}
+
+dmi_modalias() {
+  [[ -r $SYS/class/dmi/id/modalias ]] && cat "$SYS/class/dmi/id/modalias" || true
+}
+
+# Does KEY describe this machine? PRESENT holds the exact ids; the dmi glob is matched live.
+is_present() {
+  local key=$1
+  case $key in
+    dmi:*)
+      # A shell glob on purpose: unquoted on the right of ==.
+      # shellcheck disable=SC2053
+      [[ -n $MODALIAS && $MODALIAS == $key ]]
+      ;;
+    *) grep -qx "$key" <<<"$PRESENT" ;;
+  esac
+}
+
+# --- the map ----------------------------------------------------------------------
+
+validate_key() {
+  local key=$1 n=$2
+  case $key in
+    pci:[0-9a-f][0-9a-f][0-9a-f][0-9a-f]:[0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+    usb:[0-9a-f][0-9a-f][0-9a-f][0-9a-f]:[0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+    hda:*:*) [[ $key =~ ^hda:[0-9a-f]+:[0-9a-f]+$ ]] || die "$MAP:$n: bad hda key '$key'" ;;
+    dmi:?*) ;;
+    *) die "$MAP:$n: unknown key '$key' (pci:, usb:, dmi:, hda:)" ;;
+  esac
+}
+
+# Checks one value exists/parses; prints "<kind>\t<name>".
+validate_value() {
+  local value=$1 n=$2 kind name
+  kind=${value%%=*}
+  name=${value#*=}
+  [[ $value == *=* && -n $name ]] || die "$MAP:$n: expected <kind>=<value>, got '$value'"
+  case $kind in
+    packages)
+      [[ $name =~ $NAME_PATTERN && -e $LISTS/$name.txt ]] || die "$MAP:$n: no package list $LISTS/$name.txt"
+      ;;
+    cmdline)
+      [[ $name =~ $PARAM_PATTERN ]] || die "$MAP:$n: bad kernel parameter '$name'"
+      ;;
+    modprobe)
+      [[ $name =~ $NAME_PATTERN && -e $SYSTEM_DIR/modprobe/$name ]] || die "$MAP:$n: no file $SYSTEM_DIR/modprobe/$name"
+      ;;
+    files)
+      [[ $name =~ $NAME_PATTERN && -e $SYSTEM_DIR/hardware/$name ]] || die "$MAP:$n: no manifest $SYSTEM_DIR/hardware/$name"
+      ;;
+    service)
+      [[ $name =~ $NAME_PATTERN ]] || die "$MAP:$n: bad unit name '$name'"
+      ;;
+    *) die "$MAP:$n: unknown value kind '$kind' (packages, cmdline, modprobe, files, service)" ;;
+  esac
+  printf '%s\t%s\n' "$kind" "$name"
+}
+
+main() {
+  local mode=values kind=""
+  case ${1:-} in
+    "") ;;
+    --kind)
+      [[ -n ${2:-} ]] || usage
+      mode=kind kind=$2
+      ;;
+    --all) mode=all ;;
+    *) usage ;;
+  esac
+
+  [[ -e $MAP ]] || return 0
+
+  PRESENT=$(
+    present_pci
+    present_usb
+    present_hda
+  )
+  MODALIAS=$(dmi_modalias)
+
+  local line key n=0 rest present out=() all=()
+  local -a values
+  while IFS= read -r line || [[ -n $line ]]; do
+    n=$((n + 1))
+    line=${line%%#*}
+    read -r key rest <<<"$line"
+    [[ -n $key ]] || continue
+    validate_key "$key" "$n"
+    read -ra values <<<"$rest"
+    ((${#values[@]})) || die "$MAP:$n: '$key' has no values"
+    local v parsed=()
+    for v in "${values[@]}"; do
+      parsed+=("$(validate_value "$v" "$n")")
+    done
+    if is_present "$key"; then
+      present=present
+      out+=("${parsed[@]}")
+    else
+      present=absent
+    fi
+    all+=("$present	$key	${values[*]}")
+  done <"$MAP"
+
+  case $mode in
+    all) ((${#all[@]})) && printf '%s\n' "${all[@]}" ;;
+    values) ((${#out[@]})) && printf '%s\n' "${out[@]}" | sort -u ;;
+    kind)
+      ((${#out[@]})) || return 0
+      local names
+      names=$(printf '%s\n' "${out[@]}" | awk -F'\t' -v k="$kind" '$1 == k { print $2 }' | sort -u)
+      [[ -n $names ]] || return 0
+      if [[ $kind == packages ]]; then
+        local -a lists=()
+        while IFS= read -r v; do lists+=("$LISTS/$v.txt"); done <<<"$names"
+        "$REPO_ROOT/scripts/pkglist" "${lists[@]}"
+      else
+        printf '%s\n' "$names"
+      fi
+      ;;
+  esac
+  return 0
+}
+
+main "$@"

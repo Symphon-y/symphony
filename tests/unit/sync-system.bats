@@ -201,3 +201,31 @@ set_hostname() {
   assert_failure 1
   assert_line "content: /etc/ssh/authorized_keys/alice"
 }
+
+# --- --manifest FILE (Phase 19: hardware entries, symphony-hardware) ---------------
+
+@test "--manifest FILE: installs only that manifest's entries (sources relative to system/), none of the base ones" {
+  printf '0644  hardware/60-alienfx.rules  /etc/udev/rules.d/60-alienfx.rules\n' >"$BATS_TEST_TMPDIR/hw.txt"
+  run "$SCRIPT" --root "$ROOT" --manifest "$BATS_TEST_TMPDIR/hw.txt" apply
+  assert_success
+  assert_line "updated: /etc/udev/rules.d/60-alienfx.rules"
+  run cmp "$REPO_ROOT/system/hardware/60-alienfx.rules" "$ROOT/etc/udev/rules.d/60-alienfx.rules"
+  assert_success
+  assert [ ! -e "$ROOT/etc/nftables.conf" ]
+}
+
+@test "--manifest FILE: check reports that manifest's drift, and passes after apply" {
+  printf '0644  hardware/60-alienfx.rules  /etc/udev/rules.d/60-alienfx.rules\n' >"$BATS_TEST_TMPDIR/hw.txt"
+  run "$SCRIPT" --root "$ROOT" --manifest "$BATS_TEST_TMPDIR/hw.txt" check
+  assert_failure
+  assert_output --partial "60-alienfx.rules"
+  "$SCRIPT" --root "$ROOT" --manifest "$BATS_TEST_TMPDIR/hw.txt" apply >/dev/null
+  run "$SCRIPT" --root "$ROOT" --manifest "$BATS_TEST_TMPDIR/hw.txt" check
+  assert_success
+}
+
+@test "--manifest with a file that does not exist is a usage error" {
+  run "$SCRIPT" --root "$ROOT" --manifest "$BATS_TEST_TMPDIR/nope.txt" apply
+  assert_failure
+  assert_output --partial "nope.txt"
+}

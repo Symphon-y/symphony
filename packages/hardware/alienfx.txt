@@ -1,0 +1,4 @@
+# AlienFX lighting, for machines with the USB HID controller (system/hardware.txt).
+# Our own PKGBUILD under packages/aur/alienfx: upstream's AUR package depends on a
+# name Arch no longer has (python-pkg_resources) and its M14x R3 zone map is wrong.
+alienfx        # userspace AlienFX control over libusb; alienfx-theme drives it
