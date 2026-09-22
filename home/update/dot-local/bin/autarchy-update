@@ -65,14 +65,24 @@ fetch() {
   curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 "$@"
 }
 
+# Prints the tag, or nothing when GitHub has no "latest" -- a 404 (curl -f exits
+# 22), which is what a repo with only pre-releases, or none yet, answers.
 latest_release() {
-  local json
-  json=$(fetch -H 'Accept: application/vnd.github+json' "$API") ||
+  local json rc=0
+  json=$(fetch -H 'Accept: application/vnd.github+json' "$API") || rc=$?
+  if ((rc == 22)); then
+    return 0
+  elif ((rc != 0)); then
     die "could not fetch the latest release from github.com/$RELEASE_REPO"
+  fi
   local tag
   tag=$(sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' <<<"$json" | head -n1)
   [[ -n $tag ]] || die "could not read a release tag from GitHub's answer"
   echo "$tag"
+}
+
+no_release_yet() {
+  echo "autarchy-update: no release published yet at github.com/$RELEASE_REPO (pre-releases are not offered)"
 }
 
 # sort -V orders 2026.09.01 < 2026.09.22 and a bare tag after its pre-releases.
@@ -190,6 +200,10 @@ check() {
   local current latest
   current=$(installed_version)
   latest=$(latest_release)
+  if [[ -z $latest ]]; then
+    no_release_yet
+    return 0
+  fi
   if [[ $current == "$latest" ]]; then
     echo "autarchy-update: up to date ($current)"
     return 0
@@ -235,6 +249,10 @@ apply() {
     target=$(<"$work/stage/VERSION")
   else
     target=$(latest_release)
+    if [[ -z $target ]]; then
+      no_release_yet
+      return 0
+    fi
     if [[ $current == "$target" ]]; then
       echo "autarchy-update: up to date ($current)"
       return 0

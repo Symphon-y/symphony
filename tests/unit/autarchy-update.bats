@@ -89,7 +89,10 @@ while (($#)); do
   esac
 done
 case "$url" in
-  */releases/latest) printf '{"tag_name": "%s", "name": "x"}\n' "$STUB_LATEST" ;;
+  */releases/latest)
+    [[ -n ${STUB_NO_RELEASES:-} ]] && exit 22 # 404: no non-prerelease exists yet
+    printf '{"tag_name": "%s", "name": "x"}\n' "$STUB_LATEST"
+    ;;
   */releases/download/*)
     tag=${url#*/releases/download/}; tag=${tag%%/*}; file=${url##*/}
     [[ -e $RELEASES/$tag/$file ]] || exit 22
@@ -175,6 +178,22 @@ installed_version() {
   assert_output --partial "local-abc1234"
   assert_output --partial "2026.09.22"
   assert_output --partial "--yes"
+}
+
+@test "check: no release published yet (only pre-releases, or none) is said plainly, not as a fetch failure" {
+  STUB_NO_RELEASES=1 run "$SCRIPT" check
+  assert_success
+  assert_output --partial "no release"
+  refute_output --partial "could not"
+}
+
+@test "apply: no release published yet does nothing, and says so" {
+  echo "2026.09.01" >"$AUTARCHY_PAYLOAD_ROOT/current/VERSION"
+  STUB_NO_RELEASES=1 run "$SCRIPT" apply
+  assert_success
+  assert_output --partial "no release"
+  run calls
+  refute_output --partial "snapper"
 }
 
 @test "check: fails clearly when the release list cannot be fetched" {

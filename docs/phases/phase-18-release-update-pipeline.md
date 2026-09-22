@@ -96,11 +96,11 @@ Red confirmed: 2026-09-21 · Green confirmed: |
 
 - [x] Branch, tracking doc, roadmap row
 - [x] Red: the tests above (2026-09-21: 50 failing, 12 acceptance + 38 unit)
-- [ ] `scripts/build-payload`; public key + `files.txt`; `minisign` in the inventory
-- [ ] `home/update/`: `autarchy-update`, `update-notify` moved in
-- [ ] Installer: `seed_release_marker` removed
-- [ ] Workflow: `payload` job (build, sign, release, upload); ISO job after it
-- [ ] Retire `scripts/update`, `update.bats`, `dev-deploy.md`; rewrite `update.md`; README
+- [x] `scripts/build-payload`; public key + `files.txt`; `minisign` in the inventory; `scripts/setup-signing`
+- [x] `home/update/`: `autarchy-update`, `update-notify` moved in
+- [x] Installer: `seed_release_marker` removed; migration for the old marker
+- [x] Workflow: `payload` job (build, sign, release, upload); ISO job after it -- `2026.09.22-test1` signed and verified
+- [x] Retire `scripts/update`, `update.bats`, `dev-deploy.md`; rewrite `update.md`; README
 - [ ] Green: `scripts/check`; on the Alienware: `apply --from`, a test tag, a real tag,
       `apply`, `rollback`, `apply`
 - [ ] Public: LICENSE; old releases/tags deleted; history rewrite; force-push; visibility
@@ -119,6 +119,35 @@ Red confirmed: 2026-09-21 · Green confirmed: |
 - Pre-publication audit of the repo: tree clean (`check-identifiers`), history diffs
   clean of emails, keys and tokens; 37 of 193 commits carry a personal author address
   -> rewrite (user decision).
+
+### 2026-09-21 (implementation, on the Alienware)
+- **Red:** 50 failing tests across `build-payload`, `autarchy-update`, `update-notify`,
+  the installer and `phase-18.bats`. **Green** the same day; `scripts/check` 294 unit tests.
+- `scripts/build-payload` reads the allow-list from `install/configure-base-system` at the
+  ref being packed (one home), archives with `git archive` so nothing uncommitted ships,
+  creates any of the six directories git has no file for (git tracks no empty directory),
+  and pins mtime/owner/order so the same commit packs to the same bytes.
+- `autarchy-update`: the sudo stub in the tests runs the real command except `chown`
+  (a non-root test can't); the appliers are stubs that log which payload they ran from,
+  which is the assertion that matters ("from the new payload, not the download").
+- User asked whether the signing step would be automated "for any machine that installs
+  autarchy": it already is on the verifying side (the installer ships the public key,
+  `minisign` is in `base.txt`); creating the *secret* key is per project and stays with
+  the maintainer -- scripted as `scripts/setup-signing` (5 tests), never in CI. The user
+  ran it by hand; the public key `03B7F2FA9C6C3304` is committed.
+- **First self-deploy:** the old manual deploy put the new payload on the machine once;
+  then `autarchy-update apply --from ~/Projects/Arch` deployed the same checkout through
+  its own pipeline -- snapshot, swap, 49 links restowed from the new payload, services
+  up, `current`/`previous` root-owned. Two findings: `version` printed no trailing newline
+  (`tr -d '[:space:]'`), and the old per-user `current-release` marker was orphaned -- a
+  migration removes it (3 tests). Both confirmed fixed by the second `apply --from`.
+- **First CI-signed release, `2026.09.22-test1` (pre-release):** the payload job passed
+  first time. On the machine: `minisign -V -p /etc/autarchy/release.pub` verifies CI's
+  signature; the sha256 matches; a single flipped byte fails verification; the tarball
+  is **byte-identical** to a local `build-payload` of the same commit. `autarchy-update
+  check` then hit a real state the plan missed: with only pre-releases, GitHub's
+  `releases/latest` is a 404, which read as "could not fetch". Red (2 tests) then green:
+  a 404 is "no release published yet", plainly, for `check` and `apply` both.
 
 ## VM → physical hardware notes
 
