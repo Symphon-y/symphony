@@ -85,8 +85,8 @@ setup() {
   assert_success
 }
 
-@test "iso: autarchy-install exists and composes the existing, already-tested scripts in order" {
-  local script="$REPO_ROOT/iso/profile/airootfs/usr/local/bin/autarchy-install"
+@test "iso: symphony-install exists and composes the existing, already-tested scripts in order" {
+  local script="$REPO_ROOT/iso/profile/airootfs/usr/local/bin/symphony-install"
   assert [ -x "$script" ]
 
   # No new install logic here -- only orchestration of what already exists
@@ -110,12 +110,12 @@ setup() {
   assert [ "$review_line" -lt "$install_line" ]
 }
 
-@test "iso: autarchy-install lists disk options and never accepts a blank/invalid disk" {
+@test "iso: symphony-install lists disk options and never accepts a blank/invalid disk" {
   # A real bug found booting the ISO on real hardware (Phase 14): the disk
   # prompt gave no way to know the available options, and leaving it blank
   # surfaced only much later as an unrelated, unhelpful error instead of
   # being rejected at the point of input.
-  local script="$REPO_ROOT/iso/profile/airootfs/usr/local/bin/autarchy-install"
+  local script="$REPO_ROOT/iso/profile/airootfs/usr/local/bin/symphony-install"
   run grep -q '^ask_disk()' "$script"
   assert_success
   run grep -q '^list_disks()' "$script"
@@ -126,13 +126,13 @@ setup() {
   assert_success
 }
 
-@test "iso: the live medium prints autarchy-install as the one obvious thing to run" {
-  run grep -q 'autarchy-install' "$REPO_ROOT/iso/profile/airootfs/root/.bash_profile"
+@test "iso: the live medium prints symphony-install as the one obvious thing to run" {
+  run grep -q 'symphony-install' "$REPO_ROOT/iso/profile/airootfs/root/.bash_profile"
   assert_success
 }
 
-@test "docs: base-install.md documents the guided autarchy-install flow" {
-  run grep -q 'autarchy-install' "$REPO_ROOT/docs/runbooks/base-install.md"
+@test "docs: base-install.md documents the guided symphony-install flow" {
+  run grep -q 'symphony-install' "$REPO_ROOT/docs/runbooks/base-install.md"
   assert_success
 }
 

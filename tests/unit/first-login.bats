@@ -2,7 +2,7 @@
 # Unit tests for install/first-login. The real install/enable-user-services
 # needs a live user D-Bus/systemd session (systemctl --user) that doesn't
 # exist in this sandbox, and matugen needs a real palette source, so both are
-# swapped out (AUTARCHY_ENABLE_USER_SERVICES_SCRIPT, AUTARCHY_MATUGEN) for
+# swapped out (SYMPHONY_ENABLE_USER_SERVICES_SCRIPT, SYMPHONY_MATUGEN) for
 # stubs that just log their own invocation.
 
 setup() {
@@ -12,11 +12,11 @@ setup() {
   : >"$STUB_LOG"
   export HOME="$BATS_TEST_TMPDIR/home"
   mkdir -p "$HOME"
-  export AUTARCHY_FIRST_LOGIN_MARKER="$BATS_TEST_TMPDIR/state/first-login-done"
-  export AUTARCHY_ENABLE_USER_SERVICES_SCRIPT="$BATS_TEST_TMPDIR/enable-user-services-stub"
-  export AUTARCHY_MATUGEN="$BATS_TEST_TMPDIR/matugen-stub"
-  export AUTARCHY_FIRST_LOGIN_VERIFY_DELAY=0
-  cat >"$AUTARCHY_ENABLE_USER_SERVICES_SCRIPT" <<EOF
+  export SYMPHONY_FIRST_LOGIN_MARKER="$BATS_TEST_TMPDIR/state/first-login-done"
+  export SYMPHONY_ENABLE_USER_SERVICES_SCRIPT="$BATS_TEST_TMPDIR/enable-user-services-stub"
+  export SYMPHONY_MATUGEN="$BATS_TEST_TMPDIR/matugen-stub"
+  export SYMPHONY_FIRST_LOGIN_VERIFY_DELAY=0
+  cat >"$SYMPHONY_ENABLE_USER_SERVICES_SCRIPT" <<EOF
 #!/usr/bin/env bash
 echo "enable-user-services \$*" >>"$STUB_LOG"
 if [[ \${1:-} == check ]]; then
@@ -29,13 +29,13 @@ if [[ \${1:-} == check ]]; then
 fi
 exit 0
 EOF
-  cat >"$AUTARCHY_MATUGEN" <<EOF
+  cat >"$SYMPHONY_MATUGEN" <<EOF
 #!/usr/bin/env bash
 echo "matugen \$*" >>"$STUB_LOG"
 [[ -n \${STUB_MATUGEN_FAIL:-} ]] && exit 1
 exit 0
 EOF
-  chmod +x "$AUTARCHY_ENABLE_USER_SERVICES_SCRIPT" "$AUTARCHY_MATUGEN"
+  chmod +x "$SYMPHONY_ENABLE_USER_SERVICES_SCRIPT" "$SYMPHONY_MATUGEN"
 }
 
 calls() {
@@ -47,7 +47,7 @@ calls() {
   assert_success
   run calls
   assert_line "enable-user-services apply"
-  assert [ -e "$AUTARCHY_FIRST_LOGIN_MARKER" ]
+  assert [ -e "$SYMPHONY_FIRST_LOGIN_MARKER" ]
 }
 
 @test "first run: renders the theme from the current wallpaper before any service starts (Phase 16)" {
@@ -71,7 +71,7 @@ calls() {
 @test "first run: no marker when the services never come up, so the next login retries" {
   STUB_CHECK_FAIL=1 run "$SCRIPT"
   assert_failure
-  assert [ ! -e "$AUTARCHY_FIRST_LOGIN_MARKER" ]
+  assert [ ! -e "$SYMPHONY_FIRST_LOGIN_MARKER" ]
   # Retried a few times first, not given up on at the first failed check.
   run grep -c '^enable-user-services check$' "$STUB_LOG"
   assert_output "5"
@@ -81,18 +81,18 @@ calls() {
   # Fails the first two checks, then passes: still succeeds and writes the marker.
   STUB_CHECK_FAIL_COUNT=2 run "$SCRIPT"
   assert_success
-  assert [ -e "$AUTARCHY_FIRST_LOGIN_MARKER" ]
+  assert [ -e "$SYMPHONY_FIRST_LOGIN_MARKER" ]
 }
 
 @test "first run: no marker when the theme render fails, so the next login retries" {
   STUB_MATUGEN_FAIL=1 run "$SCRIPT"
   assert_failure
-  assert [ ! -e "$AUTARCHY_FIRST_LOGIN_MARKER" ]
+  assert [ ! -e "$SYMPHONY_FIRST_LOGIN_MARKER" ]
 }
 
 @test "second run: the marker already exists, so it's a no-op" {
-  mkdir -p "$(dirname "$AUTARCHY_FIRST_LOGIN_MARKER")"
-  touch "$AUTARCHY_FIRST_LOGIN_MARKER"
+  mkdir -p "$(dirname "$SYMPHONY_FIRST_LOGIN_MARKER")"
+  touch "$SYMPHONY_FIRST_LOGIN_MARKER"
   run "$SCRIPT"
   assert_success
   run calls

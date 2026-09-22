@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""autarchy-installer: the primary guided installer (Phase 15) -- a real
+"""symphony-installer: the primary guided installer (Phase 15) -- a real
 graphical wizard, cage-launched on tty1 (Milestone C). Collects every
 field once, including both passwords (Phase 15/D-0066), then hands off
 to install/run-guided-install to run unattended -- no install logic
-lives here, same principle autarchy-install's own terminal flow already
+lives here, same principle symphony-install's own terminal flow already
 follows.
 
 --dry-run: for developing/testing this app safely, e.g. in a normal

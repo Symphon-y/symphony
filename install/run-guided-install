@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # run-guided-install: the shared runner both the terminal collector
-# (autarchy-install) and the GTK4 GUI (Phase 15) hand off to, so neither
+# (symphony-install) and the GTK4 GUI (Phase 15) hand off to, so neither
 # has to reimplement "run the install, then offer to reboot."
 #
 # Usage: install/run-guided-install [--no-reboot-prompt] VARS_FILE
@@ -24,8 +24,8 @@ set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO_ROOT
-readonly INSTALL_SCRIPT="${AUTARCHY_INSTALL_SCRIPT:-$REPO_ROOT/install/install-base-system}"
-readonly FINISH_SCRIPT="${AUTARCHY_FINISH_SCRIPT:-$REPO_ROOT/install/finish-install}"
+readonly INSTALL_SCRIPT="${SYMPHONY_INSTALL_SCRIPT:-$REPO_ROOT/install/install-base-system}"
+readonly FINISH_SCRIPT="${SYMPHONY_FINISH_SCRIPT:-$REPO_ROOT/install/finish-install}"
 
 usage() {
   echo "usage: run-guided-install [--no-reboot-prompt] VARS_FILE" >&2

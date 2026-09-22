@@ -11,24 +11,24 @@
 ## Goal
 
 The core install needs zero network/GitHub access at any point.
-`iso/profile/airootfs/root/autarchy` gets a pinned, complete copy of the
-repo at CI build time; `autarchy-bootstrap` (whose entire job was cloning
+`iso/profile/airootfs/root/symphony` gets a pinned, complete copy of the
+repo at CI build time; `symphony-bootstrap` (whose entire job was cloning
 that repo from GitHub) is retired.
 
 ## Scope
 
 **In scope**
 - New CI step in `release-iso.yml`: `rsync -a` the checked-out repo into
-  `iso/profile/airootfs/root/autarchy/`, excluding `.git` and
+  `iso/profile/airootfs/root/symphony/`, excluding `.git` and
   `iso/profile/airootfs` itself (avoids self-nesting and doubling the
   ~1.4 GiB local package cache `build-offline-repo` populates after this
   step). Ordered after "Record the release tag."
-- Retire `autarchy-bootstrap`: delete the script, plus its four ripple
+- Retire `symphony-bootstrap`: delete the script, plus its four ripple
   effects (`profiledef.sh`'s `file_permissions` entry,
   `phase-10.bats`'s existence test, `phase-12.bats`'s
-  calls-autarchy-bootstrap assertion, `base-install.md`'s wording).
-- `autarchy-install` simplifies: no conditional clone, just `cd
-  /root/autarchy` directly.
+  calls-symphony-bootstrap assertion, `base-install.md`'s wording).
+- `symphony-install` simplifies: no conditional clone, just `cd
+  /root/symphony` directly.
 - New acceptance coverage for the CI step (source review, same pattern as
   the existing offline-repo-builder check).
 
@@ -40,17 +40,17 @@ that repo from GitHub) is retired.
 ## Decisions
 
 **Resolved**
-- Bake-in location: `/root/autarchy`, matching the path `autarchy-install`
+- Bake-in location: `/root/symphony`, matching the path `symphony-install`
   already expects.
 - Exclude `.git` and `iso/profile/airootfs` specifically from the
   bake-in copy, not all of `iso/`.
-- Delete `autarchy-bootstrap` rather than leave it as dead/unused code.
+- Delete `symphony-bootstrap` rather than leave it as dead/unused code.
 
 ## Acceptance tests (written before implementation)
 
 | Group | What it proves |
 |---|---|
-| static | CI workflow has the bake-in step with the right excludes, in the right order; `autarchy-bootstrap` is fully gone (script + all four ripple-effect references); `autarchy-install` no longer calls it |
+| static | CI workflow has the bake-in step with the right excludes, in the right order; `symphony-bootstrap` is fully gone (script + all four ripple-effect references); `symphony-install` no longer calls it |
 | real (CI) | A tag push produces an ISO whose live environment has the repo already present with zero GitHub access needed |
 
 Red confirmed: 2026-09-17 (tests 3 and 4 failed correctly; 1 and 2 passed
@@ -62,8 +62,8 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
 - [x] Branch, tracking doc
 - [x] Red: acceptance tests
 - [x] CI bake-in step
-- [x] Retire `autarchy-bootstrap` + 4 ripple-effect fixes
-- [x] Simplify `autarchy-install`
+- [x] Retire `symphony-bootstrap` + 4 ripple-effect fixes
+- [x] Simplify `symphony-install`
 - [x] Green: static checks
 - [x] Green: real test tag (fresh name, not reusing `2026.09.17`), real
       verification of zero-network install
@@ -85,20 +85,20 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   call site.
 - CI bake-in step added to `release-iso.yml`: `rsync -a --exclude='.git'
   --exclude='iso/profile/airootfs'` into
-  `iso/profile/airootfs/root/autarchy/`, ordered right after "Record the
+  `iso/profile/airootfs/root/symphony/`, ordered right after "Record the
   release tag."
-- `autarchy-bootstrap` deleted, plus its ripple effects: the
+- `symphony-bootstrap` deleted, plus its ripple effects: the
   `file_permissions` entry in `profiledef.sh`; the existence test in
   `phase-10.bats` (removed -- the mechanism it tested is gone, same
   precedent as other retired-mechanism cleanups this repo has done);
-  `phase-12.bats`'s `autarchy-install`-composes-it assertion (removed);
-  wording in `base-install.md` (repo is already at `/root/autarchy`, no
+  `phase-12.bats`'s `symphony-install`-composes-it assertion (removed);
+  wording in `base-install.md` (repo is already at `/root/symphony`, no
   clone/`gh auth login` step). Two references the original plan didn't
   anticipate also turned up in a full-repo grep and got fixed: a comment
   in `install/install-base-system` and one in `scripts/update`.
-- `autarchy-install` simplified: dropped the `if [[ ! -d $CLONE_DIR ]];
-  then autarchy-bootstrap; fi` guard, `cd "$CLONE_DIR"` unconditionally.
-- The retirement test itself (`autarchy-bootstrap is fully retired`)
+- `symphony-install` simplified: dropped the `if [[ ! -d $CLONE_DIR ]];
+  then symphony-bootstrap; fi` guard, `cd "$CLONE_DIR"` unconditionally.
+- The retirement test itself (`symphony-bootstrap is fully retired`)
   needed one design correction after writing it: it originally required
   the string to be *completely* absent from the tree except for itself,
   which conflicts with this repo's own established precedent (Phase 13's
@@ -133,14 +133,14 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   600` with one retry) -- commit `7ffd32f`. `2026.09.17-test3` succeeded
   cleanly, all three assets uploaded in ~17 minutes. Downloaded and
   reassembled the real built ISO, `sha256sum -c` verified, confirmed the
-  standard archiso layout (`autarchy/x86_64/airootfs.sfs`) is present.
+  standard archiso layout (`symphony/x86_64/airootfs.sfs`) is present.
   Deep squashfs-content inspection was attempted but blocked -- no
   `unsquashfs`/`squashfs-tools` available and no `sudo` to install it (nor
   does `bsdtar`/libarchive read squashfs) -- so full verification deferred
   to the user's own real USB boot test instead of a sudo-assisted
   inspection, per their choice.
 - Real hardware boot test (user, `2026.09.17-test3`): got further than
-  any previous attempt -- reached the guided `autarchy-install` flow with
+  any previous attempt -- reached the guided `symphony-install` flow with
   no network connection. Found two real problems at the disk-selection
   prompt: no way to see the available disks, and leaving it blank and
   pressing enter surfaced only as an unrelated, unhelpful "permission
@@ -148,7 +148,7 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   Root cause: the disk prompt used the same generic, unvalidated `ask()`
   as every other field, so a blank value could flow all the way into
   `install-base-system` before anything caught it. Fixed with dedicated
-  `list_disks`/`ask_disk` functions in `autarchy-install`: lists every
+  `list_disks`/`ask_disk` functions in `symphony-install`: lists every
   whole disk (name/size/model), labels the one the live medium itself is
   booted from (identified via archiso's own `/run/archiso/bootmnt`, not a
   hard block -- the existing typed-disk-path confirmation in
@@ -160,7 +160,7 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   installer-media disk itself (allowed, labeled), invalid-then-valid
   (loops), and the ambiguous-multiple-disks case (no default, blank
   rejected). New acceptance coverage in `phase-12.bats` (where
-  `autarchy-install`'s other tests already live). The "prompts are in a
+  `symphony-install`'s other tests already live). The "prompts are in a
   terminal, not a nice GUI" half of the same feedback is Phase 15's
   already-planned scope, not addressed here.
 - `2026.09.17-test4` (disk-selection fix baked in): the build and the
@@ -176,14 +176,14 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   cleanly. The user boot-tested it -- the disk listing/validation worked
   (real progress: "it looked like it was going to work better"), but
   after answering all the guided prompts and confirming the review
-  screen, `autarchy-install` itself failed: `line 149:
+  screen, `symphony-install` itself failed: `line 149:
   install/install-base-system: Permission denied` (bash's own
   exec-permission error, not one of our `die()` messages). `git ls-files
   -s install/install-base-system` confirmed the script is committed as
   `100755` -- so the executable bit is getting lost somewhere in the
   checkout -> rsync -> mkarchiso pipeline that bakes the repo into the
   ISO, a regression specific to Phase 14's new rsync-based bake-in
-  (`autarchy-bootstrap`'s old live `git clone` always set the bit
+  (`symphony-bootstrap`'s old live `git clone` always set the bit
   correctly from the git index at boot time; nothing exercised this path
   before). Reproduced the rsync step locally with `cp -a` as a stand-in
   (no `rsync` binary on this dev VM) -- permissions survived fine
@@ -232,8 +232,8 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   mode bit on every file, unconditionally -- then restores ownership/
   mode **only** for paths explicitly listed in `profiledef.sh`'s
   `file_permissions` array. That fully explains every observation:
-  `/usr/local/bin/autarchy-install` (listed) worked; everything else
-  baked in under `/root/autarchy` (not listed) didn't. A CI-side chmod
+  `/usr/local/bin/symphony-install` (listed) worked; everything else
+  baked in under `/root/symphony` (not listed) didn't. A CI-side chmod
   applied *before* `mkarchiso` runs can never survive this -- it's
   unconditionally discarded by the copy regardless of what mode was
   there beforehand, which is exactly why `test6`/`test7`'s fix, though
@@ -242,7 +242,7 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   Real fix: deleted the now-proven-dead CI chmod step entirely, and made
   `profiledef.sh`'s `file_permissions` array populate itself dynamically
   from git's own index (`git ls-files -s | awk '$1 == "100755"'`) for
-  every path landing under the baked-in `/root/autarchy` copy, rather
+  every path landing under the baked-in `/root/symphony` copy, rather
   than hand-listing each script (a footgun -- a script added later would
   silently ship non-executable unless someone remembered to also list it
   here). `git` and the real `.git` checkout are both present in the
@@ -283,12 +283,12 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   exact function researched from source) -- confirming both the
   dynamically-populated `file_permissions` and the `safe.directory` fix
   worked. Hit a new, real error there: `ERROR: Failed to set permissions
-  on '.../root/autarchy/iso/profile/airootfs/usr/local/bin/autarchy-
+  on '.../root/symphony/iso/profile/airootfs/usr/local/bin/symphony-
   install'. Outside of valid path.` `git ls-files -s` also tracks files
-  *under* `iso/profile/airootfs/` itself (the live `autarchy-install`
+  *under* `iso/profile/airootfs/` itself (the live `symphony-install`
   script's own source file) -- excluded from the bake-in rsync copy
   (same reasoning as `profiledef.sh`'s own header comment on that
-  exclude), so it never exists under `/root/autarchy`. This is a
+  exclude), so it never exists under `/root/symphony`. This is a
   genuinely different failure mode than assumed: mkarchiso's `realpath`
   check on a listed-but-nonexistent path fails *closed*, aborting the
   whole build, not the harmless "doesn't exist" warning its separate
@@ -300,7 +300,7 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   gitconfig pollution. New acceptance test asserts no generated key ever
   contains that path.
 - `2026.09.17-test10` succeeded and, on the real hardware boot test, got
-  further than any prior attempt: `autarchy-install` accepted the review
+  further than any prior attempt: `symphony-install` accepted the review
   screen and `install-base-system` actually started -- `sgdisk --zap-all`
   ran to completion (its "Exact type match not found for type code DE00"
   / "GPT data structures destroyed!" / "operation has completed
@@ -371,7 +371,7 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   than edited in place, per this repo's own established practice of
   keeping past decisions as accurate history. (2) Latent, would have
   surfaced next: `iso/build-offline-repo` built the repo as
-  `autarchy.db.tar.zst` but the pacman.conf section is `[localrepo]`; for
+  `symphony.db.tar.zst` but the pacman.conf section is `[localrepo]`; for
   a bare `Server = file://` URL, pacman derives the expected database
   filename from the *section name*, not the containing directory's name
   -- a real mismatch, confirmed against `pacman.conf(5)`'s own example
@@ -381,7 +381,7 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   pacman.conf, matching the Arch Wiki's own documented practice for
   exactly this scenario; renamed `repo-add`'s output to
   `localrepo.db.tar.zst` (chose renaming the database over renaming the
-  pacman.conf section + touching the `autarchy-repo` directory name,
+  pacman.conf section + touching the `symphony-repo` directory name,
   `.gitignore`, and every existing `phase-13.bats` test referencing
   `[localrepo]` -- confirmed via grep that the old db name was referenced
   in exactly one place, the smaller and lower-risk diff, after two
@@ -429,7 +429,7 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   hibernation now, not defer it) -- `configure_boot()` now looks up the
   swap partition's UUID the same way root's already is and adds
   `rd.luks.name=$swap_uuid=$swap_mapper` (mapper name derived from
-  `$AUTARCHY_RESUME_DEVICE` via `basename`, no new env var) plus
+  `$SYMPHONY_RESUME_DEVICE` via `basename`, no new env var) plus
   `resumeflags=x-systemd.device-timeout=30s` as unconditional insurance
   against a similar future hang ever being unbounded again. The swap
   keyfile is renamed `swap.key` -> `cryptswap.key` (matches
@@ -468,7 +468,7 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   end-to-end (disk selection -> LUKS/Btrfs/ESP -> `pacstrap` -> full
   `configure-base-system`) and the freshly installed system boots and
   logs in at a TTY with no hang. This is the goal the whole 14-test
-  real-hardware chain was chasing: `autarchy-install` -> `install-
+  real-hardware chain was chasing: `symphony-install` -> `install-
   base-system` completing to a rebootable, network-free base system.
 - The user asked whether the lack of a GUI (no Hyprland) at that TTY
   login was expected. Confirmed against the repo, not assumed:
@@ -498,7 +498,7 @@ Green confirmed: 2026-09-17 (all 4 pass; full `scripts/check` exits 0)
   goal -- zero network access needed for the core install -- is only
   really provable on real hardware, so the user boot-tested each real
   release build on the Alienware as attempts landed. `test3` was the
-  first to get far enough to reach `autarchy-install` with no network
+  first to get far enough to reach `symphony-install` with no network
   connection at all and surfaced the disk-selection bug fixed above;
   `test4` verifies that fix specifically. `test14` is the one that
   finally closed the loop: a real, from-scratch, zero-network install

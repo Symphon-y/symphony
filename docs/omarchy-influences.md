@@ -1,7 +1,7 @@
 # Omarchy Influences
 
 Omarchy is a source of ideas, not a specification. This document records what we
-learned from it and what we decided — so autarchy benefits from Omarchy without
+learned from it and what we decided — so symphony benefits from Omarchy without
 becoming Omarchy.
 
 Research is done by reading Omarchy's source and documentation. Omarchy is never
@@ -114,7 +114,7 @@ media doesn't reopen it.
 for a genuinely graphical guided installer — "how Windows/macOS does it
 with a real UI" — rather than a nicer terminal prompt. This moves further
 from Omarchy's own approach, not closer to it: Omarchy's configurator is a
-`gum` TUI feeding a Python orchestrator built on `archinstall`; autarchy's
+`gum` TUI feeding a Python orchestrator built on `archinstall`; symphony's
 is a hand-written GTK4/libadwaita app (`gui/`), kiosk-launched via `cage`,
 still handing off to this project's own `install/install-base-system` — no
 `archinstall`, no TUI toolkit, no Omarchy code, same as every prior
@@ -1044,12 +1044,12 @@ below are current as of that branch unless a component explicitly discusses v3
   the custom repo/mirror/channel infrastructure and the pacman guard
 - Our implementation: `migrations/<unix-timestamp>-<slug>.sh` + `scripts/migrate
   check|apply` (D-0051), completion markers under
-  `~/.local/state/autarchy/migrations/`. Shipped with one real first migration
+  `~/.local/state/symphony/migrations/`. Shipped with one real first migration
   (removing an unintended `yay-debug` package `scripts/pkg-audit` found), not an
   empty directory — a migration needing root calls `sudo` itself, and the user
   runs `apply`, never Claude. The pacman-guard idea was not adopted at all —
   no direct-`pacman`-blocking mechanism exists or is planned. Since Phase 18 the
-  OS content itself updates through `autarchy-update` (D-0078/D-0079): a signed
+  OS content itself updates through `symphony-update` (D-0078/D-0079): a signed
   payload tarball on a GitHub Release -- not a package from a repo -- verified
   with minisign, snapshotted, swapped in at the same path, then the appliers and
   migrations; `update-notify` toasts a new release daily (D-0059).

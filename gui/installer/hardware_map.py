@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-# gui/installer/hardware_map.py -> the repo root, which on the live ISO is /root/autarchy.
+# gui/installer/hardware_map.py -> the repo root, which on the live ISO is /root/symphony.
 MAP_PATH = Path(__file__).resolve().parents[2] / "system" / "hardware.txt"
 
 _PCI_ID = re.compile(r"^[0-9a-f]{4}:[0-9a-f]{4}$")

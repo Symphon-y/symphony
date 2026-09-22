@@ -16,7 +16,7 @@ from .state import Answers
 class InstallerWindow(Adw.ApplicationWindow):
     def __init__(self, app: Adw.Application, pages: list, *, dry_run: bool) -> None:
         super().__init__(application=app, default_width=760, default_height=640)
-        self.set_title("autarchy installer")
+        self.set_title("symphony installer")
 
         self.answers = Answers()
         self.dry_run = dry_run
@@ -83,7 +83,7 @@ class InstallerWindow(Adw.ApplicationWindow):
             self.stack.add_named(widget, name)
             self._built[index] = True
         self.stack.set_visible_child_name(name)
-        self.header.set_title_widget(Adw.WindowTitle(title="autarchy installer", subtitle=page.title))
+        self.header.set_title_widget(Adw.WindowTitle(title="symphony installer", subtitle=page.title))
         self.back_button.set_sensitive(index > 0)
         self.back_button.set_visible(page.next_label != "")
         self.next_button.set_label(page.next_label)
@@ -115,7 +115,7 @@ class InstallerWindow(Adw.ApplicationWindow):
 
 class InstallerApp(Adw.Application):
     def __init__(self, pages: list, *, dry_run: bool) -> None:
-        super().__init__(application_id="com.autarchy.installer")
+        super().__init__(application_id="com.symphony.installer")
         self._pages = pages
         self._dry_run = dry_run
         self.connect("activate", self._on_activate)

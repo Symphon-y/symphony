@@ -10,7 +10,7 @@
 # Migration scripts live in migrations/<unix-timestamp>-<slug>.sh, one per
 # one-time change, and must be idempotent/safe to interrupt: this runner marks a
 # migration complete only after it exits 0, as an empty file under
-# $AUTARCHY_STATE/migrations/<filename> (default ~/.local/state/autarchy), so a
+# $SYMPHONY_STATE/migrations/<filename> (default ~/.local/state/symphony), so a
 # later re-run picks up exactly where an interrupted one left off. Modeled on
 # Omarchy's own migrations/<timestamp>.sh + completion-marker pattern
 # (docs/omarchy-influences.md, "Update and migration mechanism") -- its
@@ -19,8 +19,8 @@ set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO_ROOT
-readonly MIGRATIONS_DIR="${AUTARCHY_MIGRATIONS_DIR:-$REPO_ROOT/migrations}"
-readonly STATE_DIR="${AUTARCHY_STATE:-$HOME/.local/state/autarchy}/migrations"
+readonly MIGRATIONS_DIR="${SYMPHONY_MIGRATIONS_DIR:-$REPO_ROOT/migrations}"
+readonly STATE_DIR="${SYMPHONY_STATE:-$HOME/.local/state/symphony}/migrations"
 
 usage() {
   echo "usage: migrate check|apply" >&2

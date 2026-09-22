@@ -11,7 +11,7 @@
 ## Goal
 
 An installed machine -- no repo on it, only the root-owned payload at
-`/usr/local/share/autarchy/current` (D-0067) -- can check for and apply the latest
+`/usr/local/share/symphony/current` (D-0067) -- can check for and apply the latest
 release on demand: a signed, versioned payload from a GitHub Release, a pre-update
 snapshot, a rollback. The same command deploys a checkout on the dev seat. The repo
 becomes public so the release assets are plainly downloadable.
@@ -19,17 +19,17 @@ becomes public so the release assets are plainly downloadable.
 ## Scope
 
 **In scope**
-- A release tag produces, in CI, `autarchy-<tag>-payload.tar.zst` (the six payload
+- A release tag produces, in CI, `symphony-<tag>-payload.tar.zst` (the six payload
   directories plus `VERSION`), its minisign signature and its sha256, on the same
   GitHub Release the ISO goes to; tags with a suffix are pre-releases.
-- `autarchy-update check|apply|rollback|version` in a new `home/update/` stow package:
-  download, verify (minisign against a public key shipped in `/etc/autarchy/`),
+- `symphony-update check|apply|rollback|version` in a new `home/update/` stow package:
+  download, verify (minisign against a public key shipped in `/etc/symphony/`),
   snapshot, stage, swap `current`/`previous` at the same path, re-run the appliers
   and migrations from the new payload. `apply --from DIR` stages a checkout instead.
 - `update-notify` moves into `home/update/` and also checks `releases/latest` daily.
 - The git-based `scripts/update`, its tests and `docs/runbooks/dev-deploy.md` retired;
   `docs/runbooks/update.md` rewritten. The installer no longer seeds
-  `~/.local/state/autarchy/current-release`; the payload's `VERSION` is the one source.
+  `~/.local/state/symphony/current-release`; the payload's `VERSION` is the one source.
 - Going public: `LICENSE` (MIT), pre-publication audit, author-email rewrite of history
   to the noreply address (user runs `git filter-repo`), visibility flipped by the user.
 - Decisions D-0078 to D-0080; D-0059 and D-0062 amended.
@@ -46,7 +46,7 @@ becomes public so the release assets are plainly downloadable.
 
 **Resolved** (user-confirmed 2026-09-21)
 - Signing: **minisign**. Secret key in a GitHub Actions secret, public key committed
-  at `system/autarchy/release.pub` and installed to `/etc/autarchy/release.pub`.
+  at `system/symphony/release.pub` and installed to `/etc/symphony/release.pub`.
   Verification is offline, one small standard tool. (Alternatives: GitHub artifact
   attestation -- needs `gh`, Sigstore and network at verify time, trusts GitHub's
   identity; sha256 only -- integrity, not authenticity.)
@@ -66,14 +66,14 @@ becomes public so the release assets are plainly downloadable.
 | Knowledge | Single home |
 |---|---|
 | What a payload contains | `PAYLOAD_CONTENT` in `install/configure-base-system`, read by `scripts/build-payload` |
-| The installed release | `/usr/local/share/autarchy/current/VERSION` |
-| Where releases live | `AUTARCHY_RELEASE_REPO` in `autarchy-update` (overridable for tests), used by `update-notify` too |
-| The public key | `system/autarchy/release.pub` -> `/etc/autarchy/release.pub` (`system/files.txt`) |
-| The applier order | `autarchy-update apply`, the same order `rebuild.md` documented |
+| The installed release | `/usr/local/share/symphony/current/VERSION` |
+| Where releases live | `SYMPHONY_RELEASE_REPO` in `symphony-update` (overridable for tests), used by `update-notify` too |
+| The public key | `system/symphony/release.pub` -> `/etc/symphony/release.pub` (`system/files.txt`) |
+| The applier order | `symphony-update apply`, the same order `rebuild.md` documented |
 
 ## Acceptance tests (written before implementation)
 
-Files: `tests/unit/build-payload.bats`, `tests/unit/autarchy-update.bats`,
+Files: `tests/unit/build-payload.bats`, `tests/unit/symphony-update.bats`,
 `tests/unit/update-notify.bats` (extended), `tests/unit/install-base-system.bats`
 (marker seeding gone), `tests/acceptance/phase-18.bats`, `tests/acceptance/phase-10.bats`
 (updated).
@@ -81,7 +81,7 @@ Files: `tests/unit/build-payload.bats`, `tests/unit/autarchy-update.bats`,
 | Test | What it proves |
 |---|---|
 | `build-payload`: only the six dirs + `VERSION` from a ref; `.git`/`tests`/`gui`/`iso`/`docs` absent; unknown ref fails | Only committed OS content ships, nothing else can leak in |
-| `autarchy-update check`: newer / equal / older; summary of `packages/` and `migrations/` changes | The user knows what an update brings |
+| `symphony-update check`: newer / equal / older; summary of `packages/` and `migrations/` changes | The user knows what an update brings |
 | `apply` refuses: `local-*` payload without `--yes`; pacman lock; bad signature or checksum (nothing touched, temp dir gone) | A bad or unwanted payload never reaches the disk |
 | `apply` order: verify, snapshot, stage, swap, appliers *from `current`*, migrate; `previous/` kept; `VERSION` from the payload | Recoverable at every step; the new code runs, not the download dir |
 | `rollback`: `previous` back to `current`, appliers re-run, migrations not undone (said so) | One command back |
@@ -97,7 +97,7 @@ Red confirmed: 2026-09-21 · Green confirmed: |
 - [x] Branch, tracking doc, roadmap row
 - [x] Red: the tests above (2026-09-21: 50 failing, 12 acceptance + 38 unit)
 - [x] `scripts/build-payload`; public key + `files.txt`; `minisign` in the inventory; `scripts/setup-signing`
-- [x] `home/update/`: `autarchy-update`, `update-notify` moved in
+- [x] `home/update/`: `symphony-update`, `update-notify` moved in
 - [x] Installer: `seed_release_marker` removed; migration for the old marker
 - [x] Workflow: `payload` job (build, sign, release, upload); ISO job after it -- `2026.09.22-test1` signed and verified
 - [x] Retire `scripts/update`, `update.bats`, `dev-deploy.md`; rewrite `update.md`; README
@@ -121,30 +121,30 @@ Red confirmed: 2026-09-21 · Green confirmed: |
   -> rewrite (user decision).
 
 ### 2026-09-21 (implementation, on the Alienware)
-- **Red:** 50 failing tests across `build-payload`, `autarchy-update`, `update-notify`,
+- **Red:** 50 failing tests across `build-payload`, `symphony-update`, `update-notify`,
   the installer and `phase-18.bats`. **Green** the same day; `scripts/check` 294 unit tests.
 - `scripts/build-payload` reads the allow-list from `install/configure-base-system` at the
   ref being packed (one home), archives with `git archive` so nothing uncommitted ships,
   creates any of the six directories git has no file for (git tracks no empty directory),
   and pins mtime/owner/order so the same commit packs to the same bytes.
-- `autarchy-update`: the sudo stub in the tests runs the real command except `chown`
+- `symphony-update`: the sudo stub in the tests runs the real command except `chown`
   (a non-root test can't); the appliers are stubs that log which payload they ran from,
   which is the assertion that matters ("from the new payload, not the download").
 - User asked whether the signing step would be automated "for any machine that installs
-  autarchy": it already is on the verifying side (the installer ships the public key,
+  symphony": it already is on the verifying side (the installer ships the public key,
   `minisign` is in `base.txt`); creating the *secret* key is per project and stays with
   the maintainer -- scripted as `scripts/setup-signing` (5 tests), never in CI. The user
   ran it by hand; the public key `03B7F2FA9C6C3304` is committed.
 - **First self-deploy:** the old manual deploy put the new payload on the machine once;
-  then `autarchy-update apply --from ~/Projects/Arch` deployed the same checkout through
+  then `symphony-update apply --from ~/Projects/Arch` deployed the same checkout through
   its own pipeline -- snapshot, swap, 49 links restowed from the new payload, services
   up, `current`/`previous` root-owned. Two findings: `version` printed no trailing newline
   (`tr -d '[:space:]'`), and the old per-user `current-release` marker was orphaned -- a
   migration removes it (3 tests). Both confirmed fixed by the second `apply --from`.
 - **First CI-signed release, `2026.09.22-test1` (pre-release):** the payload job passed
-  first time. On the machine: `minisign -V -p /etc/autarchy/release.pub` verifies CI's
+  first time. On the machine: `minisign -V -p /etc/symphony/release.pub` verifies CI's
   signature; the sha256 matches; a single flipped byte fails verification; the tarball
-  is **byte-identical** to a local `build-payload` of the same commit. `autarchy-update
+  is **byte-identical** to a local `build-payload` of the same commit. `symphony-update
   check` then hit a real state the plan missed: with only pre-releases, GitHub's
   `releases/latest` is a 404, which read as "could not fetch". Red (2 tests) then green:
   a 404 is "no release published yet", plainly, for `check` and `apply` both.

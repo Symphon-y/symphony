@@ -14,15 +14,15 @@
 # is vfat: its files' modes come from its mount options (fmask/dmask=0077, checked by
 # the Phase 1 acceptance tests), so no mode is checked or set for them.
 
-0644  mkinitcpio/10-autarchy.conf  /etc/mkinitcpio.conf.d/10-autarchy.conf
+0644  mkinitcpio/10-symphony.conf  /etc/mkinitcpio.conf.d/10-symphony.conf
 0644  mkinitcpio/linux.preset      /etc/mkinitcpio.d/linux.preset
 0644  mkinitcpio/linux-lts.preset  /etc/mkinitcpio.d/linux-lts.preset
 0644  zram/zram-generator.conf     /etc/systemd/zram-generator.conf
-0644  resolved/10-autarchy.conf    /etc/systemd/resolved.conf.d/10-autarchy.conf
+0644  resolved/10-symphony.conf    /etc/systemd/resolved.conf.d/10-symphony.conf
 0644  nftables/nftables.conf       /etc/nftables.conf
 0440  sudo/10-wheel                /etc/sudoers.d/10-wheel
 0644  profile/local-bin.sh         /etc/profile.d/local-bin.sh
-0644  ssh/10-autarchy.conf         /etc/ssh/sshd_config.d/10-autarchy.conf
+0644  ssh/10-symphony.conf         /etc/ssh/sshd_config.d/10-symphony.conf
 # Claude Code policy (deny rules, telemetry, update channel). Managed settings outrank
 # every user setting, and root ownership means Claude, running as the user, can't
 # loosen its own rules. Must stay world-readable: Claude Code exits if it can't read it.
@@ -30,7 +30,7 @@
 0644  sddm/10-wayland.conf          /etc/sddm.conf.d/10-wayland.conf
 -     boot/loader.conf             /efi/loader/loader.conf
 0644  reflector/reflector.conf      /etc/xdg/reflector/reflector.conf
-0644  journald/10-autarchy.conf     /etc/systemd/journald.conf.d/10-autarchy.conf
+0644  journald/10-symphony.conf     /etc/systemd/journald.conf.d/10-symphony.conf
 0644  xdg/user-dirs.defaults        /etc/xdg/user-dirs.defaults
 0644  networkmanager/20-connectivity.conf  /etc/NetworkManager/conf.d/20-connectivity.conf
-0644  autarchy/release.pub          /etc/autarchy/release.pub
+0644  symphony/release.pub          /etc/symphony/release.pub

@@ -258,8 +258,8 @@ bar_json() {
   done
 }
 
-@test "docs: the runbook explains autarchy.nogui for a terminal on the live ISO" {
-  run grep -F 'autarchy.nogui' "$REPO_ROOT/docs/runbooks/base-install.md"
+@test "docs: the runbook explains symphony.nogui for a terminal on the live ISO" {
+  run grep -F 'symphony.nogui' "$REPO_ROOT/docs/runbooks/base-install.md"
   assert_success
 }
 
@@ -317,7 +317,7 @@ bar_json() {
 @test "quirks: the installer asks scripts/quirkparams and hands the result to configure-base-system" {
   run grep -F 'quirkparams' "$REPO_ROOT/install/install-base-system"
   assert_success
-  run grep -F 'AUTARCHY_KERNEL_PARAMS' "$REPO_ROOT/install/configure-base-system"
+  run grep -F 'SYMPHONY_KERNEL_PARAMS' "$REPO_ROOT/install/configure-base-system"
   assert_success
 }
 
@@ -326,7 +326,7 @@ bar_json() {
   # the real map and an empty machine.
   local empty="$BATS_TEST_TMPDIR/sys"
   mkdir -p "$empty"
-  AUTARCHY_SYS="$empty" run "$REPO_ROOT/scripts/quirkparams"
+  SYMPHONY_SYS="$empty" run "$REPO_ROOT/scripts/quirkparams"
   assert_success
 }
 

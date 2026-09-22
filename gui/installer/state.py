@@ -1,6 +1,6 @@
 """The answers collected across every page, in one place.
 
-Mirrors autarchy-install's own local variables (disk, host, username,
+Mirrors symphony-install's own local variables (disk, host, username,
 tzone, locale, keymap, swap_size) plus the two passwords Phase 15 adds
 to the collector's job (user password, LUKS passphrase -- D-0066) and
 the optional git identity. Nothing here is written to disk until the

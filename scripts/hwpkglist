@@ -12,7 +12,7 @@
 # Like pkglist it fails closed: a malformed map line or an unknown list prints nothing and
 # exits 1, so a broken map can't yield a partial install.
 #
-# AUTARCHY_SYS, AUTARCHY_HARDWARE_MAP and AUTARCHY_HARDWARE_PACKAGES override the sysfs
+# SYMPHONY_SYS, SYMPHONY_HARDWARE_MAP and SYMPHONY_HARDWARE_PACKAGES override the sysfs
 # root, the map and the lists directory (tests).
 set -euo pipefail
 
@@ -21,9 +21,9 @@ export LC_ALL=C
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO_ROOT
-readonly SYS="${AUTARCHY_SYS:-/sys}"
-readonly MAP="${AUTARCHY_HARDWARE_MAP:-$REPO_ROOT/system/hardware.txt}"
-readonly LISTS="${AUTARCHY_HARDWARE_PACKAGES:-$REPO_ROOT/packages/hardware}"
+readonly SYS="${SYMPHONY_SYS:-/sys}"
+readonly MAP="${SYMPHONY_HARDWARE_MAP:-$REPO_ROOT/system/hardware.txt}"
+readonly LISTS="${SYMPHONY_HARDWARE_PACKAGES:-$REPO_ROOT/packages/hardware}"
 
 die() {
   printf 'hwpkglist: %s\n' "$*" >&2

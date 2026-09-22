@@ -6,7 +6,7 @@ Verified by `tests/acceptance/phase-02.bats`, with `phase-01.bats` as a regressi
 check.
 
 **Conventions**
-- VM steps run **as your user** (`travis`) from `~/Projects/autarchy`. Unraid steps run
+- VM steps run **as your user** (`travis`) from `~/Projects/symphony`. Unraid steps run
   in Unraid's web terminal (Unraid's web UI, the `>_` button in the top right).
 - `<vm-lan-ip>` and `<unraid-lan-ip>` are the machines' LAN addresses. Look them up on
   the machines; **never write them into the repo** (enforced by `scripts/check-identifiers`).
@@ -18,7 +18,7 @@ check.
 ## 1. Switch to the branch, then red (VM console)
 
 ```sh
-cd ~/Projects/autarchy
+cd ~/Projects/symphony
 git fetch
 git switch phase/02-agent-handoff
 git pull
@@ -84,13 +84,13 @@ admits SSH only from Unraid's address (firewall rule and a restriction on the ke
 
 ```sh
 ls -la /root/.ssh                      # expect: /root/.ssh -> /boot/config/ssh/root (persists on flash)
-ssh-keygen -t ed25519 -f /root/.ssh/autarchy-vm -C unraid-to-autarchy-vm   # set a passphrase
-cat /root/.ssh/autarchy-vm.pub         # send this public key to Claude
+ssh-keygen -t ed25519 -f /root/.ssh/symphony-vm -C unraid-to-symphony-vm   # set a passphrase
+cat /root/.ssh/symphony-vm.pub         # send this public key to Claude
 ip -4 -br addr show br0                # note Unraid's address; keep it out of the repo
 ```
 
-Claude commits only the **public key** (`system/hosts/autarchy-vm/ssh/`). **Never**
-share `/root/.ssh/autarchy-vm` (the private key).
+Claude commits only the **public key** (`system/hosts/symphony-vm/ssh/`). **Never**
+share `/root/.ssh/symphony-vm` (the private key).
 
 **5b. VM console, once that commit is green in CI:**
 
@@ -109,7 +109,7 @@ ip -4 -br addr                         # note the VM's <vm-lan-ip>
 **5c. Unraid: connect.**
 
 ```sh
-ssh -i /root/.ssh/autarchy-vm travis@<vm-lan-ip>
+ssh -i /root/.ssh/symphony-vm travis@<vm-lan-ip>
 ```
 
 On the first connection, SSH shows the VM's host key fingerprint. **Accept it only if it
@@ -119,7 +119,7 @@ matches** the one from step 5b. Then enter the key's passphrase.
 
 ```sh
 tmux
-cd ~/Projects/autarchy
+cd ~/Projects/symphony
 claude
 ```
 
@@ -133,7 +133,7 @@ tab. Authorize, copy the code, and paste it at Claude's `Paste code here` prompt
 Leave Claude running in tmux window 0. Press `Ctrl-b c` for window 1:
 
 ```sh
-cd ~/Projects/autarchy
+cd ~/Projects/symphony
 # Commits from this machine use your GitHub noreply address, not a personal email.
 git config user.email "$(gh api user --jq '"\(.id)+\(.login)@users.noreply.github.com"')"
 claude doctor
@@ -166,7 +166,7 @@ and you run it in window 1.
 ## Every later session
 
 1. **VM console:** `sudo systemctl start sshd`
-2. **Unraid terminal:** `ssh -i /root/.ssh/autarchy-vm travis@<vm-lan-ip>`, then
+2. **Unraid terminal:** `ssh -i /root/.ssh/symphony-vm travis@<vm-lan-ip>`, then
    `tmux attach || tmux`
 3. **When done:** detach (`Ctrl-b d`), `exit`, and in the VM `sudo systemctl stop sshd`.
 

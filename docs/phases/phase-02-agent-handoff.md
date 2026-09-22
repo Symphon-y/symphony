@@ -170,7 +170,7 @@ scanner allowlist, and CI checkout fixes)
   demand; passphrase key on Unraid's flash; remove the gist relay.
 - Implementation, test-first: `sync-system` gains per-host manifests
   (`system/hosts/<hostname>/files.txt`), unit-tested against a throwaway repo copy.
-  Portable sshd drop-in (`system/ssh/10-autarchy.conf`): keys only, no root, no
+  Portable sshd drop-in (`system/ssh/10-symphony.conf`): keys only, no root, no
   forwarding, and root-owned `AuthorizedKeysFile /etc/ssh/authorized_keys/%u`, so an
   agent running as the user can't grant itself SSH access. `nftables.conf` includes
   `/etc/nftables.d/*.nft`. `openssh` is declared. New phase-02 SSH acceptance tests.
@@ -179,7 +179,7 @@ scanner allowlist, and CI checkout fixes)
   is removed. Unit tests 54/54; `sshd -T` (OpenSSH 10.3 on the Mac) reads the drop-in
   and reports exactly the values the acceptance tests expect.
 - Unraid (runbook step 5a, user): `/root/.ssh` is a symlink to `/boot/config/ssh/root/`
-  (persistent). Key `unraid-to-autarchy-vm` (ed25519, with passphrase) created. Unraid's
+  (persistent). Key `unraid-to-symphony-vm` (ed25519, with passphrase) created. Unraid's
   LAN address stays on the machines only (see below), never in git.
 - **User objection: no network identifiers in git, even in a private repo.** The first
   host files (unpushed) committed Unraid's LAN address. An audit also found the VM
@@ -194,7 +194,7 @@ scanner allowlist, and CI checkout fixes)
     authorized keys, each restricted with `from="<address>",restrict,pty`. That keeps a
     defense-in-depth check in sshd behind the firewall; `pty` keeps interactive sessions
     working.
-  - The repo keeps only the public key (`system/hosts/autarchy-vm/ssh/authorized_keys.travis`).
+  - The repo keeps only the public key (`system/hosts/symphony-vm/ssh/authorized_keys.travis`).
   - `scripts/check-identifiers` (IPv4, MAC, IPv6 global/ULA/link-local, email; loopback,
     unspecified, and documentation ranges allowed; never prints the value) runs in
     `scripts/check` and CI, and `system-report` masks the same patterns

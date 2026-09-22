@@ -1,6 +1,6 @@
 # Alienware 14 (P39G) -- ground truth
 
-The machine autarchy is installed on and driven from since 2026-09-20 (Phase 12's
+The machine symphony is installed on and driven from since 2026-09-20 (Phase 12's
 device, D-0063). Below the report is what the installer and the phases learned
 about it that a report cannot show. Regenerate the report with `scripts/system-report`.
 
@@ -254,5 +254,5 @@ installed packages: 704
 - **Install history:** `2026.09.17-test14` (base, Phase 14), `2026.09.18-test2` (GUI,
   Phase 15), `2026.09.19-test1` (desktop round 1, Phase 16), `local-5c8bcf1` (2026-09-20,
   the current install, Phase 17's D-0074 commit; later checkouts deployed over it with
-  `autarchy-update apply --from`, Phase 18). It will not be reinstalled to test ISOs -- it is the dev
+  `symphony-update apply --from`, Phase 18). It will not be reinstalled to test ISOs -- it is the dev
   seat; fresh-install proofs need a second machine.

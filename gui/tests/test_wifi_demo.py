@@ -58,7 +58,7 @@ class DemoBackendTest(unittest.TestCase):
 
     def test_a_good_password_connects_and_leaves_a_private_profile_in_the_demo_directory(self):
         self.backend.connect("HomeNet", "correct horse", Security.WPA_PSK)
-        profile = Path(self._dir.name) / "autarchy-wifi.nmconnection"
+        profile = Path(self._dir.name) / "symphony-wifi.nmconnection"
         self.assertTrue(profile.exists())
         self.assertIn("ssid=HomeNet", profile.read_text(encoding="utf-8"))
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # Unit tests for home/update/dot-local/bin/update-notify: the daily check that
 # informs about pending package updates (Phase 9, D-0059) and, since Phase 18, a
-# newer autarchy release -- and never applies either. checkupdates, curl and
+# newer symphony release -- and never applies either. checkupdates, curl and
 # notify-send are stubs on PATH.
 
 # Each @test runs in its own subshell, so per-test exports are intentionally local.
@@ -12,11 +12,11 @@ setup() {
   SCRIPT="$REPO_ROOT/home/update/dot-local/bin/update-notify"
   export STUB_LOG="$BATS_TEST_TMPDIR/calls.log"
   : >"$STUB_LOG"
-  export AUTARCHY_PAYLOAD_ROOT="$BATS_TEST_TMPDIR/payload"
-  export AUTARCHY_STATE="$BATS_TEST_TMPDIR/state"
-  export AUTARCHY_RELEASE_REPO="example/autarchy"
-  mkdir -p "$AUTARCHY_PAYLOAD_ROOT/current"
-  echo "2026.09.01" >"$AUTARCHY_PAYLOAD_ROOT/current/VERSION"
+  export SYMPHONY_PAYLOAD_ROOT="$BATS_TEST_TMPDIR/payload"
+  export SYMPHONY_STATE="$BATS_TEST_TMPDIR/state"
+  export SYMPHONY_RELEASE_REPO="example/symphony"
+  mkdir -p "$SYMPHONY_PAYLOAD_ROOT/current"
+  echo "2026.09.01" >"$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
   export STUB_CHECKUPDATES_RC=2 STUB_CHECKUPDATES_OUT="" STUB_LATEST=2026.09.01
   make_stubs
 }
@@ -60,8 +60,8 @@ calls() {
   STUB_LATEST=2026.09.22 run "$SCRIPT"
   assert_success
   run calls
-  assert_output --partial "autarchy 2026.09.22 available"
-  assert_output --partial "autarchy-update apply"
+  assert_output --partial "symphony 2026.09.22 available"
+  assert_output --partial "symphony-update apply"
 }
 
 @test "the same new release on the next day: no second toast" {
@@ -81,7 +81,7 @@ calls() {
 }
 
 @test "a local-* payload (the dev seat) is not nagged about releases" {
-  echo "local-abc1234" >"$AUTARCHY_PAYLOAD_ROOT/current/VERSION"
+  echo "local-abc1234" >"$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
   STUB_LATEST=2026.09.22 run "$SCRIPT"
   assert_success
   run calls
@@ -93,7 +93,7 @@ calls() {
   assert_success
   run calls
   assert_output --partial "1 update available"
-  refute_output --partial "autarchy 2"
+  refute_output --partial "symphony 2"
 }
 
 @test "the release check has a timeout, so a hung network cannot hang the timer" {

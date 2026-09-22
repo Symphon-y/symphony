@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Unit tests for home/update/dot-local/bin/autarchy-update: the one way an installed
+# Unit tests for home/update/dot-local/bin/symphony-update: the one way an installed
 # machine moves from one payload to the next (Phase 18, D-0079). Everything that
 # touches the network, root or the system is a stub on PATH that records its calls;
 # the payload root is a temp dir. A "release" is a payload tarball the test builds
@@ -13,15 +13,15 @@ setup() {
   load '../helpers/common'
   export GIT_AUTHOR_NAME=Test GIT_AUTHOR_EMAIL=test@users.noreply.github.com
   export GIT_COMMITTER_NAME=Test GIT_COMMITTER_EMAIL=test@users.noreply.github.com
-  SCRIPT="$REPO_ROOT/home/update/dot-local/bin/autarchy-update"
+  SCRIPT="$REPO_ROOT/home/update/dot-local/bin/symphony-update"
   export STUB_LOG="$BATS_TEST_TMPDIR/calls.log"
   : >"$STUB_LOG"
-  export AUTARCHY_PAYLOAD_ROOT="$BATS_TEST_TMPDIR/payload"
-  export AUTARCHY_RELEASE_PUBKEY="$BATS_TEST_TMPDIR/release.pub"
-  export AUTARCHY_PACMAN_LOCK="$BATS_TEST_TMPDIR/db.lck"
-  export AUTARCHY_STATE="$BATS_TEST_TMPDIR/state"
-  export AUTARCHY_RELEASE_REPO="example/autarchy"
-  echo "untrusted comment: test key" >"$AUTARCHY_RELEASE_PUBKEY"
+  export SYMPHONY_PAYLOAD_ROOT="$BATS_TEST_TMPDIR/payload"
+  export SYMPHONY_RELEASE_PUBKEY="$BATS_TEST_TMPDIR/release.pub"
+  export SYMPHONY_PACMAN_LOCK="$BATS_TEST_TMPDIR/db.lck"
+  export SYMPHONY_STATE="$BATS_TEST_TMPDIR/state"
+  export SYMPHONY_RELEASE_REPO="example/symphony"
+  echo "untrusted comment: test key" >"$SYMPHONY_RELEASE_PUBKEY"
   export RELEASES="$BATS_TEST_TMPDIR/releases" # what "GitHub" serves, by tag
   mkdir -p "$RELEASES"
   make_installed_payload local-abc1234
@@ -33,7 +33,7 @@ setup() {
 # The payload an installed machine has: every applier present as a stub that logs
 # which payload it was run from (the point of "appliers run from current").
 make_installed_payload() {
-  local version=$1 dir="$AUTARCHY_PAYLOAD_ROOT/current"
+  local version=$1 dir="$SYMPHONY_PAYLOAD_ROOT/current"
   mkdir -p "$dir/install" "$dir/scripts" "$dir/packages" "$dir/migrations" "$dir/home" "$dir/system"
   echo "$version" >"$dir/VERSION"
   local tool
@@ -66,7 +66,7 @@ make_release() {
   git -C "$repo" commit -q -m "release $tag"
   mkdir -p "$RELEASES/$tag"
   "$REPO_ROOT/scripts/build-payload" "$repo" HEAD "$tag" "$RELEASES/$tag" >/dev/null
-  echo "valid" >"$RELEASES/$tag/autarchy-$tag-payload.tar.zst.minisig"
+  echo "valid" >"$RELEASES/$tag/symphony-$tag-payload.tar.zst.minisig"
 }
 
 # shellcheck disable=SC2016 # stub bodies expand when the stub runs
@@ -117,7 +117,7 @@ while (($#)); do
   esac
 done
 [[ -z $sig ]] && sig="$file.minisig"
-[[ $pub == "$AUTARCHY_RELEASE_PUBKEY" && $(cat "$sig") == valid ]] || { echo "Signature verification failed" >&2; exit 1; }
+[[ $pub == "$SYMPHONY_RELEASE_PUBKEY" && $(cat "$sig") == valid ]] || { echo "Signature verification failed" >&2; exit 1; }
 echo "Signature and comment signature verified"
 EOF
 
@@ -135,7 +135,7 @@ calls() {
 }
 
 installed_version() {
-  cat "$AUTARCHY_PAYLOAD_ROOT/current/VERSION"
+  cat "$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
 }
 
 # --- version / check ---------------------------------------------------------------
@@ -155,7 +155,7 @@ installed_version() {
 }
 
 @test "check: a newer release is reported with what changed in packages/ and migrations/" {
-  echo "2026.09.01" >"$AUTARCHY_PAYLOAD_ROOT/current/VERSION"
+  echo "2026.09.01" >"$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
   run "$SCRIPT" check
   assert_success
   assert_output --partial "2026.09.01 -> 2026.09.22"
@@ -164,7 +164,7 @@ installed_version() {
 }
 
 @test "check: up to date when the installed version is the latest" {
-  echo "2026.09.22" >"$AUTARCHY_PAYLOAD_ROOT/current/VERSION"
+  echo "2026.09.22" >"$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
   run "$SCRIPT" check
   assert_success
   assert_output --partial "up to date (2026.09.22)"
@@ -188,7 +188,7 @@ installed_version() {
 }
 
 @test "apply: no release published yet does nothing, and says so" {
-  echo "2026.09.01" >"$AUTARCHY_PAYLOAD_ROOT/current/VERSION"
+  echo "2026.09.01" >"$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
   STUB_NO_RELEASES=1 run "$SCRIPT" apply
   assert_success
   assert_output --partial "no release"
@@ -214,8 +214,8 @@ installed_version() {
 }
 
 @test "apply: refuses while a pacman transaction holds the lock" {
-  echo "2026.09.01" >"$AUTARCHY_PAYLOAD_ROOT/current/VERSION"
-  touch "$AUTARCHY_PACMAN_LOCK"
+  echo "2026.09.01" >"$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
+  touch "$SYMPHONY_PACMAN_LOCK"
   run "$SCRIPT" apply
   assert_failure
   assert_output --partial "pacman"
@@ -224,23 +224,23 @@ installed_version() {
 }
 
 @test "apply: a bad signature stops before the snapshot, touches nothing, and leaves no download behind" {
-  echo "2026.09.01" >"$AUTARCHY_PAYLOAD_ROOT/current/VERSION"
-  echo "forged" >"$RELEASES/2026.09.22/autarchy-2026.09.22-payload.tar.zst.minisig"
+  echo "2026.09.01" >"$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
+  echo "forged" >"$RELEASES/2026.09.22/symphony-2026.09.22-payload.tar.zst.minisig"
   run "$SCRIPT" apply
   assert_failure
   assert_output --partial "signature"
   assert_equal "$(installed_version)" "2026.09.01"
-  assert [ ! -e "$AUTARCHY_PAYLOAD_ROOT/previous" ]
+  assert [ ! -e "$SYMPHONY_PAYLOAD_ROOT/previous" ]
   run calls
   refute_output --partial "snapper"
-  run find "$BATS_TEST_TMPDIR" -name 'autarchy-2026.09.22-payload.tar.zst' -not -path "$RELEASES/*"
+  run find "$BATS_TEST_TMPDIR" -name 'symphony-2026.09.22-payload.tar.zst' -not -path "$RELEASES/*"
   assert_output ""
 }
 
 @test "apply: a checksum mismatch after a good signature is still a refusal" {
-  echo "2026.09.01" >"$AUTARCHY_PAYLOAD_ROOT/current/VERSION"
-  echo "0000000000000000000000000000000000000000000000000000000000000000  autarchy-2026.09.22-payload.tar.zst" \
-    >"$RELEASES/2026.09.22/autarchy-2026.09.22-payload.tar.zst.sha256"
+  echo "2026.09.01" >"$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
+  echo "0000000000000000000000000000000000000000000000000000000000000000  symphony-2026.09.22-payload.tar.zst" \
+    >"$RELEASES/2026.09.22/symphony-2026.09.22-payload.tar.zst.sha256"
   run "$SCRIPT" apply
   assert_failure
   assert_output --partial "checksum"
@@ -248,7 +248,7 @@ installed_version() {
 }
 
 @test "apply: up to date does nothing" {
-  echo "2026.09.22" >"$AUTARCHY_PAYLOAD_ROOT/current/VERSION"
+  echo "2026.09.22" >"$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
   run "$SCRIPT" apply
   assert_success
   assert_output --partial "up to date"
@@ -259,11 +259,11 @@ installed_version() {
 # --- apply: the pipeline ------------------------------------------------------------
 
 @test "apply: verifies, snapshots, swaps, then runs every applier and the migrations from the NEW payload" {
-  echo "2026.09.01" >"$AUTARCHY_PAYLOAD_ROOT/current/VERSION"
+  echo "2026.09.01" >"$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
   run "$SCRIPT" apply
   assert_success
   assert_equal "$(installed_version)" "2026.09.22"
-  assert_equal "$(cat "$AUTARCHY_PAYLOAD_ROOT/previous/VERSION")" "2026.09.01"
+  assert_equal "$(cat "$SYMPHONY_PAYLOAD_ROOT/previous/VERSION")" "2026.09.01"
   run calls
   # Order: verify before the snapshot, the snapshot before anything moves.
   local verify snap sync
@@ -284,7 +284,7 @@ installed_version() {
 }
 
 @test "apply: root-only steps go through sudo, user-level ones do not" {
-  echo "2026.09.01" >"$AUTARCHY_PAYLOAD_ROOT/current/VERSION"
+  echo "2026.09.01" >"$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
   run "$SCRIPT" apply
   assert_success
   run calls
@@ -297,7 +297,7 @@ installed_version() {
 }
 
 @test "apply: hardware packages for this machine are installed alongside the declared ones" {
-  echo "2026.09.01" >"$AUTARCHY_PAYLOAD_ROOT/current/VERSION"
+  echo "2026.09.01" >"$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
   run "$SCRIPT" apply
   assert_success
   run calls
@@ -305,15 +305,15 @@ installed_version() {
 }
 
 @test "apply: the swap is the same physical path (stow keeps its links) and previous is replaced, not nested" {
-  echo "2026.09.01" >"$AUTARCHY_PAYLOAD_ROOT/current/VERSION"
-  mkdir -p "$AUTARCHY_PAYLOAD_ROOT/previous"
-  echo "2026.08.01" >"$AUTARCHY_PAYLOAD_ROOT/previous/VERSION"
+  echo "2026.09.01" >"$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
+  mkdir -p "$SYMPHONY_PAYLOAD_ROOT/previous"
+  echo "2026.08.01" >"$SYMPHONY_PAYLOAD_ROOT/previous/VERSION"
   run "$SCRIPT" apply
   assert_success
-  assert_equal "$(cat "$AUTARCHY_PAYLOAD_ROOT/previous/VERSION")" "2026.09.01"
-  assert [ ! -e "$AUTARCHY_PAYLOAD_ROOT/previous/previous" ]
-  assert [ ! -L "$AUTARCHY_PAYLOAD_ROOT/current" ]
-  run find "$AUTARCHY_PAYLOAD_ROOT" -maxdepth 1 -name 'staging*'
+  assert_equal "$(cat "$SYMPHONY_PAYLOAD_ROOT/previous/VERSION")" "2026.09.01"
+  assert [ ! -e "$SYMPHONY_PAYLOAD_ROOT/previous/previous" ]
+  assert [ ! -L "$SYMPHONY_PAYLOAD_ROOT/current" ]
+  run find "$SYMPHONY_PAYLOAD_ROOT" -maxdepth 1 -name 'staging*'
   assert_output ""
 }
 
@@ -324,7 +324,7 @@ installed_version() {
 }
 
 @test "apply: the new payload is root-owned before anything runs from it" {
-  echo "2026.09.01" >"$AUTARCHY_PAYLOAD_ROOT/current/VERSION"
+  echo "2026.09.01" >"$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
   run "$SCRIPT" apply
   assert_success
   run calls
@@ -357,7 +357,7 @@ installed_version() {
   run "$SCRIPT" apply --from "$repo"
   assert_success
   assert_output --partial "uncommitted"
-  assert [ -e "$AUTARCHY_PAYLOAD_ROOT/current/scripts/wip" ]
+  assert [ -e "$SYMPHONY_PAYLOAD_ROOT/current/scripts/wip" ]
 }
 
 @test "apply --from DIR: refuses a directory that is not a checkout of this repo" {
@@ -371,13 +371,13 @@ installed_version() {
 # --- rollback ----------------------------------------------------------------------
 
 @test "rollback: previous becomes current again, the appliers run from it, migrations are not undone (and it says so)" {
-  echo "2026.09.01" >"$AUTARCHY_PAYLOAD_ROOT/current/VERSION"
+  echo "2026.09.01" >"$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
   "$SCRIPT" apply >/dev/null
   : >"$STUB_LOG"
   run "$SCRIPT" rollback
   assert_success
   assert_equal "$(installed_version)" "2026.09.01"
-  assert_equal "$(cat "$AUTARCHY_PAYLOAD_ROOT/previous/VERSION")" "2026.09.22"
+  assert_equal "$(cat "$SYMPHONY_PAYLOAD_ROOT/previous/VERSION")" "2026.09.22"
   assert_output --partial "migrations"
   run calls
   assert_line "snapper -c root create -d pre-rollback: 2026.09.22 -> 2026.09.01"

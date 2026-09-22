@@ -119,10 +119,10 @@ outlines; their scope is finalized in their own plan mode.
   restructuring note for the full story of the fold-back.
 - **Phase 14:** resolved; see D-0064, D-0065. Phase 13's offline ISO baked
   in the *package* closure but never the *repo itself* driving the
-  install -- `autarchy-bootstrap`/`autarchy-install` still needed a
+  install -- `symphony-bootstrap`/`symphony-install` still needed a
   GitHub clone at boot time, defeating the whole point of an offline
   installer. This phase bakes the checked-out repo straight into the
-  live environment at CI build time and retires `autarchy-bootstrap`
+  live environment at CI build time and retires `symphony-bootstrap`
   entirely. The real work turned out to be a long real-hardware
   debugging chain (14 build-and-boot cycles on the Alienware), each
   surfacing a genuine bug no static test or VM could have caught: a
@@ -182,9 +182,9 @@ outlines; their scope is finalized in their own plan mode.
   debugging" feature was explicitly deferred to its own future story,
   not squeezed into this phase's close.
 
-- **Phase 16:** resolved; see D-0067. The plan's `~/Projects/autarchy` checkout
+- **Phase 16:** resolved; see D-0067. The plan's `~/Projects/symphony` checkout
   on the target was dropped mid-phase for a root-owned payload at
-  `/usr/local/share/autarchy/current` ("Windows doesn't have a 'windows os' repo
+  `/usr/local/share/symphony/current` ("Windows doesn't have a 'windows os' repo
   anywhere either"), SDDM autologin reversed part of D-0026, and one script
   (`install/first-login`) does what the chroot can't. Real hardware then found
   the bug that mattered: Hyprland parsed the hook's `[ -x ]` guard as exec rules,

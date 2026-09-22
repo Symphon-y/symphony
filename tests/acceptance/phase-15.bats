@@ -30,7 +30,7 @@ setup() {
   assert_success
   run grep -q 'GSK_RENDERER=gl' "$bp"
   assert_success
-  run grep -q 'exec cage -- /root/autarchy/gui/autarchy-installer' "$bp"
+  run grep -q 'exec cage -- /root/symphony/gui/symphony-installer' "$bp"
   assert_success
 }
 
@@ -40,12 +40,12 @@ setup() {
   # through, or every tty would try to launch the GUI.
   run grep -q 'exec cage' "$bp"
   assert_success
-  run grep -q 'Run:  autarchy-install' "$bp"
+  run grep -q 'Run:  symphony-install' "$bp"
   assert_success
 }
 
-@test "gui/autarchy-installer is executable and defaults to the real runner, not --dry-run" {
-  local entry="$REPO_ROOT/gui/autarchy-installer"
+@test "gui/symphony-installer is executable and defaults to the real runner, not --dry-run" {
+  local entry="$REPO_ROOT/gui/symphony-installer"
   assert [ -x "$entry" ]
   run grep -q -- '--dry-run' "$entry"
   assert_success

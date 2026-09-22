@@ -85,7 +85,7 @@ setup() {
 }
 
 @test "the updater exists, is executable, and supports check, apply, rollback and version (Phase 18 replaced scripts/update)" {
-  local script="$REPO_ROOT/home/update/dot-local/bin/autarchy-update"
+  local script="$REPO_ROOT/home/update/dot-local/bin/symphony-update"
   assert [ -x "$script" ]
   run "$script" bogus-subcommand
   assert_failure

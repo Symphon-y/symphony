@@ -55,7 +55,7 @@ class Disk:
 
 def _boot_disk_name() -> str:
     """The whole disk the live medium itself is booted from, if it can be
-    identified -- mirrors autarchy-install's own boot_disk() exactly, a
+    identified -- mirrors symphony-install's own boot_disk() exactly, a
     best-effort label, not a hard block."""
     try:
         source = subprocess.run(
@@ -78,7 +78,7 @@ def _boot_disk_name() -> str:
 
 def available_disks() -> list[Disk]:
     """Every whole disk, labeling the live medium's own disk -- mirrors
-    autarchy-install's list_disks()."""
+    symphony-install's list_disks()."""
     boot = _boot_disk_name()
     out = subprocess.run(
         ["lsblk", "-dno", "NAME,SIZE,MODEL,TYPE"],

@@ -20,7 +20,7 @@ secrets/
 # Generated at release-ISO build time (Phase 13): the local package repo
 # baked into the offline installer, never committed -- large binary
 # .pkg.tar.zst files and repo databases, regenerated fresh by CI every build.
-/iso/profile/airootfs/var/lib/autarchy-repo/
+/iso/profile/airootfs/var/lib/symphony-repo/
 
 # Editors and OS noise
 .DS_Store

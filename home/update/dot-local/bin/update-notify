@@ -2,7 +2,7 @@
 # Target: ~/.local/bin/update-notify (linked by install/link-home)
 #
 # update-notify: notify the desktop when the set of pending package updates
-# changes (Phase 9, D-0059), and when a newer autarchy release exists (Phase 18).
+# changes (Phase 9, D-0059), and when a newer symphony release exists (Phase 18).
 # Never applies anything -- unattended `-Syu` risks a partial upgrade, the
 # well-known Arch anti-pattern, and an OS update is the user's call; this only
 # ever informs, once per new thing.
@@ -21,9 +21,9 @@
 # no release supersedes), it stays silent.
 set -uo pipefail
 
-readonly PAYLOAD_ROOT="${AUTARCHY_PAYLOAD_ROOT:-/usr/local/share/autarchy}"
-readonly STATE_DIR="${AUTARCHY_STATE:-$HOME/.local/state/autarchy}"
-readonly RELEASE_REPO="${AUTARCHY_RELEASE_REPO:-Symphon-y/autarchy}"
+readonly PAYLOAD_ROOT="${SYMPHONY_PAYLOAD_ROOT:-/usr/local/share/symphony}"
+readonly STATE_DIR="${SYMPHONY_STATE:-$HOME/.local/state/symphony}"
+readonly RELEASE_REPO="${SYMPHONY_RELEASE_REPO:-Symphon-y/symphony}"
 readonly API="https://api.github.com/repos/$RELEASE_REPO/releases/latest"
 
 notify_packages() {
@@ -64,9 +64,9 @@ notify_release() {
   [[ -r $marker && $(<"$marker") == "$latest" ]] && return 0
   mkdir -p "$STATE_DIR"
   echo "$latest" >"$marker"
-  notify-send --app-name="autarchy" \
-    "autarchy $latest available" \
-    "Installed: $installed. Run 'autarchy-update check', then 'autarchy-update apply'."
+  notify-send --app-name="symphony" \
+    "symphony $latest available" \
+    "Installed: $installed. Run 'symphony-update check', then 'symphony-update apply'."
 }
 
 notify_packages

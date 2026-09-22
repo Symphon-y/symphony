@@ -1,31 +1,31 @@
 #!/usr/bin/env bash
-# Target: ~/.local/bin/autarchy-update (linked by install/link-home)
+# Target: ~/.local/bin/symphony-update (linked by install/link-home)
 #
-# autarchy-update: the one way an installed machine moves from one payload to the
+# symphony-update: the one way an installed machine moves from one payload to the
 # next (Phase 18, D-0079). An installed machine has no repo -- its OS content is the
-# root-owned payload at /usr/local/share/autarchy/current (D-0067) -- so an update is
+# root-owned payload at /usr/local/share/symphony/current (D-0067) -- so an update is
 # a new payload: a signed tarball from a GitHub Release, verified with minisign
-# against the key shipped at /etc/autarchy/release.pub, unpacked beside the current
+# against the key shipped at /etc/symphony/release.pub, unpacked beside the current
 # one and swapped in at the same path (stow records links by resolved path, so the
 # path must not move), then the same appliers the installer ran, from the new payload.
 #
-# Usage: autarchy-update check                 what the latest release would change
-#        autarchy-update apply [--yes]         download, verify, snapshot, swap, re-apply
-#        autarchy-update apply --from DIR      the same from a checkout (the dev seat)
-#        autarchy-update rollback              previous/ back to current/, re-apply
-#        autarchy-update version               the installed release
+# Usage: symphony-update check                 what the latest release would change
+#        symphony-update apply [--yes]         download, verify, snapshot, swap, re-apply
+#        symphony-update apply --from DIR      the same from a checkout (the dev seat)
+#        symphony-update rollback              previous/ back to current/, re-apply
+#        symphony-update version               the installed release
 #
 # Root is needed for the snapshot, the swap and the two root-owned appliers; each is
 # its own `sudo` call, and the user runs this, never an agent. Nothing is applied
 # automatically: update-notify only informs (D-0059).
 set -euo pipefail
 
-readonly PAYLOAD_ROOT="${AUTARCHY_PAYLOAD_ROOT:-/usr/local/share/autarchy}"
+readonly PAYLOAD_ROOT="${SYMPHONY_PAYLOAD_ROOT:-/usr/local/share/symphony}"
 readonly CURRENT="$PAYLOAD_ROOT/current"
 readonly PREVIOUS="$PAYLOAD_ROOT/previous"
-readonly PUBKEY="${AUTARCHY_RELEASE_PUBKEY:-/etc/autarchy/release.pub}"
-readonly PACMAN_LOCK="${AUTARCHY_PACMAN_LOCK:-/var/lib/pacman/db.lck}"
-readonly RELEASE_REPO="${AUTARCHY_RELEASE_REPO:-Symphon-y/autarchy}"
+readonly PUBKEY="${SYMPHONY_RELEASE_PUBKEY:-/etc/symphony/release.pub}"
+readonly PACMAN_LOCK="${SYMPHONY_PACMAN_LOCK:-/var/lib/pacman/db.lck}"
+readonly RELEASE_REPO="${SYMPHONY_RELEASE_REPO:-Symphon-y/symphony}"
 readonly API="https://api.github.com/repos/$RELEASE_REPO/releases/latest"
 readonly DOWNLOAD="https://github.com/$RELEASE_REPO/releases/download"
 
@@ -33,12 +33,12 @@ work=""
 trap '[[ -n $work ]] && rm -rf "$work"' EXIT
 
 die() {
-  printf 'autarchy-update: %s\n' "$*" >&2
+  printf 'symphony-update: %s\n' "$*" >&2
   exit 1
 }
 
 usage() {
-  echo "usage: autarchy-update check | apply [--yes | --from DIR] | rollback | version" >&2
+  echo "usage: symphony-update check | apply [--yes | --from DIR] | rollback | version" >&2
   exit 2
 }
 
@@ -82,7 +82,7 @@ latest_release() {
 }
 
 no_release_yet() {
-  echo "autarchy-update: no release published yet at github.com/$RELEASE_REPO (pre-releases are not offered)"
+  echo "symphony-update: no release published yet at github.com/$RELEASE_REPO (pre-releases are not offered)"
 }
 
 # sort -V orders 2026.09.01 < 2026.09.22 and a bare tag after its pre-releases.
@@ -107,7 +107,7 @@ summarize() {
 # archive path. Nothing on the system is touched before this returns.
 fetch_release() {
   local tag=$1
-  local name="autarchy-$tag-payload.tar.zst" asset
+  local name="symphony-$tag-payload.tar.zst" asset
   for asset in "$name" "$name.minisig" "$name.sha256"; do
     fetch -o "$work/$asset" "$DOWNLOAD/$tag/$asset" ||
       die "could not download $asset for $tag"
@@ -144,7 +144,7 @@ stage_checkout() {
   local short
   short=$(git -C "$dir" rev-parse --short HEAD)
   if [[ -n $(git -C "$dir" status --porcelain) ]]; then
-    echo "autarchy-update: $dir has uncommitted changes -- they are deployed too" >&2
+    echo "symphony-update: $dir has uncommitted changes -- they are deployed too" >&2
   fi
   mkdir -p "$work/stage"
   local item
@@ -205,19 +205,19 @@ check() {
     return 0
   fi
   if [[ $current == "$latest" ]]; then
-    echo "autarchy-update: up to date ($current)"
+    echo "symphony-update: up to date ($current)"
     return 0
   fi
   if ! is_release "$current"; then
-    echo "autarchy-update: this machine runs $current, not a release; the latest release is $latest"
-    echo "  'autarchy-update apply --yes' would replace it"
+    echo "symphony-update: this machine runs $current, not a release; the latest release is $latest"
+    echo "  'symphony-update apply --yes' would replace it"
     return 0
   fi
   if ! newer "$current" "$latest"; then
-    echo "autarchy-update: installed $current is newer than the latest release $latest"
+    echo "symphony-update: installed $current is newer than the latest release $latest"
     return 0
   fi
-  echo "autarchy-update: $current -> $latest"
+  echo "symphony-update: $current -> $latest"
   local archive
   archive=$(fetch_release "$latest")
   stage_archive "$archive"
@@ -254,7 +254,7 @@ apply() {
       return 0
     fi
     if [[ $current == "$target" ]]; then
-      echo "autarchy-update: up to date ($current)"
+      echo "symphony-update: up to date ($current)"
       return 0
     fi
     if ! is_release "$current" && ((! yes)); then
@@ -269,14 +269,14 @@ apply() {
     stage_archive "$archive"
   fi
 
-  echo "autarchy-update: $current -> $target"
+  echo "symphony-update: $current -> $target"
   snapshot "pre-update: $current -> $target"
   log "installing the payload"
   swap_in
   apply_payload
   log "running pending migrations"
   "$CURRENT/scripts/migrate" apply
-  echo "autarchy-update: now at $target"
+  echo "symphony-update: now at $target"
 }
 
 rollback() {
@@ -286,14 +286,14 @@ rollback() {
   previous=$(tr -d '[:space:]' <"$PREVIOUS/VERSION")
   [[ ! -e $PACMAN_LOCK ]] || die "a pacman transaction is running ($PACMAN_LOCK exists) -- try again when it is done"
 
-  echo "autarchy-update: rolling back $current -> $previous"
+  echo "symphony-update: rolling back $current -> $previous"
   snapshot "pre-rollback: $current -> $previous"
   local staging="$PAYLOAD_ROOT/staging.$$"
   sudo mv "$PREVIOUS" "$staging"
   sudo mv "$CURRENT" "$PREVIOUS"
   sudo mv "$staging" "$CURRENT"
   apply_payload
-  echo "autarchy-update: now at $previous"
+  echo "symphony-update: now at $previous"
   echo "note: migrations that $current ran are not undone -- see snapper for the pre-update snapshot"
 }
 

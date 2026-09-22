@@ -148,7 +148,7 @@ Green confirmed: 2026-09-15, 4/4
   downstream (`read -r` with `IFS=` doesn't trim it) -- fixed by stripping
   trailing whitespace after stripping comments.
 - Built `migrations/` + `scripts/migrate check|apply` (timestamped scripts +
-  completion markers under `~/.local/state/autarchy/migrations/`, both
+  completion markers under `~/.local/state/symphony/migrations/`, both
   overridable via env vars for testing). Wrote the mechanism's first real
   migration: removing the `yay-debug` package found by `pkg-audit` above --
   genuinely useful, not a synthetic placeholder, but needs `sudo` internally so

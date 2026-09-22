@@ -25,11 +25,11 @@ set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO_ROOT
-readonly ENABLE_USER_SERVICES="${AUTARCHY_ENABLE_USER_SERVICES_SCRIPT:-$REPO_ROOT/install/enable-user-services}"
-readonly MATUGEN="${AUTARCHY_MATUGEN:-matugen}"
-readonly MARKER="${AUTARCHY_FIRST_LOGIN_MARKER:-$HOME/.local/state/autarchy/first-login-done}"
+readonly ENABLE_USER_SERVICES="${SYMPHONY_ENABLE_USER_SERVICES_SCRIPT:-$REPO_ROOT/install/enable-user-services}"
+readonly MATUGEN="${SYMPHONY_MATUGEN:-matugen}"
+readonly MARKER="${SYMPHONY_FIRST_LOGIN_MARKER:-$HOME/.local/state/symphony/first-login-done}"
 readonly VERIFY_ATTEMPTS=5
-readonly VERIFY_DELAY="${AUTARCHY_FIRST_LOGIN_VERIFY_DELAY:-2}"
+readonly VERIFY_DELAY="${SYMPHONY_FIRST_LOGIN_VERIFY_DELAY:-2}"
 
 # --source-color-index 0 skips matugen's interactive source-color prompt, the
 # same flag (and reason) as home/hyprpaper/dot-local/bin/wallpaper-set. Rendered

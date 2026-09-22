@@ -12,7 +12,7 @@ set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO_ROOT
-readonly REPO_DIR="$REPO_ROOT/iso/profile/airootfs/var/lib/autarchy-repo"
+readonly REPO_DIR="$REPO_ROOT/iso/profile/airootfs/var/lib/symphony-repo"
 readonly WORK_DIR=/tmp/offline-repo-work
 readonly BLANK_DBPATH=/tmp/offline-repo-blank-db
 # Can't be resolved by pacman -Syw; built from source, same as this repo's

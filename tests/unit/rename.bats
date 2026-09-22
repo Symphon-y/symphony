@@ -117,13 +117,13 @@ EOF
   assert_output --partial "nothing to rename"
 }
 
-@test "a file marked '# rename: keep' is left alone and does not count as NEW being in use" {
-  printf '# rename: keep\nmoves oldname to newname\n' >"$REPO/migrations-note.md"
+@test "a file marked '# rename: keep' is left alone -- content and path -- and does not count as NEW being in use" {
+  printf '# rename: keep\nmoves oldname to newname\n' >"$REPO/oldname-to-newname.md"
   git -C "$REPO" add -A
   git -C "$REPO" commit -q -m "note"
   run "$SCRIPT" oldname newname
   assert_success
-  run cat "$REPO/migrations-note.md"
+  run cat "$REPO/oldname-to-newname.md"
   assert_line "moves oldname to newname"
 }
 

@@ -27,9 +27,9 @@ this repo, no `~/Projects`, the user's XDG directories in place. See the
   (`install/configure-base-system`).
 - Give the installed target the OS content it needs (`home/ install/
   migrations/ packages/ scripts/ system/`) as a root-owned payload at
-  `/usr/local/share/autarchy/current` -- **not** a git checkout, and nothing
+  `/usr/local/share/symphony/current` -- **not** a git checkout, and nothing
   under the user's home (revised 2026-09-20; the original plan copied a
-  real checkout to `~/Projects/autarchy`).
+  real checkout to `~/Projects/symphony`).
 - Run `install/link-home apply` for the new user at install time, from the payload.
 - Create the user's XDG directories (Documents, Downloads, Music, Pictures,
   Videos; never `~/Projects`) via `system/xdg/user-dirs.defaults`.
@@ -45,7 +45,7 @@ this repo, no `~/Projects`, the user's XDG directories in place. See the
 
 **Out of scope**
 - Adding a git-identity prompt to the terminal fallback
-  (`autarchy-install`) -- stays the narrower "collector of last resort."
+  (`symphony-install`) -- stays the narrower "collector of last resort."
 - Automating `gh auth login`, Claude Code's own login, or the separate
   `config.nvim` clone -- permanently manual by Phase 8/D-0053's own
   decision (OAuth/interactive, can't be scripted).
@@ -67,14 +67,14 @@ this repo, no `~/Projects`, the user's XDG directories in place. See the
 - Git identity: complete the GUI's already-collected, currently-
   discarded `git_name`/`git_email` fields by writing
   `~/.gitconfig.local` during install when provided.
-- ~~The target gets a real git checkout at `~/Projects/autarchy`~~ --
+- ~~The target gets a real git checkout at `~/Projects/symphony`~~ --
   **superseded 2026-09-20** (user: "the iso doesn't need an installed
   machine's copy of our repo -- Windows doesn't have a 'windows os' repo
   anywhere either"). The target gets a root-owned payload instead; `.git`
   is back to being excluded from the ISO bake-in (Phase 14's original
   behavior). Updating such a machine (`scripts/update` is git-based today)
   is Phase 17's job, not this phase's.
-- Payload location `/usr/local/share/autarchy/current`, a **real directory
+- Payload location `/usr/local/share/symphony/current`, a **real directory
   at a fixed path**, not a symlink to a versioned directory. Found by
   spiking it: GNU stow records each symlink by the *resolved* path of its
   stow dir, so `releases/<tag>/` behind a `current` symlink makes every
@@ -99,7 +99,7 @@ this repo, no `~/Projects`, the user's XDG directories in place. See the
 ## Acceptance tests (written before implementation)
 
 Revised 2026-09-20: this table replaces the original one, whose "copies the
-baked-in repo to `~/Projects/autarchy`" row went away with that design; the
+baked-in repo to `~/Projects/symphony`" row went away with that design; the
 rows for the self-contained layout and the gaps a review of the branch found
 were added.
 
@@ -109,7 +109,7 @@ Files: `tests/unit/configure-base-system.bats`, `first-login.bats`,
 
 | Test | What it proves |
 |---|---|
-| `configure-base-system` installs a payload at `/usr/local/share/autarchy/current` with no `.git`/`iso`/`tests`/`gui`, no `~/Projects`, chowned root | The installed machine is self-contained and the user can't modify the OS layer |
+| `configure-base-system` installs a payload at `/usr/local/share/symphony/current` with no `.git`/`iso`/`tests`/`gui`, no `~/Projects`, chowned root | The installed machine is self-contained and the user can't modify the OS layer |
 | payload `VERSION` records the live release (or `unreleased`); re-running replaces rather than nests | The payload's identity is known to a later updater; re-run safe |
 | `configure-base-system` runs `install/link-home apply` as the new user from the payload | Dotfiles exist before first boot, not after a manual step |
 | XDG dirs created via `xdg-user-dirs-update` (as the user, `HOME` set, `LC_ALL=C`) before link-home | `~/Documents` etc. exist; `Projects` never does |
@@ -120,7 +120,7 @@ Files: `tests/unit/configure-base-system.bats`, `first-login.bats`,
 | `first-login`: theme rendered before services start; services verified (bounded retry) before the marker; no marker on render or verify failure | A login where something failed retries on the next one instead of being marked done |
 | git identity is double-quoted with `\` and `"` escaped | A name with quotes/`#` can't corrupt `~/.gitconfig.local` |
 | `sddm.service` enabled; `20-autologin.conf` correct; first-login run once and marked (original rows, unchanged) | A display manager starts and logs in; the session-dependent step happens once |
-| acceptance: XDG defaults list exactly five dirs, registered in `system/files.txt`; `xdg-user-dirs` in `packages/`; nothing shipped references `~/Projects/autarchy`; `.git` not baked into the ISO; installer and `autostart.lua` agree on the payload path | Repo-level guarantees the unit tests can't see |
+| acceptance: XDG defaults list exactly five dirs, registered in `system/files.txt`; `xdg-user-dirs` in `packages/`; nothing shipped references `~/Projects/symphony`; `.git` not baked into the ISO; installer and `autostart.lua` agree on the payload path | Repo-level guarantees the unit tests can't see |
 
 Red confirmed: 2026-09-18 (original) and 2026-09-20 (revised set: 24 tests
 failed before implementation, each for its missing behavior) ·
@@ -186,11 +186,11 @@ Green confirmed: 2026-09-20 (`scripts/check` green; `phase-16.bats` 6/6)
   identity (complete it).
 - **Implemented.** `install/configure-base-system` gained four new
   steps between `create_user()` and `enable_services()`: `copy_repo()`
-  (`cp -a "$REPO_ROOT" "$TARGET/home/$USERNAME/Projects/autarchy"` +
+  (`cp -a "$REPO_ROOT" "$TARGET/home/$USERNAME/Projects/symphony"` +
   chown -- `$REPO_ROOT` is the live ISO's own baked-in copy, now
   including `.git` since `.github/workflows/release-iso.yml`'s rsync no
   longer excludes it), `link_home()` (`arch-chroot ... runuser -u
-  $USERNAME -- bash -c 'cd ~/Projects/autarchy && install/link-home
+  $USERNAME -- bash -c 'cd ~/Projects/symphony && install/link-home
   apply'`), `configure_autologin()` (writes `/etc/sddm.conf.d/
   20-autologin.conf` with `User=$USERNAME`/`Session=hyprland-uwsm` --
   the exact session name confirmed by reading `/usr/share/
@@ -198,18 +198,18 @@ Green confirmed: 2026-09-20 (`scripts/check` green; `phase-16.bats` 6/6)
   guessed), and `write_git_identity()` (writes `~/.gitconfig.local`
   only when both `GIT_NAME`/`GIT_EMAIL` are non-empty). `sddm.service`
   added to the existing `SERVICES` array. New `install/first-login`:
-  marker-gated (`~/.local/state/autarchy/first-login-done`, matching
+  marker-gated (`~/.local/state/symphony/first-login-done`, matching
   D-0051's marker-family convention), calls `install/enable-user-
   services apply` -- its target script swappable via
-  `AUTARCHY_ENABLE_USER_SERVICES_SCRIPT`, matching this repo's
-  established `AUTARCHY_*_SCRIPT` override pattern
+  `SYMPHONY_ENABLE_USER_SERVICES_SCRIPT`, matching this repo's
+  established `SYMPHONY_*_SCRIPT` override pattern
   (`install-base-system`/`run-guided-install` already do the same).
   `home/hypr/dot-config/hypr/autostart.lua` gained one line,
-  `hl.exec_cmd("~/Projects/autarchy/install/first-login")` -- verified
+  `hl.exec_cmd("~/Projects/symphony/install/first-login")` -- verified
   for real, not just by syntax, by running `Hyprland --verify-config`
   against this dev VM's actual Hyprland install: it parsed clean *and*
   actually executed `first-login`, which created a real
-  `~/.local/state/autarchy/first-login-done` marker on this dev VM
+  `~/.local/state/symphony/first-login-done` marker on this dev VM
   (harmless -- `enable-user-services apply` is a no-op on
   already-enabled units -- and genuine, useful end-to-end proof the
   whole chain works beyond the bats stubs). `gui/installer/state.py`'s
@@ -261,7 +261,7 @@ Green confirmed: 2026-09-20 (`scripts/check` green; `phase-16.bats` 6/6)
   user-confirmed. SDDM autologin, `link-home` and `first-login` work
   end to end on real hardware.
 - **Scope changed by the user.** Asked what should happen to
-  `~/Projects/autarchy`, the answer was that an installed machine needs no
+  `~/Projects/symphony`, the answer was that an installed machine needs no
   copy of the repo at all ("Windows doesn't have a 'windows os' repo
   anywhere either"), plus: create common-sense XDG directories, and make
   the repo public so a later updater needs no auth. A review pass over the
@@ -315,7 +315,7 @@ Green confirmed: 2026-09-20 (`scripts/check` green; `phase-16.bats` 6/6)
   real chroot behavior of `xdg-user-dirs-update` (`HOME` handling under
   `runuser`), and whether `xdg-user-dirs.service` runs under uwsm -- all
   covered by hardware round 2.
-- Pre-existing, unrelated: `tests/acceptance/phase-14.bats` "autarchy-
+- Pre-existing, unrelated: `tests/acceptance/phase-14.bats` "symphony-
   bootstrap is fully retired" fails on this branch's HEAD too (it flags
   `docs/roadmap.md`); acceptance tests aren't part of CI's `scripts/check`.
 
@@ -349,7 +349,7 @@ Green confirmed: 2026-09-20 (`scripts/check` green; `phase-16.bats` 6/6)
   linked everything -- and yet no theme, no bar, every user service
   `disabled`, no `~/.config/{fuzzel,mako}`, no `colors.css`, no
   `first-login-done` marker. Hyprland's own log had the cause on every login:
-  `[executor] Executing  && /usr/local/share/autarchy/current/install/first-login`
+  `[executor] Executing  && /usr/local/share/symphony/current/install/first-login`
   followed by `Applied rule arguments for exec`. Hyprland reads a leading
   `[...]` on any exec command as its *rule block* and strips it, so the
   `[ -x path ] && path` guard added after the original verification (which
@@ -361,7 +361,7 @@ Green confirmed: 2026-09-20 (`scripts/check` green; `phase-16.bats` 6/6)
   `exec_cmd("[` in the Hyprland Lua config; `autostart.lua` uses `test -x`.
 - **Also fixed:** `tests/unit/network-watch.bats` "without notify-send" failed
   on this machine because `PATH="$bin:$PATH"` fell through to the real
-  `/usr/bin/notify-send` (present on every installed autarchy machine, absent
+  `/usr/bin/notify-send` (present on every installed symphony machine, absent
   only in CI's container); the test now gives the script a private PATH.
 - Round 2's remaining checks (snapper on real Btrfs, `xdg-user-dirs-update`
   under `runuser`, SDDM autologin, `first-login` on a fresh install) are

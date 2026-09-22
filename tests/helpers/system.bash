@@ -6,8 +6,8 @@
 # payload on a machine installed from the ISO (D-0067), else the checkout the
 # tests sit in. link-home must be checked from there -- stow links point into it.
 os_root() {
-  if [[ -d /usr/local/share/autarchy/current/home ]]; then
-    echo /usr/local/share/autarchy/current
+  if [[ -d /usr/local/share/symphony/current/home ]]; then
+    echo /usr/local/share/symphony/current
   else
     echo "$REPO_ROOT"
   fi

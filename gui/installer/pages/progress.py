@@ -26,7 +26,7 @@ class ProgressPage(Page):
 
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
 
-        self._heading = Gtk.Label(label="Installing autarchy...")
+        self._heading = Gtk.Label(label="Installing symphony...")
         self._heading.add_css_class("title-2")
         box.append(self._heading)
 
@@ -68,9 +68,9 @@ class ProgressPage(Page):
         self._window = window
 
         if window.dry_run:
-            vars_path = Path(tempfile.gettempdir()) / "autarchy-gui-dry-run.vars"
+            vars_path = Path(tempfile.gettempdir()) / "symphony-gui-dry-run.vars"
         else:
-            vars_path = Path("/root/autarchy/base-install.local.vars")
+            vars_path = Path("/root/symphony/base-install.local.vars")
 
         runner.start_install(
             answers,

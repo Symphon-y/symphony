@@ -8,7 +8,7 @@
 # person-specific values in the install; everything else comes from the repo.
 
 DISK=/dev/vda           # target disk. EVERYTHING on it is erased. Confirm with `lsblk`.
-HOST=                   # hostname, e.g. autarchy-vm
+HOST=                   # hostname, e.g. symphony-vm
 USERNAME=               # your login name
 TZONE=                  # timezone, e.g. America/Chicago (list: ls /usr/share/zoneinfo)
 LOCALE=en_US.UTF-8      # system language

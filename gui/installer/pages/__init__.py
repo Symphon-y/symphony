@@ -1,6 +1,6 @@
 """Every wizard page, in the fixed order they're shown -- a linear
 sequential flow ending in one review screen, not a free-navigation menu
-(the same principle autarchy-install's own terminal flow already
+(the same principle symphony-install's own terminal flow already
 documents and was researched against archinstall/Calamares/Windows
 Setup precedent for)."""
 

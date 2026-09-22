@@ -14,7 +14,7 @@
 #
 # A file that must keep both names -- a migration that moves an installed
 # machine from the old name to the new one, and its test -- opts out with the
-# line "# rename: keep" anywhere in it; it is neither edited nor counted.
+# line "# rename: keep" anywhere in it; it is neither edited, moved nor counted.
 #
 # What this cannot do: rename the GitHub repository (gh repo rename), move an
 # installed machine's paths (that is a migration, shipped with the rename), or
@@ -78,7 +78,8 @@ files_with() {
 
 # Anything to do? (tracked text files containing any form, or paths carrying it)
 mapfile -t files < <(files_with "$old")
-mapfile -t paths < <(git ls-files | grep -E "(^|/)[^/]*${old}[^/]*(/|$)" | awk -F/ -v t="$old" '{
+mapfile -t paths < <(comm -23 <(git ls-files | sort) <(git grep -I -l -F '# rename: keep' -- . 2>/dev/null | sort) |
+  grep -E "(^|/)[^/]*${old}[^/]*(/|$)" | awk -F/ -v t="$old" '{
   # every directory or file component along the path that carries the token
   p = ""
   for (i = 1; i <= NF; i++) { p = (i == 1 ? $i : p "/" $i); if (index($i, t)) print p }

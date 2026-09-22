@@ -23,7 +23,7 @@ class WelcomePage(Page):
         icon.set_pixel_size(96)
         box.append(icon)
 
-        title = Gtk.Label(label="Welcome to autarchy")
+        title = Gtk.Label(label="Welcome to symphony")
         title.add_css_class("title-1")
         box.append(title)
 

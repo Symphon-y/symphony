@@ -1,6 +1,6 @@
 # Runbook: Base Arch Install
 
-Reusable procedure for installing the autarchy base system. It is used in Phase 1 (lab
+Reusable procedure for installing the symphony base system. It is used in Phase 1 (lab
 VM), and again for the rebuild test (Phase 8) and physical hardware (Phase 12).
 
 **Two ways to run this, since Phase 10:**
@@ -9,18 +9,18 @@ VM), and again for the rebuild test (Phase 8) and physical hardware (Phase 12).
   Releases page (built by `.github/workflows/release-iso.yml` from a tagged
   commit on `main`). Since Phase 13, this ISO is fully offline-capable: the
   entire `packages/*.txt` closure is baked in. Since Phase 14, the repo
-  itself is baked in too, at `/root/autarchy`. No network connection or
+  itself is baked in too, at `/root/symphony`. No network connection or
   GitHub access is needed at all to install (use the stock-ISO manual path
   below only if there's some other reason to run it by hand).
 
-  **If the release is split into multiple files** (`autarchy-<tag>.iso.00.part`,
+  **If the release is split into multiple files** (`symphony-<tag>.iso.00.part`,
   `.01.part`, etc. -- GitHub Releases refuses any single file at or above
   2 GiB, and this ISO's full offline package set can exceed that), download
-  every part plus `autarchy-<tag>.iso.sha256`, then reassemble and verify
+  every part plus `symphony-<tag>.iso.sha256`, then reassemble and verify
   before writing to USB:
   ```sh
-  cat autarchy-<tag>.iso.*.part >autarchy-<tag>.iso
-  sha256sum -c autarchy-<tag>.iso.sha256
+  cat symphony-<tag>.iso.*.part >symphony-<tag>.iso
+  sha256sum -c symphony-<tag>.iso.sha256
   ```
   Only write the reassembled file to USB once that reports `OK`.
 
@@ -28,17 +28,17 @@ VM), and again for the rebuild test (Phase 8) and physical hardware (Phase 12).
   GitHub Actions round trip is most of a real-hardware test cycle). Needs only
   git and a container engine (Docker Desktop is fine on Windows):
   ```sh
-  scripts/build-iso                # builds the committed HEAD -> out/autarchy-local-<sha>.iso
+  scripts/build-iso                # builds the committed HEAD -> out/symphony-local-<sha>.iso
   scripts/build-iso --tag 2026.09.20-test1 --ref my-branch
   ```
   It runs the same steps as the release workflow in a privileged Arch
   container and never uploads anything. Only *committed* work goes in (it warns
-  if the tree is dirty). On an autarchy machine the engine is rootless podman,
+  if the tree is dirty). On an symphony machine the engine is rootless podman,
   which cannot do the mounts `pacstrap` needs inside the container (it fails at
   `mount: .../airootfs/dev: permission denied`), so run the engine as root --
   the script itself and the git bundle stay yours:
   ```sh
-  AUTARCHY_CONTAINER_ENGINE="sudo podman" scripts/build-iso
+  SYMPHONY_CONTAINER_ENGINE="sudo podman" scripts/build-iso
   ```
   (The copied-out ISO is then root-owned; `dd` needs root anyway.) About 3 GB
   of packages are downloaded per build. Then write it to a USB stick -- on Windows, from an
@@ -57,7 +57,7 @@ VM), and again for the rebuild test (Phase 8) and physical hardware (Phase 12).
   password, and the laptop lands on its desktop already online, because the
   connection is carried to the installed system as a plain NetworkManager
   connection file. From a terminal (the fallback installer, `tty2`+) run `nmtui`
-  before `autarchy-install` -- whatever it saves is carried over the same way.
+  before `symphony-install` -- whatever it saves is carried over the same way.
   The live ISO runs NetworkManager, the same stack as the installed system (D-0068).
   Enterprise (802.1X) networks are set up after install, in `nm-connection-editor`
   (right-click the bar's Wi-Fi icon). After first boot the bar's Wi-Fi icon (or
@@ -69,7 +69,7 @@ VM), and again for the rebuild test (Phase 8) and physical hardware (Phase 12).
   under "Details"; it notices a change (pressing the laptop's Wi-Fi key, fixing a
   BIOS setting) by itself. To get a terminal on the live ISO for anything further --
   `cage` has no VT switching, so tty2 is unreachable while the GUI runs -- press `e`
-  on the boot entry, append `autarchy.nogui` to its options, and boot: tty1 then
+  on the boot entry, append `symphony.nogui` to its options, and boot: tty1 then
   stays a normal login shell, and `scripts/system-report` (a "Wi-Fi" section) or
   `rfkill list all`, `nmcli radio`, `lspci -nnk`, `iw reg get` and `evtest` (does the
   Wi-Fi key send an event?) are all there. Some laptops (Dell/Alienware among them)
@@ -79,7 +79,7 @@ VM), and again for the rebuild test (Phase 8) and physical hardware (Phase 12).
   **The whole runbook below (steps 1-7) is replaced by one guided
   command**, printed on screen the moment you log in:
   ```sh
-  autarchy-install
+  symphony-install
   ```
   It shows a ground-truth report of the
   machine (CPU/memory/GPU/storage/network), asks a handful of plain
@@ -134,9 +134,9 @@ section at the end of this runbook, or reinstall from step 1.
 
 Boot the ISO and wait for the root prompt.
 
-**On the release ISO**, the repo is already at `/root/autarchy` (baked in at
+**On the release ISO**, the repo is already at `/root/symphony` (baked in at
 build time, Phase 14) -- everything below down to (not including) `source
-base-install.local.vars` is unnecessary: just `cd /root/autarchy`.
+base-install.local.vars` is unnecessary: just `cd /root/symphony`.
 
 **On a stock Arch ISO:**
 
@@ -151,8 +151,8 @@ pacman -Sy --noconfirm git github-cli
 gh auth login --hostname github.com --git-protocol https --web
 gh auth setup-git
 
-gh repo clone Symphon-y/autarchy /root/autarchy -- --branch phase/01-base-install
-cd /root/autarchy
+gh repo clone Symphon-y/symphony /root/symphony -- --branch phase/01-base-install
+cd /root/symphony
 git config --global user.name  "<your name>"
 git config --global user.email "<your email>"
 ```
@@ -332,8 +332,8 @@ sudo systemctl enable --now snapper-cleanup.timer
 gh auth login --hostname github.com --git-protocol https --web
 gh auth setup-git
 mkdir -p ~/Projects
-gh repo clone Symphon-y/autarchy ~/Projects/autarchy -- --branch phase/01-base-install
-cd ~/Projects/autarchy
+gh repo clone Symphon-y/symphony ~/Projects/symphony -- --branch phase/01-base-install
+cd ~/Projects/symphony
 git config --global user.name  "<your name>"
 git config --global user.email "<your email>"
 ```

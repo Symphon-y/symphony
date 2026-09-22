@@ -25,7 +25,7 @@ reapplying config-only changes, not just before pacman transactions.
   `packages.x86_64` covers only what the live installer environment needs
   (git, github-cli, bats + bats-assert + bats-support) — the desktop stack
   still comes from `packages/*.txt` at pacstrap time, exactly as today.
-- An `airootfs` first-boot helper (`autarchy-bootstrap`) that reads the
+- An `airootfs` first-boot helper (`symphony-bootstrap`) that reads the
   release tag baked in at build time and runs `gh auth login --web` +
   `gh repo clone --branch <tag>` — collapsing today's manual step 1 typing
   into one command. The `gh auth login` device-code handshake stays
@@ -96,7 +96,7 @@ unit tests, shellcheck/shfmt/JSON/YAML/identifiers)
 - [x] Branch, tracking doc
 - [x] Red: `tests/acceptance/phase-10.bats` (13 tests written before any
       implementation existed)
-- [x] `iso/profile/` archiso profile + `autarchy-bootstrap` first-boot helper
+- [x] `iso/profile/` archiso profile + `symphony-bootstrap` first-boot helper
 - [x] `install/install-base-system` + unit tests (11/11 green)
 - [x] `.github/workflows/release-iso.yml`
 - [x] `scripts/update` + unit tests (11/11 green) + `docs/runbooks/update.md`
@@ -109,7 +109,7 @@ unit tests, shellcheck/shfmt/JSON/YAML/identifiers)
       and the acceptance tests to the real installed syntax
 - [x] Verify a real tag push produces a release ISO on a real GitHub Release
       -- confirmed for real: `2026.09.16` on GitHub Releases carries
-      `autarchy-2026.09.16.iso` + `.sha256`, built by
+      `symphony-2026.09.16.iso` + `.sha256`, built by
       `.github/workflows/release-iso.yml` (13m3s, well under the 45min
       timeout). Took 4 pushes of the same test tag to get there, each one a
       real bug this approach was specifically meant to catch before it ever
@@ -133,7 +133,7 @@ unit tests, shellcheck/shfmt/JSON/YAML/identifiers)
 - Branch and tracking doc created.
 - Built the archiso profile (`iso/profile/`: `profiledef.sh` UEFI-only per
   D-0010, `pacman.conf` unmodified from upstream releng, a deliberately thin
-  `packages.x86_64`, and the `autarchy-bootstrap` first-boot helper),
+  `packages.x86_64`, and the `symphony-bootstrap` first-boot helper),
   `install/install-base-system` (steps 4-6, composing with rather than
   duplicating `configure-base-system`), `.github/workflows/release-iso.yml`
   (privileged-container `mkarchiso`, corroborated against Omarchy's own real
@@ -183,7 +183,7 @@ unit tests, shellcheck/shfmt/JSON/YAML/identifiers)
   directory, so the next step (running as the plain runner user, no
   container) got `Permission denied` renaming it -- fixed with a `chown`
   back to the runner's UID/GID from inside the container before it exits.
-  The 4th push succeeded end to end: `autarchy-2026.09.16.iso` +
+  The 4th push succeeded end to end: `symphony-2026.09.16.iso` +
   `.sha256` published on a real GitHub Release, 13m3s build time.
   Also ran `scripts/update check` and `scripts/update apply` for real
   against this VM (not just stubbed): `check` correctly reported

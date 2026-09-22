@@ -21,7 +21,7 @@ size, AUR build-cache growth, and update visibility (never auto-applying).
 - `system/services-root.txt` + `install/enable-root-services` (mirrors Phase
   8's user-service pattern), declaring `reflector.timer`, `btrfs-scrub@-.timer`,
   `pacman-filesdb-refresh.timer`.
-- `system/journald/10-autarchy.conf` (`SystemMaxUse=`).
+- `system/journald/10-symphony.conf` (`SystemMaxUse=`).
 - `home/yay/dot-config/yay/config.json` (`CleanAfter`, exact key verified
   against yay's real config schema).
 - `home/update-notify/`: `checkupdates` wired to a desktop notification via a
@@ -67,7 +67,7 @@ design)
 - [x] `system/reflector/reflector.conf` + `system/files.txt` entry -- verified
       the real shipped default format first (Arch Wiki + reflector's own
       source, since GitLab's Anubis anti-bot wall blocked direct fetches)
-- [x] `system/journald/10-autarchy.conf` + `system/files.txt` entry
+- [x] `system/journald/10-symphony.conf` + `system/files.txt` entry
 - [x] `system/services-root.txt` + `install/enable-root-services` + unit tests
       (mirrors Phase 8's `enable-user-services` pattern at root scope)
 - [x] `home/yay/dot-config/yay/config.json` -- found a real gotcha verifying
@@ -119,7 +119,7 @@ design)
   -- the config is correct for physical hardware, which is the actual target.
 - Built and verified the rest of Phase 9's actual scope: `packages/base.txt`
   (`reflector`), `system/reflector/reflector.conf`, `system/journald/
-  10-autarchy.conf`, `system/services-root.txt` + `install/
+  10-symphony.conf`, `system/services-root.txt` + `install/
   enable-root-services` (+ unit tests), `home/yay/dot-config/yay/config.json`,
   `home/update-notify/` (script + user timer/service). Tested `update-notify`
   against this VM's real 13 pending updates end to end: a genuine mako

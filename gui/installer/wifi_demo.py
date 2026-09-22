@@ -95,5 +95,5 @@ def demo_backend(
 ) -> _DemoBackend:
     """A WifiBackend over canned answers. `delay` is how long a join takes, so the
     page's spinner can be seen; `radio` is the simulated `nmcli radio` state."""
-    directory = Path(profile_dir or tempfile.mkdtemp(prefix="autarchy-wifi-demo-"))
+    directory = Path(profile_dir or tempfile.mkdtemp(prefix="symphony-wifi-demo-"))
     return _DemoBackend(run=_DemoNetworkManager(directory / PROFILE_NAME, delay, radio), profile_dir=directory)

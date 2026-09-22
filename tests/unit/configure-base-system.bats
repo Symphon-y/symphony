@@ -157,11 +157,11 @@ calls() {
 
   local pair
   for pair in \
-    "system/mkinitcpio/10-autarchy.conf:etc/mkinitcpio.conf.d/10-autarchy.conf" \
+    "system/mkinitcpio/10-symphony.conf:etc/mkinitcpio.conf.d/10-symphony.conf" \
     "system/mkinitcpio/linux.preset:etc/mkinitcpio.d/linux.preset" \
     "system/mkinitcpio/linux-lts.preset:etc/mkinitcpio.d/linux-lts.preset" \
     "system/zram/zram-generator.conf:etc/systemd/zram-generator.conf" \
-    "system/resolved/10-autarchy.conf:etc/systemd/resolved.conf.d/10-autarchy.conf" \
+    "system/resolved/10-symphony.conf:etc/systemd/resolved.conf.d/10-symphony.conf" \
     "system/nftables/nftables.conf:etc/nftables.conf" \
     "system/sudo/10-wheel:etc/sudoers.d/10-wheel" \
     "system/networkmanager/20-connectivity.conf:etc/NetworkManager/conf.d/20-connectivity.conf" \
@@ -207,8 +207,8 @@ calls() {
   assert_line "blkid -s UUID -o value /dev/disk/by-partlabel/cryptroot"
 }
 
-@test "adds resume= to the cmdline when AUTARCHY_RESUME_DEVICE is set (Phase 12 hibernation)" {
-  AUTARCHY_RESUME_DEVICE=/dev/mapper/cryptswap run "$SCRIPT" "$VARS" "$TARGET"
+@test "adds resume= to the cmdline when SYMPHONY_RESUME_DEVICE is set (Phase 12 hibernation)" {
+  SYMPHONY_RESUME_DEVICE=/dev/mapper/cryptswap run "$SCRIPT" "$VARS" "$TARGET"
   assert_success
   assert_equal "$(cat "$TARGET/etc/kernel/cmdline")" \
     "rd.luks.name=1111-2222=root root=/dev/mapper/root rootflags=subvol=@ rw rd.luks.name=5555-6666=cryptswap resume=/dev/mapper/cryptswap resumeflags=x-systemd.device-timeout=30s"
@@ -217,14 +217,14 @@ calls() {
 }
 
 @test "appends the firmware-quirk kernel parameters install-base-system resolved (D-0076)" {
-  AUTARCHY_KERNEL_PARAMS="module_blacklist=dell_rbtn quiet" run "$SCRIPT" "$VARS" "$TARGET"
+  SYMPHONY_KERNEL_PARAMS="module_blacklist=dell_rbtn quiet" run "$SCRIPT" "$VARS" "$TARGET"
   assert_success
   assert_equal "$(cat "$TARGET/etc/kernel/cmdline")" \
     "rd.luks.name=1111-2222=root root=/dev/mapper/root rootflags=subvol=@ rw module_blacklist=dell_rbtn quiet"
 }
 
 @test "quirk parameters come after resume= and are in place before the images are built (D-0076)" {
-  AUTARCHY_RESUME_DEVICE=/dev/mapper/cryptswap AUTARCHY_KERNEL_PARAMS="module_blacklist=dell_rbtn" \
+  SYMPHONY_RESUME_DEVICE=/dev/mapper/cryptswap SYMPHONY_KERNEL_PARAMS="module_blacklist=dell_rbtn" \
     run "$SCRIPT" "$VARS" "$TARGET"
   assert_success
   assert_equal "$(cat "$TARGET/etc/kernel/cmdline")" \
@@ -239,11 +239,11 @@ calls() {
   # via crypttab on the not-yet-mounted real root, is a permanent hang,
   # not a slow one. Whenever resume=/dev/mapper/X appears, rd.luks.name=
   # ...=X must also appear in the same cmdline.
-  AUTARCHY_RESUME_DEVICE=/dev/mapper/cryptswap run "$SCRIPT" "$VARS" "$TARGET"
+  SYMPHONY_RESUME_DEVICE=/dev/mapper/cryptswap run "$SCRIPT" "$VARS" "$TARGET"
   assert_success
   local cmdline mapper_name
   cmdline=$(cat "$TARGET/etc/kernel/cmdline")
-  mapper_name=$(basename "$AUTARCHY_RESUME_DEVICE")
+  mapper_name=$(basename "$SYMPHONY_RESUME_DEVICE")
   [[ $cmdline == *"resume=/dev/mapper/$mapper_name"* ]]
   [[ $cmdline == *"rd.luks.name="*"=$mapper_name"* ]]
 }
@@ -324,18 +324,18 @@ calls() {
   # connection file others can read.
   local live="$BATS_TEST_TMPDIR/live-nm"
   mkdir -p "$live"
-  printf '[connection]\nid=HomeNet\npsk=not-a-real-secret\n' >"$live/autarchy-wifi.nmconnection"
-  chmod 600 "$live/autarchy-wifi.nmconnection"
+  printf '[connection]\nid=HomeNet\npsk=not-a-real-secret\n' >"$live/symphony-wifi.nmconnection"
+  chmod 600 "$live/symphony-wifi.nmconnection"
   printf 'unrelated\n' >"$live/notes.txt"
 
-  AUTARCHY_LIVE_NM_DIR="$live" run "$SCRIPT" "$VARS" "$TARGET"
+  SYMPHONY_LIVE_NM_DIR="$live" run "$SCRIPT" "$VARS" "$TARGET"
   assert_success
 
   local dest="$TARGET/etc/NetworkManager/system-connections"
-  run cmp "$live/autarchy-wifi.nmconnection" "$dest/autarchy-wifi.nmconnection"
+  run cmp "$live/symphony-wifi.nmconnection" "$dest/symphony-wifi.nmconnection"
   assert_success
-  run find "$dest/autarchy-wifi.nmconnection" -perm 0600
-  assert_output "$dest/autarchy-wifi.nmconnection"
+  run find "$dest/symphony-wifi.nmconnection" -perm 0600
+  assert_output "$dest/symphony-wifi.nmconnection"
   run find "$dest" -maxdepth 0 -perm 0700
   assert_output "$dest"
   # Only connection files are carried.
@@ -349,7 +349,7 @@ calls() {
   mkdir -p "$live"
   printf '[connection]\nid=Loose\n' >"$live/loose.nmconnection"
   chmod 644 "$live/loose.nmconnection"
-  AUTARCHY_LIVE_NM_DIR="$live" run "$SCRIPT" "$VARS" "$TARGET"
+  SYMPHONY_LIVE_NM_DIR="$live" run "$SCRIPT" "$VARS" "$TARGET"
   assert_success
   run find "$TARGET/etc/NetworkManager/system-connections/loose.nmconnection" -perm 0600
   assert_output "$TARGET/etc/NetworkManager/system-connections/loose.nmconnection"
@@ -357,7 +357,7 @@ calls() {
 
 @test "carries nothing, and does not fail, when the live session saved no connection (Phase 17)" {
   # The install is offline and Wi-Fi is optional: the common case is no profile.
-  AUTARCHY_LIVE_NM_DIR="$BATS_TEST_TMPDIR/no-such-dir" run "$SCRIPT" "$VARS" "$TARGET"
+  SYMPHONY_LIVE_NM_DIR="$BATS_TEST_TMPDIR/no-such-dir" run "$SCRIPT" "$VARS" "$TARGET"
   assert_success
   # (The profiles directory isn't even created; the connectivity drop-in is what
   # makes /etc/NetworkManager exist.)
@@ -423,7 +423,7 @@ calls() {
 }
 
 @test "creates snapper's root config from its shipped template, matching the runbook's settings (Phase 16)" {
-  # autarchy-update takes a pre-update `snapper -c root create`, which fails on a
+  # symphony-update takes a pre-update `snapper -c root create`, which fails on a
   # machine with no root config -- and base-install.md's manual snapper steps
   # never ran on an ISO install. The config is written directly (not via
   # `snapper create-config`, which insists on creating its own /.snapshots
@@ -461,7 +461,7 @@ calls() {
     "$(printf '[Autologin]\nUser=alice\nSession=hyprland-uwsm')"
 }
 
-@test "installs a self-contained payload at /usr/local/share/autarchy/current -- no repo checkout, no ~/Projects (Phase 16)" {
+@test "installs a self-contained payload at /usr/local/share/symphony/current -- no repo checkout, no ~/Projects (Phase 16)" {
   # The installed machine gets the OS content (what install/, scripts/, system/,
   # home/, packages/ and migrations/ hold), root-owned, and nothing else: no
   # .git (a machine isn't a dev checkout), no iso/ or tests/ (build-time
@@ -471,10 +471,10 @@ calls() {
   run "$SCRIPT" "$VARS" "$TARGET"
   assert_success
 
-  local payload="$TARGET/usr/local/share/autarchy/current"
+  local payload="$TARGET/usr/local/share/symphony/current"
   assert [ -e "$payload/install/configure-base-system" ]
   assert [ -e "$payload/install/link-home" ]
-  assert [ -e "$payload/home/update/dot-local/bin/autarchy-update" ]
+  assert [ -e "$payload/home/update/dot-local/bin/symphony-update" ]
   assert [ -e "$payload/system/files.txt" ]
   assert [ -e "$payload/home/bash/dot-bashrc" ]
   assert [ -e "$payload/packages/desktop.txt" ]
@@ -485,37 +485,37 @@ calls() {
   assert [ ! -e "$payload/gui" ]
   assert [ ! -e "$TARGET/home/alice/Projects" ]
   run calls
-  assert_line "arch-chroot $TARGET chown -R root:root /usr/local/share/autarchy"
+  assert_line "arch-chroot $TARGET chown -R root:root /usr/local/share/symphony"
 }
 
 @test "records the installed release in the payload's VERSION file (Phase 16)" {
   echo "2026.09.20" >"$BATS_TEST_TMPDIR/live-release"
-  AUTARCHY_LIVE_RELEASE_FILE="$BATS_TEST_TMPDIR/live-release" run "$SCRIPT" "$VARS" "$TARGET"
+  SYMPHONY_LIVE_RELEASE_FILE="$BATS_TEST_TMPDIR/live-release" run "$SCRIPT" "$VARS" "$TARGET"
   assert_success
-  assert_equal "$(cat "$TARGET/usr/local/share/autarchy/current/VERSION")" "2026.09.20"
+  assert_equal "$(cat "$TARGET/usr/local/share/symphony/current/VERSION")" "2026.09.20"
 }
 
 @test "VERSION is 'unreleased' when the live environment has no release marker" {
-  AUTARCHY_LIVE_RELEASE_FILE="$BATS_TEST_TMPDIR/does-not-exist" run "$SCRIPT" "$VARS" "$TARGET"
+  SYMPHONY_LIVE_RELEASE_FILE="$BATS_TEST_TMPDIR/does-not-exist" run "$SCRIPT" "$VARS" "$TARGET"
   assert_success
-  assert_equal "$(cat "$TARGET/usr/local/share/autarchy/current/VERSION")" "unreleased"
+  assert_equal "$(cat "$TARGET/usr/local/share/symphony/current/VERSION")" "unreleased"
 }
 
 @test "re-running replaces the payload instead of nesting a second copy inside it" {
   run "$SCRIPT" "$VARS" "$TARGET"
   assert_success
-  touch "$TARGET/usr/local/share/autarchy/current/stale-file"
+  touch "$TARGET/usr/local/share/symphony/current/stale-file"
   run "$SCRIPT" "$VARS" "$TARGET"
   assert_success
-  assert [ ! -e "$TARGET/usr/local/share/autarchy/current/stale-file" ]
-  assert [ ! -e "$TARGET/usr/local/share/autarchy/current/current" ]
+  assert [ ! -e "$TARGET/usr/local/share/symphony/current/stale-file" ]
+  assert [ ! -e "$TARGET/usr/local/share/symphony/current/current" ]
 }
 
 @test "runs link-home apply as the new user from the installed payload (Phase 16)" {
   run "$SCRIPT" "$VARS" "$TARGET"
   assert_success
   run calls
-  assert_line "arch-chroot $TARGET runuser -u alice -- bash -c cd /usr/local/share/autarchy/current && install/link-home apply"
+  assert_line "arch-chroot $TARGET runuser -u alice -- bash -c cd /usr/local/share/symphony/current && install/link-home apply"
 }
 
 @test "creates the user's XDG directories, English-named and without Projects, before linking dotfiles (Phase 16)" {

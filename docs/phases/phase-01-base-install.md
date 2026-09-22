@@ -150,7 +150,7 @@ genuine assertion failure, with no load or syntax errors. · Green confirmed:
   `archiso`), SSH (the ISO ships `sshd`), and package drift (`pkglist` works on the ISO
   and reports 118 undeclared ISO packages).
 - **Bug found — the ISO's root shell is zsh, not bash.** A screenshot showed the prompt
-  hostname as `autarchy-vm` after the vars file was sourced: zsh treats `HOST` as its
+  hostname as `symphony-vm` after the vars file was sourced: zsh treats `HOST` as its
   hostname parameter (cosmetic only). More importantly, zsh does not word-split unquoted
   variables, so the planned `pacstrap -K /mnt $PKGS` would have passed every package as
   one argument. Fixed in the runbook (`50f6e38`) before the user reached step 5 by using

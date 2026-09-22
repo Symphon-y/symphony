@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# configure-base-system: configure a freshly pacstrapped autarchy system
+# configure-base-system: configure a freshly pacstrapped symphony system
 # (runbook step 6).
 #
 # Usage: install/configure-base-system VARS_FILE [TARGET]
@@ -40,18 +40,18 @@ set -Eeuo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO_ROOT
-readonly ENABLE_ROOT_SERVICES="${AUTARCHY_ENABLE_ROOT_SERVICES_SCRIPT:-$REPO_ROOT/install/enable-root-services}"
+readonly ENABLE_ROOT_SERVICES="${SYMPHONY_ENABLE_ROOT_SERVICES_SCRIPT:-$REPO_ROOT/install/enable-root-services}"
 # The live ISO's own release marker (baked in by release-iso.yml) -- absent on a
 # plain stock-ISO manual install, which is recorded as "unreleased".
-readonly LIVE_RELEASE_FILE="${AUTARCHY_LIVE_RELEASE_FILE:-/etc/autarchy-release}"
+readonly LIVE_RELEASE_FILE="${SYMPHONY_LIVE_RELEASE_FILE:-/etc/symphony-release}"
 # Where the live session's NetworkManager saves connections (Phase 17): the
 # installer's Wi-Fi page, or nmtui from a shell, leaves one file per network.
-readonly LIVE_NM_DIR="${AUTARCHY_LIVE_NM_DIR:-/etc/NetworkManager/system-connections}"
+readonly LIVE_NM_DIR="${SYMPHONY_LIVE_NM_DIR:-/etc/NetworkManager/system-connections}"
 
 # What an installed machine needs from this repo. Not tests/, iso/, gui/ or
 # docs/ (build-time or dev-time only), and never .git or the GUI's vars file
 # that sits at the repo root: an allow-list means nothing else can leak in.
-readonly PAYLOAD_ROOT=/usr/local/share/autarchy
+readonly PAYLOAD_ROOT=/usr/local/share/symphony
 readonly PAYLOAD_DIR=$PAYLOAD_ROOT/current
 readonly PAYLOAD_CONTENT=(home install migrations packages scripts system)
 
@@ -177,19 +177,19 @@ configure_boot() {
   # swap device needs its own rd.luks.name=, exactly like root already
   # has, so sd-encrypt unlocks it early, inside the initramfs, before
   # systemd-hibernate-resume.service needs it.
-  if [[ -n ${AUTARCHY_RESUME_DEVICE:-} ]]; then
+  if [[ -n ${SYMPHONY_RESUME_DEVICE:-} ]]; then
     local swap_mapper swap_device swap_uuid
-    swap_mapper=$(basename "$AUTARCHY_RESUME_DEVICE")
+    swap_mapper=$(basename "$SYMPHONY_RESUME_DEVICE")
     swap_device="/dev/disk/by-partlabel/$SWAP_PARTLABEL"
     swap_uuid=$(blkid -s UUID -o value "$swap_device" || true)
     [[ -n $swap_uuid ]] || die "cannot read the UUID of $swap_device"
-    cmdline+=" rd.luks.name=$swap_uuid=$swap_mapper resume=$AUTARCHY_RESUME_DEVICE resumeflags=x-systemd.device-timeout=30s"
+    cmdline+=" rd.luks.name=$swap_uuid=$swap_mapper resume=$SYMPHONY_RESUME_DEVICE resumeflags=x-systemd.device-timeout=30s"
   fi
   # Firmware quirks chosen by DMI (system/quirks.txt, resolved by install-base-system,
   # D-0076): parameters the kernel enforces itself, e.g. module_blacklist=dell_rbtn. On the
   # command line they reach every unified kernel image, with no initramfs step of their own.
-  if [[ -n ${AUTARCHY_KERNEL_PARAMS:-} ]]; then
-    cmdline+=" $AUTARCHY_KERNEL_PARAMS"
+  if [[ -n ${SYMPHONY_KERNEL_PARAMS:-} ]]; then
+    cmdline+=" $SYMPHONY_KERNEL_PARAMS"
   fi
   mkdir -p "$TARGET/etc/kernel"
   echo "$cmdline" >"$TARGET/etc/kernel/cmdline"
@@ -291,7 +291,7 @@ configure_regdom() {
 # instant the real system boots. Re-running replaces the whole tree, so it can
 # never nest a second copy or keep files a newer payload dropped.
 install_payload() {
-  log "Installing the autarchy payload at $PAYLOAD_DIR"
+  log "Installing the symphony payload at $PAYLOAD_DIR"
   local dest="$TARGET$PAYLOAD_DIR" release=unreleased content
   if [[ -r $LIVE_RELEASE_FILE ]]; then
     release=$(<"$LIVE_RELEASE_FILE")
@@ -340,7 +340,7 @@ link_home() {
   in_target runuser -u "$USERNAME" -- bash -c "cd $PAYLOAD_DIR && install/link-home apply"
 }
 
-# autarchy-update takes a pre-update `snapper create`, which fails on a machine
+# symphony-update takes a pre-update `snapper create`, which fails on a machine
 # with no root config -- and base-install.md's manual snapper steps never ran on
 # an ISO install. Written directly from snapper's own shipped template (with the
 # same settings that runbook applies) instead of `snapper create-config`, which

@@ -1,6 +1,6 @@
-# Public keys allowed to log in as travis on autarchy-vm (public, safe to commit).
+# Public keys allowed to log in as travis on symphony-vm (public, safe to commit).
 #
 # install/ssh-jump-host installs them as root-owned /etc/ssh/authorized_keys/travis,
 # each restricted to the jump host's address. The address is set on the machine and
 # never enters git.
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP1kO14vqM5R1zCWyGNWACQhuCQx99qcn/y8/3YCjrI6 unraid-to-autarchy-vm
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP1kO14vqM5R1zCWyGNWACQhuCQx99qcn/y8/3YCjrI6 unraid-to-symphony-vm

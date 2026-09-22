@@ -35,4 +35,4 @@
 -- error -- on every login, and the desktop came up unthemed with no bar and no
 -- user services (Alienware, Phase 16 round 2). tests/acceptance/phase-16.bats
 -- guards against the bracket coming back.
-hl.exec_cmd("test -x /usr/local/share/autarchy/current/install/first-login && /usr/local/share/autarchy/current/install/first-login")
+hl.exec_cmd("test -x /usr/local/share/symphony/current/install/first-login && /usr/local/share/symphony/current/install/first-login")

@@ -11,7 +11,7 @@ setup() {
   SYS="$BATS_TEST_TMPDIR/sys"
   MAP="$BATS_TEST_TMPDIR/quirks.txt"
   mkdir -p "$SYS/class/dmi/id"
-  export AUTARCHY_SYS="$SYS" AUTARCHY_QUIRKS_MAP="$MAP"
+  export SYMPHONY_SYS="$SYS" SYMPHONY_QUIRKS_MAP="$MAP"
 }
 
 # The machine's DMI modalias, as /sys/class/dmi/id/modalias shows it.
@@ -112,7 +112,7 @@ ALIENWARE_17='dmi:bvnAlienware:bvr A11:bd01/01/2015:svnAlienware:pnAlienware 17:
 }
 
 @test "the repo's real quirks file parses cleanly" {
-  unset AUTARCHY_QUIRKS_MAP
+  unset SYMPHONY_QUIRKS_MAP
   dmi "dmi:svnNobody:pnNothing:"
   run "$SCRIPT"
   assert_success
@@ -122,7 +122,7 @@ ALIENWARE_17='dmi:bvnAlienware:bvr A11:bd01/01/2015:svnAlienware:pnAlienware 17:
 # The real map, against the DMI strings read off the Alienware 14 itself
 # (sys_vendor "Alienware", product_name "Alienware 14").
 @test "the real quirks file blacklists dell_rbtn on the Alienware 14" {
-  unset AUTARCHY_QUIRKS_MAP
+  unset SYMPHONY_QUIRKS_MAP
   dmi "$ALIENWARE_14"
   run "$SCRIPT"
   assert_success
@@ -130,7 +130,7 @@ ALIENWARE_17='dmi:bvnAlienware:bvr A11:bd01/01/2015:svnAlienware:pnAlienware 17:
 }
 
 @test "the real quirks file leaves other Alienware models alone" {
-  unset AUTARCHY_QUIRKS_MAP
+  unset SYMPHONY_QUIRKS_MAP
   dmi "$ALIENWARE_17"
   run "$SCRIPT"
   assert_success

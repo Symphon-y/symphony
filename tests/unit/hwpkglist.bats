@@ -10,7 +10,7 @@ setup() {
   MAP="$BATS_TEST_TMPDIR/hardware.txt"
   LISTS="$BATS_TEST_TMPDIR/lists"
   mkdir -p "$SYS/bus/pci/devices" "$LISTS"
-  export AUTARCHY_SYS="$SYS" AUTARCHY_HARDWARE_MAP="$MAP" AUTARCHY_HARDWARE_PACKAGES="$LISTS"
+  export SYMPHONY_SYS="$SYS" SYMPHONY_HARDWARE_MAP="$MAP" SYMPHONY_HARDWARE_PACKAGES="$LISTS"
 }
 
 # A PCI device as sysfs shows it: vendor and device are 0x-prefixed hex.
@@ -112,7 +112,7 @@ list() {
 }
 
 @test "with the repo's real map and lists, the Broadcom BCM4352 gets its driver and headers for both kernels" {
-  unset AUTARCHY_HARDWARE_MAP AUTARCHY_HARDWARE_PACKAGES
+  unset SYMPHONY_HARDWARE_MAP SYMPHONY_HARDWARE_PACKAGES
   pci 0000:03:00.0 14e4 43b1
   run "$SCRIPT"
   assert_success
@@ -122,7 +122,7 @@ list() {
 }
 
 @test "with the repo's real map, a machine without that adapter adds nothing" {
-  unset AUTARCHY_HARDWARE_MAP AUTARCHY_HARDWARE_PACKAGES
+  unset SYMPHONY_HARDWARE_MAP SYMPHONY_HARDWARE_PACKAGES
   pci 0000:00:02.0 8086 0416
   run "$SCRIPT"
   assert_success

@@ -39,10 +39,10 @@ setup() {
   assert_line "xdg-user-dirs"
 }
 
-@test "nothing that ships to an installed machine points at ~/Projects/autarchy" {
+@test "nothing that ships to an installed machine points at ~/Projects/symphony" {
   # Docs may still describe a dev clone there; code and config must not depend
   # on it -- the installed machine has no checkout at all.
-  run grep -rn 'Projects/autarchy' \
+  run grep -rn 'Projects/symphony' \
     "$REPO_ROOT/install" "$REPO_ROOT/scripts" "$REPO_ROOT/home" "$REPO_ROOT/system"
   assert_failure
 }
@@ -54,12 +54,12 @@ setup() {
 
 @test "configure-base-system installs the payload where the first-login hook looks for it" {
   # The hook (autostart.lua) and the installer must agree on one path.
-  run grep -F 'readonly PAYLOAD_ROOT=/usr/local/share/autarchy' "$REPO_ROOT/install/configure-base-system"
+  run grep -F 'readonly PAYLOAD_ROOT=/usr/local/share/symphony' "$REPO_ROOT/install/configure-base-system"
   assert_success
   # shellcheck disable=SC2016 # matching the script's literal text, not expanding it
   run grep -F 'readonly PAYLOAD_DIR=$PAYLOAD_ROOT/current' "$REPO_ROOT/install/configure-base-system"
   assert_success
-  run grep -F '/usr/local/share/autarchy/current/install/first-login' "$REPO_ROOT/home/hypr/dot-config/hypr/autostart.lua"
+  run grep -F '/usr/local/share/symphony/current/install/first-login' "$REPO_ROOT/home/hypr/dot-config/hypr/autostart.lua"
   assert_success
 }
 

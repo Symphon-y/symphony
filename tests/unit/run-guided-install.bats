@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
 # Unit tests for install/run-guided-install. install-base-system and
-# finish-install are both overridden via AUTARCHY_INSTALL_SCRIPT/
-# AUTARCHY_FINISH_SCRIPT, mirroring install-base-system's own
-# AUTARCHY_CONFIGURE_SCRIPT-style test override.
+# finish-install are both overridden via SYMPHONY_INSTALL_SCRIPT/
+# SYMPHONY_FINISH_SCRIPT, mirroring install-base-system's own
+# SYMPHONY_CONFIGURE_SCRIPT-style test override.
 
 setup() {
   load '../helpers/common'
@@ -26,8 +26,8 @@ make_stubs() {
   mkdir -p "$bin"
   stub "$bin/install-base-system-stub" 'echo "install-base-system $*" >>"$STUB_LOG"; exit "${STUB_INSTALL_RC:-0}"'
   stub "$bin/finish-install-stub" 'echo "finish-install called" >>"$STUB_LOG"'
-  export AUTARCHY_INSTALL_SCRIPT="$bin/install-base-system-stub"
-  export AUTARCHY_FINISH_SCRIPT="$bin/finish-install-stub"
+  export SYMPHONY_INSTALL_SCRIPT="$bin/install-base-system-stub"
+  export SYMPHONY_FINISH_SCRIPT="$bin/finish-install-stub"
 }
 
 calls() {

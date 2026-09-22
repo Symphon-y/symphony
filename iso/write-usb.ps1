@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-  Writes an autarchy ISO to a USB stick from Windows -- a raw, dd-style write.
+  Writes an symphony ISO to a USB stick from Windows -- a raw, dd-style write.
 
 .DESCRIPTION
-  The Windows counterpart of `dd if=autarchy.iso of=/dev/sdX`, for the
+  The Windows counterpart of `dd if=symphony.iso of=/dev/sdX`, for the
   build-boot-fix loop after scripts/build-iso. Windows has no dd, and the ISO is
   a hybrid image that must be written byte for byte, not copied as files.
 
@@ -15,7 +15,7 @@
   afterwards to prove the write. Needs an elevated (Administrator) PowerShell.
 
 .PARAMETER Iso
-  The ISO to write. Default: the newest out/autarchy-*.iso in this repo.
+  The ISO to write. Default: the newest out/symphony-*.iso in this repo.
 
 .PARAMETER DiskNumber
   The Windows disk number (Get-Disk) of the USB stick. Omit to just list.
@@ -51,7 +51,7 @@ function Resolve-IsoPath {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "No such file: $Path" }
     return (Resolve-Path -LiteralPath $Path).Path
   }
-  $found = Get-ChildItem -Path (Join-Path (Get-RepoRoot) 'out') -Filter 'autarchy-*.iso' -File -ErrorAction SilentlyContinue |
+  $found = Get-ChildItem -Path (Join-Path (Get-RepoRoot) 'out') -Filter 'symphony-*.iso' -File -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
   if (-not $found) { throw "No ISO given and none found in out/ -- run scripts/build-iso first, or pass -Iso." }
   $found.FullName

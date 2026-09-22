@@ -1,4 +1,4 @@
-# Builds a bootable, fully offline-installable autarchy ISO from a tagged
+# Builds a bootable, fully offline-installable symphony ISO from a tagged
 # commit on main and publishes it as a GitHub Release (Phase 10, made
 # offline-capable in Phase 13, made genuinely network-free in Phase 14 --
 # Phase 13 baked in the *package* closure but not the *repo* driving the
@@ -29,10 +29,10 @@ jobs:
   # The release payload (Phase 18, D-0078): what an installed machine updates to.
   # Built from the tagged commit by scripts/build-payload, signed with minisign
   # (the secret key lives only in the MINISIGN_SECRET_KEY / MINISIGN_PASSWORD
-  # secrets; the public key ships in system/autarchy/release.pub), and published
+  # secrets; the public key ships in system/symphony/release.pub), and published
   # first -- the Release is created here, so a payload exists even if the ISO
   # build below fails, and the ISO job only ever adds assets to it. A tag with a
-  # suffix (2026.09.22-test1) is a pre-release: autarchy-update follows
+  # suffix (2026.09.22-test1) is a pre-release: symphony-update follows
   # releases/latest, which GitHub defines as the newest non-prerelease.
   payload:
     runs-on: ubuntu-latest
@@ -59,12 +59,12 @@ jobs:
           umask 077
           printf '%s\n' "$MINISIGN_SECRET_KEY" >minisign.key
           printf '%s\n' "$MINISIGN_PASSWORD" |
-            minisign -S -s minisign.key -m "out/autarchy-$GITHUB_REF_NAME-payload.tar.zst" \
-              -t "autarchy $GITHUB_REF_NAME payload"
+            minisign -S -s minisign.key -m "out/symphony-$GITHUB_REF_NAME-payload.tar.zst" \
+              -t "symphony $GITHUB_REF_NAME payload"
           rm -f minisign.key
           # The signature must verify with the key the repo ships, or an installed
           # machine will refuse this release: fail here, not there.
-          minisign -V -p system/autarchy/release.pub -m "out/autarchy-$GITHUB_REF_NAME-payload.tar.zst"
+          minisign -V -p system/symphony/release.pub -m "out/symphony-$GITHUB_REF_NAME-payload.tar.zst"
 
       - name: Create the GitHub Release and upload the payload
         env:
@@ -78,7 +78,7 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             --target "$GITHUB_SHA" \
             --generate-notes "${prerelease[@]}" \
-            out/autarchy-"$GITHUB_REF_NAME"-payload.tar.zst*
+            out/symphony-"$GITHUB_REF_NAME"-payload.tar.zst*
 
   build-and-release:
     needs: payload
@@ -105,10 +105,10 @@ jobs:
       # Baked into the ISO so scripts/update (post-install) knows the
       # installed release.
       - name: Record the release tag
-        run: echo "${GITHUB_REF_NAME}" >iso/profile/airootfs/etc/autarchy-release
+        run: echo "${GITHUB_REF_NAME}" >iso/profile/airootfs/etc/symphony-release
 
       # The core install needs the repo itself, not just the package cache
-      # build-offline-repo populates below -- without this, autarchy-install
+      # build-offline-repo populates below -- without this, symphony-install
       # would still need a GitHub clone (Phase 14). Excludes:
       #   .git                    -- not needed to run install scripts
       #   iso/profile/airootfs    -- the destination lives under this path
@@ -119,9 +119,9 @@ jobs:
       #                              second, nested copy of the repo
       - name: Bake the repo into the live environment
         run: |
-          mkdir -p iso/profile/airootfs/root/autarchy
+          mkdir -p iso/profile/airootfs/root/symphony
           rsync -a --exclude='.git' --exclude='iso/profile/airootfs' \
-            ./ iso/profile/airootfs/root/autarchy/
+            ./ iso/profile/airootfs/root/symphony/
 
       - name: Disk space before the build
         run: df -h
@@ -143,9 +143,9 @@ jobs:
         run: |
           cd out
           iso=$(ls -- *.iso)
-          mv -- "$iso" "autarchy-${GITHUB_REF_NAME}.iso"
-          sha256sum "autarchy-${GITHUB_REF_NAME}.iso" >"autarchy-${GITHUB_REF_NAME}.iso.sha256"
-          echo "size=$(stat -c%s "autarchy-${GITHUB_REF_NAME}.iso")" >>"$GITHUB_OUTPUT"
+          mv -- "$iso" "symphony-${GITHUB_REF_NAME}.iso"
+          sha256sum "symphony-${GITHUB_REF_NAME}.iso" >"symphony-${GITHUB_REF_NAME}.iso.sha256"
+          echo "size=$(stat -c%s "symphony-${GITHUB_REF_NAME}.iso")" >>"$GITHUB_OUTPUT"
 
       # GitHub Releases refuses any single asset >= 2 GiB. Only decided here,
       # against the real built file's size -- not assumed in advance from the
@@ -159,8 +159,8 @@ jobs:
         run: |
           cd out
           split -d -b 1800M --additional-suffix=.part \
-            "autarchy-${GITHUB_REF_NAME}.iso" "autarchy-${GITHUB_REF_NAME}.iso."
-          rm "autarchy-${GITHUB_REF_NAME}.iso"
+            "symphony-${GITHUB_REF_NAME}.iso" "symphony-${GITHUB_REF_NAME}.iso."
+          rm "symphony-${GITHUB_REF_NAME}.iso"
 
       # Publishes with the gh CLI directly, not softprops/action-gh-release:
       # a real run (Phase 14, twice in a row -- 2026.09.17-test1 and
@@ -183,7 +183,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd out
-          for f in autarchy-"$GITHUB_REF_NAME".iso*; do
+          for f in symphony-"$GITHUB_REF_NAME".iso*; do
             uploaded=false
             for attempt in 1 2 3; do
               if timeout 600 gh release upload "$GITHUB_REF_NAME" "$f" --clobber; then

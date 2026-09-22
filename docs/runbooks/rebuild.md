@@ -2,7 +2,7 @@
 
 > **Since Phase 16 (D-0067) a machine installed from the release ISO has no
 > checkout and needs none of the linking below:** the installer copies the OS
-> content to `/usr/local/share/autarchy/current`, links the home from it and
+> content to `/usr/local/share/symphony/current`, links the home from it and
 > runs `install/first-login` on the first desktop start. This runbook is for a
 > *development* machine that also carries the repo, and for the steps the
 > installer does not do (identity, auth, the personal Neovim config).
@@ -20,7 +20,7 @@ sequence against an **already-configured** machine and confirming every step is 
 safe no-op.
 
 **Conventions**
-- Runs **as your user** (`travis`) from `~/Projects/autarchy`, in a terminal, unless
+- Runs **as your user** (`travis`) from `~/Projects/symphony`, in a terminal, unless
   a step says otherwise. Steps needing `sudo` are called out explicitly — run those
   yourself; Claude never does.
 - Every script here is idempotent: re-running the whole sequence on a
@@ -31,8 +31,8 @@ safe no-op.
 ## 1. Clone the repo (skip if already present)
 
 ```sh
-gh repo clone Symphon-y/autarchy ~/Projects/autarchy
-cd ~/Projects/autarchy
+gh repo clone Symphon-y/symphony ~/Projects/symphony
+cd ~/Projects/symphony
 ```
 
 ## 2. Bootstrap yay (skip if `yay --version` already works)
@@ -99,7 +99,7 @@ install/link-home check
 | `gh` OAuth token | `~/.config/gh/hosts.yml` | `gh auth login` — step 7 |
 | Claude Code's own credentials | `~/.claude/.credentials.json` | Claude Code's own login — step 7 |
 | LUKS header | Backed up to the Unraid host (not the VM, not this repo) | `cryptsetup luksHeaderRestore` from that backup — see D-0052 for how/when it was taken |
-| SSH jump-host private key | Unraid's flash only (`/root/.ssh/autarchy-vm`), never the VM (D-0021) | Not a VM rebuild concern at all — it never lived here |
+| SSH jump-host private key | Unraid's flash only (`/root/.ssh/symphony-vm`), never the VM (D-0021) | Not a VM rebuild concern at all — it never lived here |
 
 Nothing above is scriptable end-to-end: identity, auth, and the LUKS passphrase all
 need a human. That's the point — none of it belongs in git either way.

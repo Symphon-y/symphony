@@ -53,7 +53,7 @@ setup() {
   # The exact second bug found alongside the core/extra one: pacman
   # derives the expected database filename from the section name for a
   # bare `Server = file://` URL, not from the repo directory's own name
-  # -- a real mismatch here (localrepo vs autarchy.db) would silently
+  # -- a real mismatch here (localrepo vs symphony.db) would silently
   # break the sync even with core/extra correctly disabled.
   local conf="$REPO_ROOT/iso/profile/airootfs/etc/pacman.conf"
   local script="$REPO_ROOT/iso/build-offline-repo"
@@ -98,7 +98,7 @@ setup() {
 
 @test "docs: base-install.md documents reassembling a split ISO before writing to USB" {
   local doc="$REPO_ROOT/docs/runbooks/base-install.md"
-  run grep -q 'cat autarchy' "$doc"
+  run grep -q 'cat symphony' "$doc"
   assert_success
   run grep -q 'sha256sum -c' "$doc"
   assert_success

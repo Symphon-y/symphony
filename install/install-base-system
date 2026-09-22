@@ -25,9 +25,9 @@ set -Eeuo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO_ROOT
-readonly CONFIGURE_SCRIPT="${AUTARCHY_CONFIGURE_SCRIPT:-$REPO_ROOT/install/configure-base-system}"
-readonly HWPKGLIST="${AUTARCHY_HWPKGLIST_SCRIPT:-$REPO_ROOT/scripts/hwpkglist}"
-readonly QUIRKPARAMS="${AUTARCHY_QUIRKPARAMS_SCRIPT:-$REPO_ROOT/scripts/quirkparams}"
+readonly CONFIGURE_SCRIPT="${SYMPHONY_CONFIGURE_SCRIPT:-$REPO_ROOT/install/configure-base-system}"
+readonly HWPKGLIST="${SYMPHONY_HWPKGLIST_SCRIPT:-$REPO_ROOT/scripts/hwpkglist}"
+readonly QUIRKPARAMS="${SYMPHONY_QUIRKPARAMS_SCRIPT:-$REPO_ROOT/scripts/quirkparams}"
 
 # Packages this machine's hardware needs on top of packages/*.txt (Phase 17); filled in by
 # resolve_hardware_packages before anything destructive happens.
@@ -119,7 +119,7 @@ resolve_kernel_params() {
 # The one interactive moment: typing the disk path back, not just y/n, so a
 # reflexive Enter can't confirm the wrong disk.
 confirm_destructive() {
-  log "This will ERASE EVERYTHING on $DISK and partition it for autarchy."
+  log "This will ERASE EVERYTHING on $DISK and partition it for symphony."
   local reply
   read -rp "Type the disk path ($DISK) to continue: " reply
   [[ $reply == "$DISK" ]] || die "confirmation did not match '$DISK', aborting"
@@ -266,10 +266,10 @@ main() {
 
   log "Base disk layout done. Handing off to configure-base-system."
   if [[ -n ${SWAP_SIZE:-} ]]; then
-    export AUTARCHY_RESUME_DEVICE="/dev/mapper/$SWAP_MAPPER"
+    export SYMPHONY_RESUME_DEVICE="/dev/mapper/$SWAP_MAPPER"
   fi
   if [[ -n $KERNEL_PARAMS ]]; then
-    export AUTARCHY_KERNEL_PARAMS="$KERNEL_PARAMS"
+    export SYMPHONY_KERNEL_PARAMS="$KERNEL_PARAMS"
   fi
   "$CONFIGURE_SCRIPT" "$vars_file" "$TARGET"
 }

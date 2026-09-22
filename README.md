@@ -1,10 +1,10 @@
-# autarchy
+# symphony
 
 An individually opinionated Arch Linux workstation.
 
 > Opinionated defaults, individually owned.
 
-autarchy is not a distribution and not an Omarchy installation. It is standard Arch
+symphony is not a distribution and not an Omarchy installation. It is standard Arch
 Linux plus a deliberate, documented system design — with the polish of a curated
 desktop and the transparency of a personally maintained Arch install.
 
@@ -60,14 +60,14 @@ first needs them, not in advance.
 
 ## Installing and updating
 
-- **Install:** download `autarchy-<tag>.iso` from the latest
-  [release](https://github.com/Symphon-y/autarchy/releases) (reassemble the
+- **Install:** download `symphony-<tag>.iso` from the latest
+  [release](https://github.com/Symphon-y/symphony/releases) (reassemble the
   `.part` files if it was split; check the `.sha256`), write it to a USB stick, boot
   it. A graphical installer collects everything once and installs offline;
   the first boot lands on the desktop. Details: `docs/runbooks/base-install.md`.
-- **Update:** `autarchy-update check`, then `autarchy-update apply`. Every release
+- **Update:** `symphony-update check`, then `symphony-update apply`. Every release
   ships a signed payload; the machine verifies it before touching anything and
-  takes a Btrfs snapshot first. `autarchy-update rollback` goes back one.
+  takes a Btrfs snapshot first. `symphony-update rollback` goes back one.
   Details: `docs/runbooks/update.md`.
 - **Own it:** fork, run `scripts/setup-signing` once (your own signing key), change
   `home/`, `system/` and `packages/`, tag -- CI builds your ISO and your signed payload.
@@ -78,5 +78,5 @@ Phases 0-17 complete except Phase 12's hardware bonuses. A release ISO installs 
 whole system offline through a GTK4 guided installer (with an optional Wi-Fi step) and
 boots into a themed Hyprland desktop with a working network bar; the Alienware 14 it
 runs on is now the development seat (`docs/environment/alienware-14.md`). Phase 18
-(in progress) adds the signed release payload and `autarchy-update`. See
+(in progress) adds the signed release payload and `symphony-update`. See
 [`docs/roadmap.md`](docs/roadmap.md).

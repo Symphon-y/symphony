@@ -56,7 +56,7 @@ Phase 1 (acceptance) and Phase 2 (unit tests, CI). Verification is manual:
 - [x] Write `docs/phases/_template.md`
 - [x] Write `.gitignore` and `.editorconfig`
 - [x] `git init -b main` and initial commit
-- [x] Private GitHub repo exists (`Symphon-y/autarchy`)
+- [x] Private GitHub repo exists (`Symphon-y/symphony`)
 - [x] Verify visibility is private
 - [x] Push `main` to origin
 
@@ -66,7 +66,7 @@ Phase 1 (acceptance) and Phase 2 (unit tests, CI). Verification is manual:
 - Mac inspected: Apple M2, 8 GB — control host only. Lab VM is on a remote Unraid
   server, booted into the Arch ISO (kernel 7.2.2-arch1-1), nothing installed.
 - Roadmap planned in plan mode and approved. Wrote core documents.
-- **Deviation:** planned `gh repo create`, but `Symphon-y/autarchy` already existed
+- **Deviation:** planned `gh repo create`, but `Symphon-y/symphony` already existed
   (empty, created minutes earlier, **public**). With the user's approval, switched it to
   private (verified `PRIVATE`) instead of creating a new repo.
 - First push failed: `remote: Your repository is disabled` (HTTP 403), right after the

@@ -41,7 +41,7 @@ pre-existing personal config is used as-is, outside this repo's ownership.
 
 **Resolved (user, 2026-09-14)**
 - Shell: bash.
-- Neovim: not packaged by autarchy; user's own `config.nvim` cloned directly,
+- Neovim: not packaged by symphony; user's own `config.nvim` cloned directly,
   out of this repo's ownership.
 - Containers: rootless Podman, not Docker.
 - Git identity: set globally now (`user.name = Symphon-y`; email kept as whatever

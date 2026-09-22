@@ -14,7 +14,7 @@
 # broken map stops the install rather than putting a half-read parameter on the boot
 # command line. Every line is checked, matching or not.
 #
-# AUTARCHY_SYS and AUTARCHY_QUIRKS_MAP override the sysfs root and the map (tests).
+# SYMPHONY_SYS and SYMPHONY_QUIRKS_MAP override the sysfs root and the map (tests).
 set -euo pipefail
 
 # Byte-order sorting, so output is identical on every machine.
@@ -22,8 +22,8 @@ export LC_ALL=C
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO_ROOT
-readonly SYS="${AUTARCHY_SYS:-/sys}"
-readonly MAP="${AUTARCHY_QUIRKS_MAP:-$REPO_ROOT/system/quirks.txt}"
+readonly SYS="${SYMPHONY_SYS:-/sys}"
+readonly MAP="${SYMPHONY_QUIRKS_MAP:-$REPO_ROOT/system/quirks.txt}"
 readonly MODALIAS_FILE="$SYS/class/dmi/id/modalias"
 
 # A plain kernel parameter: a name, optionally =value with no whitespace or shell

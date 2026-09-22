@@ -52,7 +52,7 @@ not ok 38 tooling: static checks and unit tests pass on this machine
 # status : 127
 # output (2 lines):
 #   ==> shellcheck
-#   /home/travis/Projects/autarchy/scripts/check: line 10: shellcheck: command not found
+#   /home/travis/Projects/symphony/scripts/check: line 10: shellcheck: command not found
 # --
 #
 not ok 39 system config: installed files match system/files.txt

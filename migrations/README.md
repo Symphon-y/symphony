@@ -32,5 +32,5 @@ declarative file sync can express.
     scripts/migrate check   # list what's pending, run nothing
     scripts/migrate apply   # run every pending migration in order
 
-Completion markers live under `~/.local/state/autarchy/migrations/` (override
-with `$AUTARCHY_STATE`), one empty file per completed migration's filename.
+Completion markers live under `~/.local/state/symphony/migrations/` (override
+with `$SYMPHONY_STATE`), one empty file per completed migration's filename.

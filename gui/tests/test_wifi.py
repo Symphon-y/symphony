@@ -278,7 +278,7 @@ class WifiBackendTest(unittest.TestCase):
         self._dir = tempfile.TemporaryDirectory()
         self.addCleanup(self._dir.cleanup)
         self.profile_dir = Path(self._dir.name)
-        self.profile = self.profile_dir / "autarchy-wifi.nmconnection"
+        self.profile = self.profile_dir / "symphony-wifi.nmconnection"
 
     def backend(self, answers=None):
         runner = FakeRunner(answers)

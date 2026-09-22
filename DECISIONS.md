@@ -216,7 +216,7 @@ and the old entry is marked `Superseded by D-XXXX`.
 - **Status:** Accepted (2026-09-13, Phase 1)
 - **Decision:** systemd-boot (`editor no`, `timeout 3`). mkinitcpio presets build default
   and fallback UKIs into `/efi/EFI/Linux` for `linux` and `linux-lts`. Initramfs hooks are
-  systemd-based, set in a drop-in (`system/mkinitcpio/10-autarchy.conf`).
+  systemd-based, set in a drop-in (`system/mkinitcpio/10-symphony.conf`).
   `systemd-boot-update.service` keeps the loader current.
 - **Alternatives considered:**
   - Limine with `limine-snapper-sync`: Omarchy's approach; REJECT.
@@ -240,7 +240,7 @@ and the old entry is marked `Superseded by D-XXXX`.
 
 - **Status:** Accepted (2026-09-13, Phase 1)
 - **Decision:** NetworkManager for all interfaces. systemd-resolved behind the stub
-  `resolv.conf`, with LLMNR and multicast DNS disabled (`system/resolved/10-autarchy.conf`).
+  `resolv.conf`, with LLMNR and multicast DNS disabled (`system/resolved/10-symphony.conf`).
   Time sync by systemd-timesyncd.
 - **Alternatives considered:** systemd-networkd (excellent on servers, weaker for Wi-Fi
   and VPN on a workstation); iwd alone; a local caching resolver (unneeded); chrony
@@ -370,10 +370,10 @@ and the old entry is marked `Superseded by D-XXXX`.
 - **Decision:** sshd starts on demand, not at boot, reached only from Unraid's LAN
   address. `install/ssh-jump-host <address>` writes both the firewall rule
   (`/etc/nftables.d/ssh-jump-host.nft`) and root-owned `authorized_keys`, with every key
-  restricted `from="<address>",restrict,pty`. The drop-in (`system/ssh/10-autarchy.conf`)
+  restricted `from="<address>",restrict,pty`. The drop-in (`system/ssh/10-symphony.conf`)
   allows keys only, no root login, no forwarding. The passphrase-protected private key
   lives on Unraid's flash, never in the VM or the repo; the repo keeps only the public
-  key (`system/hosts/autarchy-vm/ssh/authorized_keys.travis`).
+  key (`system/hosts/symphony-vm/ssh/authorized_keys.travis`).
 - **Alternatives considered:**
   - A short-lived secret-gist relay for copy/paste: the original Phase 2 plan, dropped
     once SSH from Unraid was on the table.
@@ -456,7 +456,7 @@ and the old entry is marked `Superseded by D-XXXX`.
 ## D-0025 — Desktop shell: standard decoupled tools + matugen, not a unified shell
 
 - **Status:** Accepted (2026-09-14, Phase 3)
-- **Decision:** autarchy's desktop layer (status bar, notifications, idle/lock,
+- **Decision:** symphony's desktop layer (status bar, notifications, idle/lock,
   wallpaper, launcher, menus, clipboard, polkit agent) is built from standard,
   independently-replaceable Linux desktop tools, each behind its own role — not a single
   unified shell process. The one real problem a unified shell solves for a personal
@@ -917,7 +917,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   question to the user, per the plan's own "resolved by research" framing.
 - **Consequences:** none of note.
 
-## D-0045 — Neovim: not packaged by autarchy; personal config used directly
+## D-0045 — Neovim: not packaged by symphony; personal config used directly
 
 - **Status:** Accepted (2026-09-14, Phase 7)
 - **Decision:** no `home/nvim/` stow package, no curated distribution of any kind.
@@ -933,7 +933,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   custom from scratch. All rejected once the user clarified they already have their
   own config and specifically didn't want it coupled to this distro's repo.
 - **Reasoning:** the user's existing config is genuinely personal content, not
-  "system design" -- coupling it to autarchy's own repo would mean either forking
+  "system design" -- coupling it to symphony's own repo would mean either forking
   it (drifting from the source they actually maintain) or making this repo own
   something it has no business owning. This also sidesteps a real, confirmed
   Omarchy pitfall for free: `omarchy-nvim`'s theme hot-reload structurally requires
@@ -1099,7 +1099,7 @@ and the old entry is marked `Superseded by D-XXXX`.
 - **Status:** Accepted (2026-09-15, Phase 8)
 - **Decision:** `migrations/<unix-timestamp>-<slug>.sh` scripts, run in
   filename order by `scripts/migrate check|apply`, each marked complete (an
-  empty file under `~/.local/state/autarchy/migrations/`) only after it exits
+  empty file under `~/.local/state/symphony/migrations/`) only after it exits
   `0`. A migration needing root calls `sudo` itself; the user runs `scripts/
   migrate apply`, never Claude. Shipped with one real first migration
   (removing the `yay-debug` package D-0050 found), not a synthetic
@@ -1250,8 +1250,8 @@ and the old entry is marked `Superseded by D-XXXX`.
 ## D-0057 — Journal size: an explicit cap, not the compiled-in default
 
 - **Status:** Accepted (2026-09-15, Phase 9)
-- **Decision:** `system/journald/10-autarchy.conf` →
-  `/etc/systemd/journald.conf.d/10-autarchy.conf`, setting `SystemMaxUse=500M`.
+- **Decision:** `system/journald/10-symphony.conf` →
+  `/etc/systemd/journald.conf.d/10-symphony.conf`, setting `SystemMaxUse=500M`.
 - **Alternatives considered:** a periodic `journalctl --vacuum-*` timer —
   rejected once confirmed that journald already self-limits continuously as it
   writes (a boundary it enforces itself, not a periodic job); the actual gap
@@ -1290,7 +1290,7 @@ and the old entry is marked `Superseded by D-XXXX`.
 
 - **Status:** Accepted (2026-09-15, Phase 9). _Amended 2026-09-21 (Phase 18): the same
   daily timer, now in `home/update/`, also asks GitHub's `releases/latest` once and
-  toasts a newer autarchy release once per tag; still never applies (D-0079)._
+  toasts a newer symphony release once per tag; still never applies (D-0079)._
 - **Decision:** `home/update-notify/` — a `systemd --user` timer (daily) running
   a script that calls `checkupdates --change` (`pacman-contrib`, already
   installed) and sends a desktop notification only when the set of pending
@@ -1401,7 +1401,7 @@ and the old entry is marked `Superseded by D-XXXX`.
 ## D-0062 — `scripts/update` takes an unconditional pre-update snapshot (extends D-0011)
 
 - **Status:** Accepted (2026-09-16, Phase 10). _`scripts/update` retired 2026-09-21;
-  `autarchy-update` keeps the rule for every `apply` and `rollback` (D-0079)._
+  `symphony-update` keeps the rule for every `apply` and `rollback` (D-0079)._
 - **Decision:** `scripts/update apply` runs `snapper -c root create`
   unconditionally, before touching anything, then reapplies the repo's
   existing appliers in order (`install/install-packages`, `sudo install/
@@ -1447,7 +1447,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   gotcha: the build container's own dbpath resolves wrong), builds the 3
   AUR packages via `makepkg` as a non-root user, and `repo-add`s both sets
   into one local repo baked into `iso/profile/airootfs/var/lib/
-  autarchy-repo` — gitignored, regenerated fresh by every CI run, never
+  symphony-repo` — gitignored, regenerated fresh by every CI run, never
   committed. A **new** `iso/profile/airootfs/etc/pacman.conf` (distinct
   from the already-existing, still build-time-only `iso/profile/
   pacman.conf`) makes this the live/install-time environment's real
@@ -1501,7 +1501,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   `[extra]` sections are commented out (`#[core]`, not deleted), not left
   enabled as D-0063 originally stated. `iso/build-offline-repo`'s
   `repo-add` output is renamed `localrepo.db.tar.zst`, matching the
-  `[localrepo]` pacman.conf section name exactly (was `autarchy.db.tar.zst`
+  `[localrepo]` pacman.conf section name exactly (was `symphony.db.tar.zst`
   — a mismatch pacman doesn't tolerate for a bare `Server = file://` URL,
   since it derives the expected database filename from the section name).
   `install/install-base-system`'s `pacstrap` call gets `-M`, so the
@@ -1539,7 +1539,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   failure and the fix against upstream pacman/`pacstrap.in`/`mkarchiso`
   source and the Arch Wiki), independently converging on the same root
   cause and citing `pacman.conf(5)`'s own documented section-name-to-
-  database-filename convention for the second, latent `autarchy.db` vs
+  database-filename convention for the second, latent `symphony.db` vs
   `[localrepo]` mismatch bug found alongside it.
 - **Consequences:** `core`/`extra` are now genuinely inert on this ISO —
   correctly reflecting that a real, working network-fallback install path
@@ -1644,7 +1644,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   hand-written GTK4/libadwaita Python app (`gui/`), kiosk-launched via
   `cage` (a 66 KiB wlroots compositor, "run one fullscreen app, exit
   when it exits") auto-started on `tty1` login, with `GSK_RENDERER=gl`
-  pinned explicitly. The terminal flow (`autarchy-install`) stays as the
+  pinned explicitly. The terminal flow (`symphony-install`) stays as the
   boot fallback / manual-recovery path on `tty2`+, not replaced. Both
   frontends are pure collectors: they gather every field once (including
   both the account password and the LUKS root passphrase, typed and
@@ -1694,7 +1694,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   taken a `--key-file` before this phase — they prompted interactively
   on the TTY, *after* whichever collector's own review/confirmation
   screen already ran, breaking the "fully unattended after confirm"
-  promise `autarchy-install`'s own header already claimed; this is a
+  promise `symphony-install`'s own header already claimed; this is a
   real, pre-existing gap this phase closed for both frontends, not just
   the new GUI. A real hardware boot of the first Milestone C build found
   the destructive-confirmation gate genuinely unanswerable: with no
@@ -1725,7 +1725,7 @@ and the old entry is marked `Superseded by D-XXXX`.
 - **Status:** Accepted (2026-09-20, Phase 16; verified on the Alienware 2026-09-20/21)
 - **Decision:** `install/configure-base-system` copies the six directories that make up the
   OS content (`home install migrations packages scripts system`, an allow-list) to
-  `/usr/local/share/autarchy/current` -- a real directory at a fixed path, `root:root`, with a
+  `/usr/local/share/symphony/current` -- a real directory at a fixed path, `root:root`, with a
   `VERSION` file naming the release -- and runs `install/link-home` from there, so every
   `~/.config`/`~/.local/bin` entry is a stow link into the payload. The target gets no git
   checkout and no `~/Projects`; `.git` is not baked into the ISO. The user's XDG directories
@@ -1736,7 +1736,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   -- is one script, `install/first-login`, run from `autostart.lua` on every Hyprland start and
   made a no-op by a marker file after its first success. Snapper's root config is written from
   the package's template at install; root timers are enabled with `--root`.
-- **Alternatives considered:** A checkout at `~/Projects/autarchy` on the target (the original
+- **Alternatives considered:** A checkout at `~/Projects/symphony` on the target (the original
   plan) -- the user's own framing killed it: "Windows doesn't have a 'windows os' repo anywhere
   either"; it also put `.git` in the ISO. `releases/<tag>/` behind a `current` symlink -- spiked:
   GNU stow records links by the *resolved* stow dir, so a restow after an update aborts with
@@ -1755,7 +1755,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   was read from the machine itself. `test -x` fixes it; an acceptance test refuses the bracket.
 - **Consequences:** An installed machine has no way to update itself yet (`scripts/update` is
   git-based) -- Phase 18's scope; until then the dev seat is updated by hand
-  (`docs/runbooks/dev-deploy.md`, since replaced by `autarchy-update apply --from`, D-0079), which is the shape the update takes: snapshot, replace the
+  (`docs/runbooks/dev-deploy.md`, since replaced by `symphony-update apply --from`, D-0079), which is the shape the update takes: snapshot, replace the
   payload's contents at the same path, re-run the appliers from the payload. Every applier must
   run *from the payload*, never from a checkout (stow's ownership rule). The full "zero manual
   steps from a fresh install" signal has been observed on the mechanism's parts (payload,
@@ -1799,7 +1799,7 @@ and the old entry is marked `Superseded by D-XXXX`.
 
 - **Status:** Accepted (2026-09-20, Phase 17)
 - **Decision:** The installer's Wi-Fi page joins a network by writing a
-  NetworkManager connection file (`autarchy-wifi.nmconnection`, mode 0600)
+  NetworkManager connection file (`symphony-wifi.nmconnection`, mode 0600)
   and asking NetworkManager to reload it — never `nmcli … password X`.
   `keyfile_for()` in `gui/installer/wifi.py` is the one place that knows the
   file format: the secret is stored in the file (`psk-flags=0`), there is no
@@ -1943,7 +1943,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   The page re-reads the state every couple of seconds while it is blocked, missing or
   unreadable and stops when it leaves the screen, so pressing the Wi-Fi key or fixing a
   BIOS setting is noticed on its own. The live ISO gains `iw`, `pciutils`, `usbutils`
-  and `evtest`; `autarchy.nogui` on the kernel command line skips the GUI and leaves a
+  and `evtest`; `symphony.nogui` on the kernel command line skips the GUI and leaves a
   terminal on tty1; `scripts/system-report` gains a Wi-Fi section built on the same module.
 - **Alternatives considered:** Keep one generic message — what failed. Show raw
   `rfkill list` output — needs the tool and a parser, and still doesn't say what to do.
@@ -2019,7 +2019,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   (a firmware-reported airplane-mode slider, hard-blocked) would keep NetworkManager from
   enabling Wi-Fi even with the driver; other Alienware owners cleared it by blacklisting the
   module or with an `acpi_osi` kernel parameter, but nothing confirms either for the 14, so
-  that waits for a test on the machine (`modprobe -r dell_rbtn` from `autarchy.nogui`) rather
+  that waits for a test on the machine (`modprobe -r dell_rbtn` from `symphony.nogui`) rather
   than being guessed. Phase 12's planned `packages/alienware-14.txt` is superseded by this.
 
 ## D-0075 — The network picker's password prompt is fixed at its source, and its outcome is reported (amends D-0071)
@@ -2151,13 +2151,13 @@ and the old entry is marked `Superseded by D-XXXX`.
 ## D-0078 — A release is a signed payload tarball on a GitHub Release, verified with minisign against a key the system ships
 
 - **Status:** Accepted (2026-09-21, Phase 18)
-- **Decision:** A date-shaped tag on `main` makes CI build `autarchy-<tag>-payload.tar.zst`
+- **Decision:** A date-shaped tag on `main` makes CI build `symphony-<tag>-payload.tar.zst`
   -- the six payload directories (`home install migrations packages scripts system`, the
   allow-list `install/configure-base-system` defines, read from there by
   `scripts/build-payload`) plus `VERSION` -- sign it with minisign, and publish it with
   its `.minisig` and `.sha256` on the GitHub Release for that tag, before the ISO job
-  adds the ISO. The public key is committed at `system/autarchy/release.pub` and installed
-  to `/etc/autarchy/release.pub` on every machine; `minisign` and `zstd` are in
+  adds the ISO. The public key is committed at `system/symphony/release.pub` and installed
+  to `/etc/symphony/release.pub` on every machine; `minisign` and `zstd` are in
   `packages/base.txt`. The secret key exists only in the repository secrets
   `MINISIGN_SECRET_KEY`/`MINISIGN_PASSWORD`, created once by the maintainer with
   `scripts/setup-signing` (never by CI). CI verifies its own signature against the shipped
@@ -2186,11 +2186,11 @@ and the old entry is marked `Superseded by D-XXXX`.
   `system/quirks.txt`'s kernel parameters to an installed machine; that change ships as a
   migration.
 
-## D-0079 — One updater, `autarchy-update`, replaces the git-based `scripts/update`; the payload's `VERSION` is the installed release
+## D-0079 — One updater, `symphony-update`, replaces the git-based `scripts/update`; the payload's `VERSION` is the installed release
 
 - **Status:** Accepted (2026-09-21, Phase 18). Supersedes D-0062's script (the rule
   stays) and the dev-deploy runbook.
-- **Decision:** `home/update/dot-local/bin/autarchy-update check | apply [--yes | --from
+- **Decision:** `home/update/dot-local/bin/symphony-update check | apply [--yes | --from
   DIR] | rollback | version`, in every install. `apply` refuses while pacman holds its
   lock, on a `local-*` build without `--yes`, and on a downgrade without `--yes`; downloads
   the three assets over https only (`--proto '=https' --tlsv1.2`), verifies the signature
@@ -2203,8 +2203,8 @@ and the old entry is marked `Superseded by D-XXXX`.
   back and re-runs the appliers; migrations are one-way (D-0051) and it says so.
   `apply --from DIR` stages a checkout's working tree the same way, versioned
   `local-<sha>`, uncommitted changes included with a warning -- the dev seat's deploy.
-  The installed release is `/usr/local/share/autarchy/current/VERSION`; the per-user
-  `~/.local/state/autarchy/current-release` marker is no longer seeded and a migration
+  The installed release is `/usr/local/share/symphony/current/VERSION`; the per-user
+  `~/.local/state/symphony/current-release` marker is no longer seeded and a migration
   removes it. When GitHub has no non-prerelease (`releases/latest` is 404) `check` and
   `apply` say "no release published yet" rather than failing.
 - **Alternatives considered:** Keep `scripts/update` for a checkout-only machine beside
@@ -2226,14 +2226,14 @@ and the old entry is marked `Superseded by D-XXXX`.
 ## D-0080 — The repository is public
 
 - **Status:** Accepted (2026-09-21, Phase 18)
-- **Decision:** `Symphon-y/autarchy` is public under the MIT license (`LICENSE`), so
+- **Decision:** `Symphon-y/symphony` is public under the MIT license (`LICENSE`), so
   release assets download without authentication and the project can be read, forked
   and audited. Before flipping visibility: the tree was already clean of identifiers
   (D-0022's scanner) and the history's diffs were grepped for emails, keys and tokens;
   the 37 commits authored with a personal address were rewritten to the GitHub noreply
   address with `git filter-repo --mailmap` (run by the user), and the ten pre-Phase-18
   releases and tags -- ISOs of a state that cannot update -- were deleted first. The
-  updater's `AUTARCHY_RELEASE_REPO` names the repo in one place.
+  updater's `SYMPHONY_RELEASE_REPO` names the repo in one place.
 - **Alternatives considered:** Stay private and download with `gh release download`
   (needs `gh auth` on every install; not what a from-USB install has). Accept the
   personal author addresses -- they would be public forever; a rewrite before going

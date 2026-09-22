@@ -232,7 +232,7 @@ Red confirmed: | Green confirmed: |
   `keyfile_for()` output for all 16 awkward SSID/password cases was fed to a real
   NetworkManager 1.58.1 and every `id`, `ssid`, `psk`, `psk-flags=0` and `key-mgmt`
   came back exactly. Design points settled while writing it: one fixed profile file
-  (`autarchy-wifi.nmconnection`) so no file name is built from a user-typed SSID and
+  (`symphony-wifi.nmconnection`) so no file name is built from a user-typed SSID and
   joining another network replaces the first; the profile is written 0600 under any
   umask and tightened if it already existed looser; a file NetworkManager silently
   ignores is detected after the reload; a failed join deletes the profile (a wrong
@@ -318,13 +318,13 @@ Red confirmed: | Green confirmed: |
   an error that says nothing about the cause (the failure itself was a typo). Fix:
   validate in `gui/installer/state.py` (GTK-free, unit-tested: a whole number plus
   `K/M/G/T`; reject spaces, `GB`/`GiB`, zero, empty units), block Next on the Disk
-  page with a clear message, mirror it in the terminal fallback `autarchy-install`,
+  page with a clear message, mirror it in the terminal fallback `symphony-install`,
   and have `install-base-system`'s preflight reject a bad or larger-than-the-disk
   `SWAP_SIZE` before anything destructive runs. Red tests first; small enough to
   bundle into whichever phase next touches the installer.
 
 ### 2026-09-20 (first hardware boot: "Wi-Fi is switched off by a hardware switch")
-- **Symptom.** `autarchy-local-c4f55d5` on the Alienware 14 (P39G): the Wi-Fi page said the
+- **Symptom.** `symphony-local-c4f55d5` on the Alienware 14 (P39G): the Wi-Fi page said the
   radio was switched off by a hardware switch, and the F2 key (which carries a Wi-Fi symbol)
   did nothing however it was combined (F2, Shift/Alt/Fn/Super+F2). The live session had no
   terminal to investigate with.
@@ -358,7 +358,7 @@ Red confirmed: | Green confirmed: |
   none was found -- with a Details section and auto-recheck that notices a change without a
   click and stops when the page leaves the screen. The real GTK page was driven under a
   virtual display through hard block, recovery, no adapter, no driver, unknown and soft block
-  (37 checks). The live ISO gained `iw`, `pciutils`, `usbutils`, `evtest`; `autarchy.nogui` on
+  (37 checks). The live ISO gained `iw`, `pciutils`, `usbutils`, `evtest`; `symphony.nogui` on
   the kernel command line skips the GUI and leaves a terminal on tty1 (documented in
   `base-install.md`); `scripts/system-report` gained a Wi-Fi section reusing the same module.
 - **For the user, before the new ISO** (no code): in the BIOS set *Function Key Behavior* to
@@ -394,7 +394,7 @@ Red confirmed: | Green confirmed: |
   Wi-Fi off even with the driver. Other Alienware owners (13 R3, 15 R2) and several Inspiron
   owners cleared it by blacklisting `dell_rbtn` (or, on the 15 R2, `acpi_osi="!Windows 2012"`);
   nothing confirms either for the 14 and no source shows `modprobe -r` clearing it live. **Waiting
-  on the user's test** from `autarchy.nogui`: `grep -H . /sys/class/rfkill/rfkill*/{name,hard,soft};
+  on the user's test** from `symphony.nogui`: `grep -H . /sys/class/rfkill/rfkill*/{name,hard,soft};
   modprobe -r dell_rbtn; rfkill list`, then the result decides between a DMI-gated blacklist and the
   `acpi_osi` parameter.
 - **Problem 2 result: `modprobe -r dell_rbtn` clears the hard block** (user's test on the

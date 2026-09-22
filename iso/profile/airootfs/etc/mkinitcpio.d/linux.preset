@@ -1,4 +1,4 @@
-# mkinitcpio preset for the 'linux' package on the autarchy live/install medium.
+# mkinitcpio preset for the 'linux' package on the symphony live/install medium.
 # Unmodified from upstream archiso's own releng profile except for this header --
 # points mkarchiso's build-time mkinitcpio invocation at the archiso-aware HOOKS
 # in archiso.conf, instead of the stock linux package's own default preset (which

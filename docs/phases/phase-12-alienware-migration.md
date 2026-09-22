@@ -33,7 +33,7 @@ it just should never have been separate.
 
 The release ISO installs the entire `packages/*.txt` closure (official
 packages + the 3 AUR packages) with zero network connectivity needed, and
-autarchy runs on real hardware: a 2014 Alienware 14 (P39G), Intel HD 4600
+symphony runs on real hardware: a 2014 Alienware 14 (P39G), Intel HD 4600
 as the base display driver, hibernation working via a dedicated LUKS2 swap
 partition, with the discrete NVIDIA GPU and AlienFX RGB attempted as
 explicit, non-blocking bonuses.
@@ -60,7 +60,7 @@ explicit, non-blocking bonuses.
 - The swap keyfile embedded into the initramfs via a per-host
   `system/hosts/<hostname>/` override (D-0021's existing per-host
   mechanism), not a global mkinitcpio change.
-- `autarchy-bootstrap` fix: seed `~/.local/state/autarchy/current-release`
+- `symphony-bootstrap` fix: seed `~/.local/state/symphony/current-release`
   from the tag it already reads, so `scripts/update` has a correct baseline
   from day one.
 - `packages/alienware-14.txt`: `intel-ucode`, WiFi firmware if actually
@@ -113,11 +113,11 @@ to check by device name instead)
 - [x] `install/install-base-system`: optional `SWAP_SIZE` path + unit tests
       (9 new tests: 3-partition layout, keyfile generation/permissions,
       LUKS2 format+open+mkswap, crypttab/fstab/mkinitcpio wiring,
-      `AUTARCHY_RESUME_DEVICE` handoff)
+      `SYMPHONY_RESUME_DEVICE` handoff)
 - [x] `install/configure-base-system`: appends `resume=` to the UKI cmdline
-      when `AUTARCHY_RESUME_DEVICE` is set + unit test
+      when `SYMPHONY_RESUME_DEVICE` is set + unit test
 - [x] Release-marker seeding: implemented in `install-base-system` instead
-      of `autarchy-bootstrap` as originally planned (that script runs
+      of `symphony-bootstrap` as originally planned (that script runs
       before the target user/system exist) + 3 unit tests
 - [x] Verify against the VM with `SWAP_SIZE` unset (no behavior change) --
       confirmed both by the regression test and the full existing test
@@ -146,10 +146,10 @@ to check by device name instead)
       branch, stress-tested 30x locally, merged separately (unrelated to
       the ISO/hardware work).
 - [x] Ground truth on real hardware: `docs/environment/alienware-14.md` (2026-09-21; the BIOS steps that mattered -- Function Key Behavior, Wireless -- are recorded there and in D-0073/D-0076)
-- [x] User: boot the offline ISO, `autarchy-install`, `install-base-system`
+- [x] User: boot the offline ISO, `symphony-install`, `install-base-system`
       with real `SWAP_SIZE` -- done via Phase 14's real-hardware
-      verification loop (`autarchy-bootstrap` itself was retired by that
-      phase; the guided `autarchy-install` flow replaced it, needing zero
+      verification loop (`symphony-bootstrap` itself was retired by that
+      phase; the guided `symphony-install` flow replaced it, needing zero
       git operations at all). `2026.09.17-test14` confirmed a real,
       zero-network install completing to a rebootable, logged-in base
       system with hibernation-capable `SWAP_SIZE` wired up (D-0064,
@@ -184,15 +184,15 @@ to check by device name instead)
   `resume=` cmdline addition in `install/configure-base-system`, both
   unit-tested with stubs -- all green on the first real run.
   Reconsidered the release-marker-seeding design from the plan while
-  implementing it: the plan said to fix `autarchy-bootstrap`, but that
+  implementing it: the plan said to fix `symphony-bootstrap`, but that
   script runs on the live ISO *before* `install-base-system` has even
   partitioned the disk, let alone created the target user account -- there's
   nothing to seed yet at that point. Moved the fix to
   `install-base-system`'s new `seed_release_marker()`, which runs after
   `configure-base-system` creates the user, reading the live ISO's own
-  `/etc/autarchy-release` (already present, written by the CI build,
-  independent of whether `autarchy-bootstrap` ran) -- no change to
-  `autarchy-bootstrap` needed at all.
+  `/etc/symphony-release` (already present, written by the CI build,
+  independent of whether `symphony-bootstrap` ran) -- no change to
+  `symphony-bootstrap` needed at all.
   Full `scripts/check` (130/130 unit tests) and the full acceptance suite
   (124/124) stayed green throughout -- no regressions to the VM's own
   still-zram-only, still-`SWAP_SIZE`-unset state.
@@ -292,7 +292,7 @@ to check by device name instead)
 - Deleted the incomplete `2026.09.17` release (object + tag) a second
   time and cut a genuinely fresh one from the now fully-merged `main`,
   containing the offline ISO, the boot fix, and hibernation together.
-- Added `autarchy-install` (a guided sequential prompt flow) and merged,
+- Added `symphony-install` (a guided sequential prompt flow) and merged,
   cut a third `2026.09.17` release. **User tested it for real and found
   two more real gaps, both architectural, not cosmetic**: (1) the ISO
   still needed `gh repo clone`/`gh auth login` to get the actual install

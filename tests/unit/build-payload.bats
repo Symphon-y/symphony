@@ -32,7 +32,7 @@ make_repo() {
 }
 
 listing() {
-  tar --zstd -tf "$OUT/autarchy-$1-payload.tar.zst" | sort
+  tar --zstd -tf "$OUT/symphony-$1-payload.tar.zst" | sort
 }
 
 @test "usage: needs a repo, a ref, a tag and an out dir" {
@@ -64,7 +64,7 @@ listing() {
 @test "VERSION carries the tag" {
   run "$SCRIPT" "$REPO" HEAD 2026.09.22 "$OUT"
   assert_success
-  run tar --zstd -xOf "$OUT/autarchy-2026.09.22-payload.tar.zst" VERSION
+  run tar --zstd -xOf "$OUT/symphony-2026.09.22-payload.tar.zst" VERSION
   assert_output "2026.09.22"
 }
 
@@ -79,7 +79,7 @@ listing() {
 @test "writes a sha256 beside the archive that verifies" {
   run "$SCRIPT" "$REPO" HEAD 2026.09.22 "$OUT"
   assert_success
-  run bash -c "cd '$OUT' && sha256sum -c autarchy-2026.09.22-payload.tar.zst.sha256"
+  run bash -c "cd '$OUT' && sha256sum -c symphony-2026.09.22-payload.tar.zst.sha256"
   assert_success
 }
 
@@ -95,14 +95,14 @@ listing() {
   run "$SCRIPT" "$REPO" no-such-ref 2026.09.22 "$OUT"
   assert_failure
   assert_output --partial "no-such-ref"
-  assert [ ! -e "$OUT/autarchy-2026.09.22-payload.tar.zst" ]
+  assert [ ! -e "$OUT/symphony-2026.09.22-payload.tar.zst" ]
 }
 
 @test "the same commit packs to the same bytes (reproducible: fixed mtime and owner)" {
   "$SCRIPT" "$REPO" HEAD 2026.09.22 "$OUT"
   local first
-  first=$(sha256sum <"$OUT/autarchy-2026.09.22-payload.tar.zst")
+  first=$(sha256sum <"$OUT/symphony-2026.09.22-payload.tar.zst")
   sleep 1
   "$SCRIPT" "$REPO" HEAD 2026.09.22 "$OUT"
-  assert_equal "$(sha256sum <"$OUT/autarchy-2026.09.22-payload.tar.zst")" "$first"
+  assert_equal "$(sha256sum <"$OUT/symphony-2026.09.22-payload.tar.zst")" "$first"
 }

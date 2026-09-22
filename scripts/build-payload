@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # build-payload: pack a release payload -- what an installed machine runs from
 # (D-0067: home/ install/ migrations/ packages/ scripts/ system/, plus VERSION) --
-# from a committed ref of this repo, as autarchy-<tag>-payload.tar.zst with a
-# .sha256 beside it. The release workflow signs the result; autarchy-update
-# unpacks it over /usr/local/share/autarchy/current (Phase 18, D-0078).
+# from a committed ref of this repo, as symphony-<tag>-payload.tar.zst with a
+# .sha256 beside it. The release workflow signs the result; symphony-update
+# unpacks it over /usr/local/share/symphony/current (Phase 18, D-0078).
 #
 # Usage: scripts/build-payload REPO REF TAG OUT_DIR
 #
@@ -37,7 +37,7 @@ content_line=$(git -C "$repo" show "$ref:install/configure-base-system" |
 content_line=${content_line#*=\(}
 read -ra content <<<"${content_line%)}"
 
-archive="$out/autarchy-$tag-payload.tar.zst"
+archive="$out/symphony-$tag-payload.tar.zst"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 

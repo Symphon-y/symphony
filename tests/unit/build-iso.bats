@@ -52,9 +52,9 @@ case "$1" in
   cp)
     # The output copy runs from inside the out dir: cp NAME:/out/. .
     if [[ ${2:-} == *:/out/. ]]; then
-      tag=$(sed -n 's/^AUTARCHY_TAG=//p' "$BATS_TEST_TMPDIR/create.args")
-      : >"autarchy-$tag.iso"
-      : >"autarchy-$tag.iso.sha256"
+      tag=$(sed -n 's/^SYMPHONY_TAG=//p' "$BATS_TEST_TMPDIR/create.args")
+      : >"symphony-$tag.iso"
+      : >"symphony-$tag.iso.sha256"
     fi
     exit 0
     ;;
@@ -86,17 +86,17 @@ calls() {
 }
 
 @test "fails clearly when the container engine isn't installed" {
-  AUTARCHY_CONTAINER_ENGINE=definitely-not-installed run "$SCRIPT"
+  SYMPHONY_CONTAINER_ENGINE=definitely-not-installed run "$SCRIPT"
   assert_failure
   assert_output --partial "definitely-not-installed"
 }
 
-@test "AUTARCHY_CONTAINER_ENGINE may carry a prefix, e.g. 'sudo podman' where rootless podman can't mount a chroot" {
+@test "SYMPHONY_CONTAINER_ENGINE may carry a prefix, e.g. 'sudo podman' where rootless podman can't mount a chroot" {
   # A stub "sudo" that logs and runs the rest, so the engine stub sees the same calls.
   # shellcheck disable=SC2016 # stub body expands when the stub runs
   printf '#!/usr/bin/env bash\necho "sudo $1" >>"$STUB_LOG"\nexec "$@"\n' >"$BATS_TEST_TMPDIR/bin/sudo"
   chmod +x "$BATS_TEST_TMPDIR/bin/sudo"
-  AUTARCHY_CONTAINER_ENGINE="sudo docker" run "$SCRIPT" --out "$BATS_TEST_TMPDIR/out"
+  SYMPHONY_CONTAINER_ENGINE="sudo docker" run "$SCRIPT" --out "$BATS_TEST_TMPDIR/out"
   assert_success
   run calls
   assert_line "sudo docker"
@@ -109,9 +109,9 @@ calls() {
   run cat "$BATS_TEST_TMPDIR/create.args"
   assert_line "--privileged"
   assert_line "archlinux:latest"
-  assert_line "AUTARCHY_SHA=$SHA"
+  assert_line "SYMPHONY_SHA=$SHA"
   # No tag given: named after the commit so a booted build can be told apart.
-  assert_line "AUTARCHY_TAG=local-$SHORT"
+  assert_line "SYMPHONY_TAG=local-$SHORT"
 }
 
 @test "--tag overrides the default tag; --ref selects the commit" {
@@ -119,8 +119,8 @@ calls() {
   run "$SCRIPT" --ref HEAD~1 --tag 2026.09.20-test1 --out "$BATS_TEST_TMPDIR/out"
   assert_success
   run cat "$BATS_TEST_TMPDIR/create.args"
-  assert_line "AUTARCHY_TAG=2026.09.20-test1"
-  assert_line "AUTARCHY_SHA=$SHA"
+  assert_line "SYMPHONY_TAG=2026.09.20-test1"
+  assert_line "SYMPHONY_SHA=$SHA"
 }
 
 @test "streams a git bundle of the repo into the container instead of bind-mounting the working tree" {
@@ -140,30 +140,30 @@ calls() {
   run calls
   # A relative path (the script cds into the repo first): an absolute host path
   # would need translating on Windows, where the engine is a native program.
-  assert_line --regexp '^docker cp iso/build-in-container autarchy-iso-build-[0-9]+:/build\.sh$'
+  assert_line --regexp '^docker cp iso/build-in-container symphony-iso-build-[0-9]+:/build\.sh$'
 }
 
 @test "copies the built ISO and its checksum into the out dir and says where" {
   run "$SCRIPT" --tag t1 --out "$BATS_TEST_TMPDIR/out"
   assert_success
-  assert [ -e "$BATS_TEST_TMPDIR/out/autarchy-t1.iso" ]
-  assert [ -e "$BATS_TEST_TMPDIR/out/autarchy-t1.iso.sha256" ]
-  assert_output --partial "autarchy-t1.iso"
+  assert [ -e "$BATS_TEST_TMPDIR/out/symphony-t1.iso" ]
+  assert [ -e "$BATS_TEST_TMPDIR/out/symphony-t1.iso.sha256" ]
+  assert_output --partial "symphony-t1.iso"
 }
 
 @test "removes the container after a successful build" {
   run "$SCRIPT" --out "$BATS_TEST_TMPDIR/out"
   assert_success
   run calls
-  assert_line --regexp '^docker rm -f autarchy-iso-build-[0-9]+$'
+  assert_line --regexp '^docker rm -f symphony-iso-build-[0-9]+$'
 }
 
 @test "removes the container and fails when the build fails" {
   STUB_START_RC=1 run "$SCRIPT" --out "$BATS_TEST_TMPDIR/out"
   assert_failure
   run calls
-  assert_line --regexp '^docker rm -f autarchy-iso-build-[0-9]+$'
-  refute_output --partial "docker cp autarchy-iso-build"
+  assert_line --regexp '^docker rm -f symphony-iso-build-[0-9]+$'
+  refute_output --partial "docker cp symphony-iso-build"
 }
 
 @test "fails when the build ends without producing the expected ISO" {
@@ -177,7 +177,7 @@ exit 0
 EOF
   run "$SCRIPT" --tag t2 --out "$BATS_TEST_TMPDIR/out"
   assert_failure
-  assert_output --partial "autarchy-t2.iso"
+  assert_output --partial "symphony-t2.iso"
 }
 
 @test "warns that uncommitted changes are not in the ISO" {

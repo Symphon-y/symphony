@@ -13,7 +13,7 @@ setup() {
   export STUB_LOG="$BATS_TEST_TMPDIR/calls.log"
   : >"$STUB_LOG"
   REPO="$BATS_TEST_TMPDIR/repo"
-  mkdir -p "$REPO/system/autarchy" "$REPO/scripts"
+  mkdir -p "$REPO/system/symphony" "$REPO/scripts"
   cp "$SCRIPT" "$REPO/scripts/setup-signing"
   SCRIPT="$REPO/scripts/setup-signing"
   export KEYDIR="$BATS_TEST_TMPDIR/keys"
@@ -64,9 +64,9 @@ run_setup() {
 @test "generates the keypair outside the repo and commits only the public half" {
   run run_setup
   assert_success
-  assert [ -e "$KEYDIR/autarchy.key" ]
-  assert [ -e "$KEYDIR/autarchy.pub" ]
-  run cat "$REPO/system/autarchy/release.pub"
+  assert [ -e "$KEYDIR/symphony.key" ]
+  assert [ -e "$KEYDIR/symphony.pub" ]
+  run cat "$REPO/system/symphony/release.pub"
   assert_line --index 0 --partial "untrusted comment:"
   assert_line --index 1 "RWQFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEF"
   run find "$REPO" -name '*.key'
@@ -99,13 +99,13 @@ run_setup() {
 @test "the secret key file is readable by its owner only" {
   run run_setup
   assert_success
-  run stat -c %a "$KEYDIR/autarchy.key"
+  run stat -c %a "$KEYDIR/symphony.key"
   assert_output "600"
 }
 
 @test "says what to do next: commit the public key, then tag" {
   run run_setup
   assert_success
-  assert_output --partial "system/autarchy/release.pub"
+  assert_output --partial "system/symphony/release.pub"
   assert_output --partial "git add"
 }

@@ -27,7 +27,7 @@ flow the user originally asked for.
 - Split the terminal collector from the shared install runner so both
   the terminal fallback and the future GUI hand off through one
   contract.
-- Terminal fallback (`autarchy-install`) gains its own passphrase
+- Terminal fallback (`symphony-install`) gains its own passphrase
   prompt (type-twice-confirm) to satisfy the new contract -- kept as
   the boot fallback / manual-recovery path, not replaced.
 - A hand-written GTK4/libadwaita installer app: keyboard/locale,
@@ -163,7 +163,7 @@ real hardware install completed end-to-end via `2026.09.18-test2`)
   `open` calls have never taken a `--key-file` -- they interactively
   prompt on the TTY today, *after* the review-screen confirmation
   already happened, breaking the "fully unattended after confirm"
-  promise `autarchy-install`'s own header already claims. Fixed as
+  promise `symphony-install`'s own header already claims. Fixed as
   Milestone A, ahead of and independent of the GUI itself: passphrase
   collected once by whichever collector is running, passed to the
   runner via file descriptor 3 (not stdin -- `confirm_destructive()`'s
@@ -200,17 +200,17 @@ real hardware install completed end-to-end via `2026.09.18-test2`)
   fd 9 isn't open, keeping `base-install.md`'s documented manual/
   recovery path (calls `install-base-system` directly, no collector at
   all) unaffected. Extracted `install/run-guided-install` (new) from
-  `autarchy-install`'s own tail-end (the `install-base-system` call +
+  `symphony-install`'s own tail-end (the `install-base-system` call +
   reboot prompt) -- the shared runner both the terminal collector and
-  the future GTK4 app will call. `autarchy-install` gains
+  the future GTK4 app will call. `symphony-install` gains
   `ask_password()` (type-twice-confirm, silent input) and now collects
   the passphrase alongside every other field, passing it via
   `9<<<"$passphrase"` -- the whole terminal flow is genuinely
   unattended after the review screen now too. Verified fd-9
   inheritance survives **two** levels of subprocess calls
-  (`autarchy-install` -> `run-guided-install` -> `install-base-system`),
+  (`symphony-install` -> `run-guided-install` -> `install-base-system`),
   not just one, with a standalone smoke test before trusting the real
-  chain. Updated `tests/acceptance/phase-12.bats`'s `autarchy-install`
+  chain. Updated `tests/acceptance/phase-12.bats`'s `symphony-install`
   structure test and `base-install.md`'s guided-flow description to
   match. Confirmed Phase 14's dynamic `file_permissions` derivation in
   `profiledef.sh` picks up the new script automatically (32 entries,
@@ -230,7 +230,7 @@ real hardware install completed end-to-end via `2026.09.18-test2`)
   every list (keymaps via `localectl`, locales by parsing `/etc/
   locale.gen` in the exact format `configure-base-system` already
   parses, timezones via `timedatectl`, disks by mirroring
-  `autarchy-install`'s own `lsblk`/`findmnt` logic) rather than hand-
+  `symphony-install`'s own `lsblk`/`findmnt` logic) rather than hand-
   maintaining a second data table -- this project's established DRY
   convention. `runner.py` hands off to `install/run-guided-install`
   (real) or `gui/fake-backend` (`--dry-run`) exactly like every other
@@ -278,7 +278,7 @@ real hardware install completed end-to-end via `2026.09.18-test2`)
   to the existing shellcheck/shfmt file list. `scripts/check` green
   throughout, including the two new steps.
 - **Milestone C wired (static half).** `iso/profile/airootfs/root/.
-  bash_profile` now execs `cage -- /root/autarchy/gui/autarchy-installer`
+  bash_profile` now execs `cage -- /root/symphony/gui/symphony-installer`
   when the login shell is on `/dev/tty1` specifically, with
   `GSK_RENDERER=gl` exported first -- pinned, not left to GTK's own
   Vulkan-by-default behavior, per the Haswell/HD 4600 blank-window risk
@@ -300,7 +300,7 @@ real hardware install completed end-to-end via `2026.09.18-test2`)
   Phase 10 "deliberately thin" live package list thin. New `tests/
   acceptance/phase-15.bats` (4 tests) covers what's staticly provable
   from the repo alone -- the package list, the tty1 wiring, the
-  tty2+ fallback, `gui/autarchy-installer`'s executable bit and its
+  tty2+ fallback, `gui/symphony-installer`'s executable bit and its
   real-runner-by-default behavior -- consistent with Phase 14's own
   acceptance-test precedent that CI-generated/real-hardware-only
   content gets a real verification pass, not a static test standing in

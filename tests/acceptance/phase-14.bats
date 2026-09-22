@@ -53,7 +53,7 @@ setup() {
   assert_success
   run grep -q '100755' "$pd"
   assert_success
-  run grep -q 'file_permissions\["/root/autarchy/' "$pd"
+  run grep -q 'file_permissions\["/root/symphony/' "$pd"
   assert_success
 
   # Dry-run the exact logic against this real repo (mirroring mkarchiso's
@@ -63,16 +63,16 @@ setup() {
   # --global --add safe.directory`, which must NOT write to the
   # developer's real ~/.gitconfig every time this test runs.
   # shellcheck disable=SC2016 # single-quoted on purpose -- $PD expands in the subshell, not here
-  run env PD="$pd" HOME="$BATS_TEST_TMPDIR" bash -c 'declare -A file_permissions; source "$PD"; echo "${file_permissions[/root/autarchy/install/install-base-system]:-}"; echo "${file_permissions[/root/autarchy/scripts/system-report]:-}"'
+  run env PD="$pd" HOME="$BATS_TEST_TMPDIR" bash -c 'declare -A file_permissions; source "$PD"; echo "${file_permissions[/root/symphony/install/install-base-system]:-}"; echo "${file_permissions[/root/symphony/scripts/system-report]:-}"'
   assert_success
   assert_output "$(printf '0:0:755\n0:0:755')"
 }
 
 @test "profiledef.sh: excludes iso/profile/airootfs/ from the generated file_permissions entries" {
   # A real build failure: git ls-files -s also tracks files under
-  # iso/profile/airootfs/ itself (e.g. the live autarchy-install script's
+  # iso/profile/airootfs/ itself (e.g. the live symphony-install script's
   # own source) -- excluded from the bake-in rsync copy, so they never
-  # exist under /root/autarchy. mkarchiso's realpath check on a listed-
+  # exist under /root/symphony. mkarchiso's realpath check on a listed-
   # but-nonexistent path fails *closed* ("outside of valid path", a hard
   # build error), not with the harmless "doesn't exist" warning its
   # plain existence check gives everywhere else.
@@ -86,8 +86,8 @@ setup() {
   assert_output ""
 }
 
-@test "autarchy-bootstrap is fully retired -- no trace outside historical records" {
-  assert [ ! -e "$REPO_ROOT/iso/profile/airootfs/usr/local/bin/autarchy-bootstrap" ]
+@test "symphony-bootstrap is fully retired -- no trace outside historical records" {
+  assert [ ! -e "$REPO_ROOT/iso/profile/airootfs/usr/local/bin/symphony-bootstrap" ]
   # docs/phases/ is allowed to still mention the retired name: phase-10 and
   # phase-12's tracking docs are accurate history of what was true when
   # they ran (established precedent, see docs/roadmap.md's Phase 13 entry),
@@ -95,15 +95,15 @@ setup() {
   # docs/roadmap.md's per-phase summaries are the same kind of history (its
   # Phase 14 paragraph says what was retired). Everything else -- scripts,
   # other docs, other tests -- must be clean.
-  run bash -c "grep -rl 'autarchy-bootstrap' '$REPO_ROOT' --exclude-dir=.git --exclude-dir=phases | grep -vE 'tests/acceptance/phase-14.bats|docs/roadmap.md'"
+  run bash -c "grep -rl 'symphony-bootstrap' '$REPO_ROOT' --exclude-dir=.git --exclude-dir=phases | grep -vE 'tests/acceptance/phase-14.bats|docs/roadmap.md'"
   assert_failure
   assert_output ""
 }
 
-@test "autarchy-install no longer conditionally clones -- the repo is always already there" {
-  local script="$REPO_ROOT/iso/profile/airootfs/usr/local/bin/autarchy-install"
+@test "symphony-install no longer conditionally clones -- the repo is always already there" {
+  local script="$REPO_ROOT/iso/profile/airootfs/usr/local/bin/symphony-install"
   assert [ -x "$script" ]
-  run grep -q 'CLONE_DIR=/root/autarchy' "$script"
+  run grep -q 'CLONE_DIR=/root/symphony' "$script"
   assert_success
   # shellcheck disable=SC2016 # a literal grep pattern, not meant to expand
   run grep -q 'cd "\$CLONE_DIR"' "$script"

@@ -100,7 +100,7 @@ not ok 12 snapshots: snapper root config exists with timeline snapshots off
 #
 # -- command failed --
 # status : 127
-# output : /root/autarchy/tests/acceptance/phase-01.bats: line 19: snapper: command not found
+# output : /root/symphony/tests/acceptance/phase-01.bats: line 19: snapper: command not found
 # --
 #
 not ok 13 snapshots: old snapshots are cleaned up on a timer

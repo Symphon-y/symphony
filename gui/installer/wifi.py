@@ -35,7 +35,7 @@ DEFAULT_PROFILE_DIR = Path("/etc/NetworkManager/system-connections")
 # One fixed file: the installer manages a single Wi-Fi connection, and joining
 # another network replaces it. Fixed also means no file name is ever built from a
 # user-typed SSID.
-PROFILE_NAME = "autarchy-wifi.nmconnection"
+PROFILE_NAME = "symphony-wifi.nmconnection"
 
 
 class Security(Enum):

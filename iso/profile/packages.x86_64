@@ -2,7 +2,7 @@
 # thin: just what the installer needs to run. The install itself is fully
 # offline (D-0063/D-0064): the whole packages/*.txt closure is baked into a
 # local repo (iso/build-offline-repo) that pacstrap reads, and the repo itself
-# is baked in at /root/autarchy, so none of that is listed here. No AUR
+# is baked in at /root/symphony, so none of that is listed here. No AUR
 # packages here -- archiso can't build them, and this project doesn't run a
 # custom repo/mirror to work around that (D-0050).
 #

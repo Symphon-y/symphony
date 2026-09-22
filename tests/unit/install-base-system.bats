@@ -2,8 +2,8 @@
 # Unit tests for install/install-base-system. Every disk-management command is
 # stubbed on PATH so the script never touches real block devices; the sibling
 # configure-base-system script it hands off to is overridden via
-# AUTARCHY_CONFIGURE_SCRIPT to a stub, mirroring scripts/migrate's
-# AUTARCHY_MIGRATIONS_DIR-style test override.
+# SYMPHONY_CONFIGURE_SCRIPT to a stub, mirroring scripts/migrate's
+# SYMPHONY_MIGRATIONS_DIR-style test override.
 
 setup() {
   load '../helpers/common'
@@ -14,10 +14,10 @@ setup() {
   : >"$STUB_LOG"
   # The live ISO's release marker is configure-base-system's business now
   # (the payload's VERSION); this script must not read it at all.
-  export AUTARCHY_LIVE_RELEASE_FILE="$BATS_TEST_TMPDIR/no-release-file"
+  export SYMPHONY_LIVE_RELEASE_FILE="$BATS_TEST_TMPDIR/no-release-file"
   # Quirks come from this machine's DMI; hermetic unless a test stubs them (D-0076).
   stub "$BATS_TEST_TMPDIR/no-quirks" 'exit 0'
-  export AUTARCHY_QUIRKPARAMS_SCRIPT="$BATS_TEST_TMPDIR/no-quirks"
+  export SYMPHONY_QUIRKPARAMS_SCRIPT="$BATS_TEST_TMPDIR/no-quirks"
   make_vars
   make_stubs
 }
@@ -89,7 +89,7 @@ EOF
   # untouched (D-0066: fd 8 is the user password, fd 9 the LUKS
   # passphrase -- install-base-system consumes fd 9 itself but must never
   # touch fd 8, which isn't its concern).
-  cat >"$bin/autarchy-configure-stub" <<'EOF'
+  cat >"$bin/symphony-configure-stub" <<'EOF'
 #!/usr/bin/env bash
 echo "configure-base-system $*" >>"$STUB_LOG"
 if [[ -e /dev/fd/8 ]]; then
@@ -97,8 +97,8 @@ if [[ -e /dev/fd/8 ]]; then
   echo "configure-base-system fd8: $p" >>"$STUB_LOG"
 fi
 EOF
-  chmod +x "$bin/autarchy-configure-stub"
-  export AUTARCHY_CONFIGURE_SCRIPT="$bin/autarchy-configure-stub"
+  chmod +x "$bin/symphony-configure-stub"
+  export SYMPHONY_CONFIGURE_SCRIPT="$bin/symphony-configure-stub"
 
   PATH="$bin:$PATH"
 }
@@ -307,13 +307,13 @@ with_swap() {
     "FILES=(/etc/cryptsetup-keys.d/cryptswap.key)"
 }
 
-@test "SWAP_SIZE set: passes AUTARCHY_RESUME_DEVICE to configure-base-system" {
+@test "SWAP_SIZE set: passes SYMPHONY_RESUME_DEVICE to configure-base-system" {
   with_swap
-  cat >"$BATS_TEST_TMPDIR/bin/autarchy-configure-stub" <<'EOF'
+  cat >"$BATS_TEST_TMPDIR/bin/symphony-configure-stub" <<'EOF'
 #!/usr/bin/env bash
-echo "configure-base-system $* resume=${AUTARCHY_RESUME_DEVICE:-unset}" >>"$STUB_LOG"
+echo "configure-base-system $* resume=${SYMPHONY_RESUME_DEVICE:-unset}" >>"$STUB_LOG"
 EOF
-  chmod +x "$BATS_TEST_TMPDIR/bin/autarchy-configure-stub"
+  chmod +x "$BATS_TEST_TMPDIR/bin/symphony-configure-stub"
   run_confirmed
   assert_success
   run calls
@@ -323,10 +323,10 @@ EOF
 # --- release marker (Phase 12; retired in Phase 18) ------------------------
 
 @test "no per-user release marker is seeded: the payload's VERSION is the installed release (D-0079)" {
-  echo "2026.09.16" >"$AUTARCHY_LIVE_RELEASE_FILE"
+  echo "2026.09.16" >"$SYMPHONY_LIVE_RELEASE_FILE"
   run_confirmed
   assert_success
-  assert [ ! -e "$TARGET/home/alice/.local/state/autarchy/current-release" ]
+  assert [ ! -e "$TARGET/home/alice/.local/state/symphony/current-release" ]
   run calls
   refute_line "arch-chroot $TARGET chown -R alice:alice /home/alice/.local"
 }
@@ -339,7 +339,7 @@ hwpkglist_stub() {
 
 @test "pacstraps the packages this machine's hardware needs on top of the declared ones (Phase 17)" {
   hwpkglist_stub 'printf "broadcom-wl-dkms\nlinux-headers\n"'
-  AUTARCHY_HWPKGLIST_SCRIPT="$BATS_TEST_TMPDIR/hwpkglist-stub" run_confirmed
+  SYMPHONY_HWPKGLIST_SCRIPT="$BATS_TEST_TMPDIR/hwpkglist-stub" run_confirmed
   assert_success
   run calls
   assert_line --partial "pacstrap -K -M $TARGET"
@@ -351,7 +351,7 @@ hwpkglist_stub() {
 
 @test "pacstraps no hardware-specific packages when the hardware needs none (Phase 17)" {
   hwpkglist_stub 'exit 0'
-  AUTARCHY_HWPKGLIST_SCRIPT="$BATS_TEST_TMPDIR/hwpkglist-stub" run_confirmed
+  SYMPHONY_HWPKGLIST_SCRIPT="$BATS_TEST_TMPDIR/hwpkglist-stub" run_confirmed
   assert_success
   run calls
   refute_output --partial "broadcom-wl-dkms"
@@ -359,7 +359,7 @@ hwpkglist_stub() {
 
 @test "a failing hardware lookup stops the install before pacstrap touches anything (Phase 17)" {
   hwpkglist_stub 'echo "hwpkglist: broken map" >&2; exit 1'
-  AUTARCHY_HWPKGLIST_SCRIPT="$BATS_TEST_TMPDIR/hwpkglist-stub" run_confirmed
+  SYMPHONY_HWPKGLIST_SCRIPT="$BATS_TEST_TMPDIR/hwpkglist-stub" run_confirmed
   assert_failure
   run calls
   refute_output --partial "pacstrap"
@@ -371,15 +371,15 @@ hwpkglist_stub() {
 quirkparams_stub() {
   printf '#!/usr/bin/env bash\n%s\n' "$1" >"$BATS_TEST_TMPDIR/quirkparams-stub"
   chmod +x "$BATS_TEST_TMPDIR/quirkparams-stub"
-  export AUTARCHY_QUIRKPARAMS_SCRIPT="$BATS_TEST_TMPDIR/quirkparams-stub"
+  export SYMPHONY_QUIRKPARAMS_SCRIPT="$BATS_TEST_TMPDIR/quirkparams-stub"
 }
 
 configure_stub_reporting_params() {
-  cat >"$BATS_TEST_TMPDIR/bin/autarchy-configure-stub" <<'STUB'
+  cat >"$BATS_TEST_TMPDIR/bin/symphony-configure-stub" <<'STUB'
 #!/usr/bin/env bash
-echo "configure-base-system params=${AUTARCHY_KERNEL_PARAMS-unset}" >>"$STUB_LOG"
+echo "configure-base-system params=${SYMPHONY_KERNEL_PARAMS-unset}" >>"$STUB_LOG"
 STUB
-  chmod +x "$BATS_TEST_TMPDIR/bin/autarchy-configure-stub"
+  chmod +x "$BATS_TEST_TMPDIR/bin/symphony-configure-stub"
 }
 
 @test "hands the kernel parameters this machine's quirks need to configure-base-system (D-0076)" {

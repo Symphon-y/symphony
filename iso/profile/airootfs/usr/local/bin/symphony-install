@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# autarchy-install: the terminal collector -- the boot fallback / manual-
+# symphony-install: the terminal collector -- the boot fallback / manual-
 # recovery path (Phase 15's GTK4 GUI is the primary one; this stays as
 # the collector of last resort, not replaced). The repo is already baked
 # into the live environment at build time (Phase 14) -- no clone, no
@@ -19,7 +19,7 @@
 # right" checkpoint, not a replacement for it.
 set -euo pipefail
 
-readonly CLONE_DIR=/root/autarchy
+readonly CLONE_DIR=/root/symphony
 readonly VARS_FILE="$CLONE_DIR/base-install.local.vars"
 
 log() {
