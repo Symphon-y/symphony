@@ -47,7 +47,7 @@ g=$(((16#${primary:2:2} + 8) / 17))
 b=$(((16#${primary:4:2} + 8) / 17))
 
 # The Alienware 14's zones, as verified by zonescan (packages/aur/alienfx's patch).
-zones='["Left Keyboard", "Middle-left Keyboard", "Middle-right Keyboard", "Right Keyboard", "Alien Head", "Logo", "Status LEDs"]'
+zones='["Left Keyboard", "Middle-left Keyboard", "Middle-right Keyboard", "Right Keyboard", "Alien Head", "Logo", "Touchpad", "Status LEDs"]'
 block="{\"zones\": $zones, \"loop\": [{\"type\": \"fixed\", \"colours\": [[$r, $g, $b]]}]}"
 
 mkdir -p "$THEME_DIR"

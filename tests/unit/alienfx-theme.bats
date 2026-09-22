@@ -43,7 +43,7 @@ print(sorted(zones))
 print(t['AC Charged'][0]['loop'][0]['colours'][0])
 print(sorted(k for k in t if k!='speed'))
 "
-  assert_line --index 0 "['Alien Head', 'Left Keyboard', 'Logo', 'Middle-left Keyboard', 'Middle-right Keyboard', 'Right Keyboard', 'Status LEDs']"
+  assert_line --index 0 "['Alien Head', 'Left Keyboard', 'Logo', 'Middle-left Keyboard', 'Middle-right Keyboard', 'Right Keyboard', 'Status LEDs', 'Touchpad']"
   assert_line --index 1 "[4, 10, 13]"
   assert_line --index 2 "['AC Charged', 'AC Charging', 'AC Sleep', 'Battery Critical', 'Battery On', 'Battery Sleep', 'Boot']"
 }

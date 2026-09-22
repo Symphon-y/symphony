@@ -7,7 +7,7 @@
 pkgname=alienfx
 pkgver=2.5.0
 _commit=bc573d99bb4beec84e8e5fd9f8763db952945caf
-pkgrel=1
+pkgrel=2
 pkgdesc="CLI and GUI utility to control the lighting of Alienware computers (symphony build: fixed deps, Alienware 14 zone map)"
 arch=('any')
 url="https://github.com/trackmastersteve/alienfx"
