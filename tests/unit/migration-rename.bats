@@ -6,6 +6,7 @@
 #
 # The migration ships inside the renamed payload, so it is run here from a payload
 # laid out under the NEW name, with the OLD-name locations still on "the machine".
+# rename: keep
 
 setup() {
   load '../helpers/common'
@@ -27,7 +28,7 @@ setup() {
   done
   # link-home is called from the NEW payload path; it must exist there after the move.
   # shellcheck disable=SC2016 # stub body expands when the stub runs
-  printf '#!/usr/bin/env bash\necho "link-home $* from $(dirname "$(dirname "$0")")" >>"$STUB_LOG"\n' \
+  printf '#!/usr/bin/env bash\necho "link-home $* from $PWD" >>"$STUB_LOG"\n' \
     >"$ROOT/usr/local/share/autarchy/current/install/link-home"
   chmod +x "$ROOT/usr/local/share/autarchy/current/install/link-home"
   make_stubs

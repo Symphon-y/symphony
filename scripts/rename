@@ -12,9 +12,14 @@
 # the letters inside another word are left alone. Binary files are skipped.
 # Runs scripts/check at the end. Commits nothing: review the diff, then commit.
 #
+# A file that must keep both names -- a migration that moves an installed
+# machine from the old name to the new one, and its test -- opts out with the
+# line "# rename: keep" anywhere in it; it is neither edited nor counted.
+#
 # What this cannot do: rename the GitHub repository (gh repo rename), move an
 # installed machine's paths (that is a migration, shipped with the rename), or
 # re-sign anything (the key is not named).
+# rename: keep
 set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -60,8 +65,19 @@ subst() { # OLD NEW -> a sed expression replacing the exact token
 
 cd "$REPO_ROOT"
 
+# Tracked text files containing any form of NAME, minus the opted-out ones.
+files_with() {
+  local name=$1 name_cap name_up
+  name_cap=$(capitalise "$name")
+  name_up=${name^^}
+  name_up=${name_up//-/_}
+  comm -23 \
+    <(git grep -I -l -E "$(token "$name")|$(token "$name_cap")|$(token "$name_up")" -- . 2>/dev/null | sort) \
+    <(git grep -I -l -F '# rename: keep' -- . 2>/dev/null | sort)
+}
+
 # Anything to do? (tracked text files containing any form, or paths carrying it)
-mapfile -t files < <(git grep -I -l -E "$(token "$old")|$(token "$old_cap")|$(token "$old_up")" -- . || true)
+mapfile -t files < <(files_with "$old")
 mapfile -t paths < <(git ls-files | grep -E "(^|/)[^/]*${old}[^/]*(/|$)" | awk -F/ -v t="$old" '{
   # every directory or file component along the path that carries the token
   p = ""
@@ -73,7 +89,7 @@ if ((${#files[@]} == 0 && ${#paths[@]} == 0)); then
 fi
 
 # NEW must not already be a name in use, or two things would merge into one.
-if git grep -I -q -E "$(token "$new")|$(token "$new_cap")|$(token "$new_up")" -- . 2>/dev/null; then
+if [[ -n $(files_with "$new") ]]; then
   die "'$new' already appears in the tree -- refusing to merge two names"
 fi
 
@@ -87,7 +103,7 @@ while IFS= read -r path; do
 done < <(printf '%s\n' "${paths[@]}" | awk '{ print gsub("/", "/"), $0 }' | sort -rn | cut -d' ' -f2-)
 
 # Then content, longest/most specific form first.
-mapfile -t files < <(git grep -I -l -E "$(token "$old")|$(token "$old_cap")|$(token "$old_up")" -- . || true)
+mapfile -t files < <(files_with "$old")
 if ((${#files[@]})); then
   # Twice: two adjacent tokens ("autarchy autarchy") share the boundary character,
   # and one pass consumes it; a second pass gets the rest.

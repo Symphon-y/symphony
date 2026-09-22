@@ -117,6 +117,16 @@ EOF
   assert_output --partial "nothing to rename"
 }
 
+@test "a file marked '# rename: keep' is left alone and does not count as NEW being in use" {
+  printf '# rename: keep\nmoves oldname to newname\n' >"$REPO/migrations-note.md"
+  git -C "$REPO" add -A
+  git -C "$REPO" commit -q -m "note"
+  run "$SCRIPT" oldname newname
+  assert_success
+  run cat "$REPO/migrations-note.md"
+  assert_line "moves oldname to newname"
+}
+
 @test "refuses when NEW is already in use as a token (would merge two names)" {
   echo "newname is taken" >"$REPO/taken.md"
   git -C "$REPO" add -A
