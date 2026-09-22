@@ -307,6 +307,16 @@ install_payload() {
   in_target chown -R root:root "$PAYLOAD_ROOT"
 }
 
+# What this machine's hardware needs beyond packages (system/hardware.txt, Phase 19):
+# modprobe drop-ins, files such as udev rules, system units. Packages were pacstrapped
+# from hwpkglist and the kernel parameters are on the boot line (configure_boot), so
+# --no-packages; user units wait for first-login. Runs inside the target as root,
+# where sudo is not needed and symphony-hardware knows to skip it.
+apply_hardware() {
+  log "Applying hardware entries"
+  in_target env SYMPHONY_PAYLOAD_DIR="$PAYLOAD_DIR" "$PAYLOAD_DIR/home/hardware/dot-local/bin/symphony-hardware" apply --no-packages
+}
+
 # Which directories get created is system/xdg/user-dirs.defaults (installed by
 # sync-system, so already in place here); this only runs xdg-user-dirs-update
 # once, as the new user, so they exist before first login. HOME is set
@@ -438,6 +448,7 @@ main() {
   configure_boot
   create_user
   install_payload
+  apply_hardware
   create_xdg_dirs
   link_home
   configure_autologin

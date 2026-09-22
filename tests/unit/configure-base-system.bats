@@ -518,6 +518,22 @@ calls() {
   assert_line "arch-chroot $TARGET runuser -u alice -- bash -c cd /usr/local/share/symphony/current && install/link-home apply"
 }
 
+@test "applies this machine's hardware entries inside the target, from the payload, as root, without packages (Phase 19)" {
+  # pacstrap already installed the hardware packages (hwpkglist) and configure_boot
+  # put the kernel parameters on the boot line; what is left is drop-ins, files and
+  # system units -- after the payload exists, before user things.
+  run "$SCRIPT" "$VARS" "$TARGET"
+  assert_success
+  run calls
+  assert_line "arch-chroot $TARGET env SYMPHONY_PAYLOAD_DIR=/usr/local/share/symphony/current /usr/local/share/symphony/current/home/hardware/dot-local/bin/symphony-hardware apply --no-packages"
+  local payload_line hw_line link_line
+  payload_line=$(grep -n 'chown -R root:root /usr/local/share/symphony' "$STUB_LOG" | head -1 | cut -d: -f1)
+  hw_line=$(grep -n 'symphony-hardware apply' "$STUB_LOG" | head -1 | cut -d: -f1)
+  link_line=$(grep -n 'install/link-home apply' "$STUB_LOG" | head -1 | cut -d: -f1)
+  assert [ "$payload_line" -lt "$hw_line" ]
+  assert [ "$hw_line" -lt "$link_line" ]
+}
+
 @test "creates the user's XDG directories, English-named and without Projects, before linking dotfiles (Phase 16)" {
   # xdg-user-dirs 0.20 creates ~/Projects by default; system/xdg/user-dirs.defaults
   # (installed by sync-system) is what keeps it -- and Desktop/Templates/Public --

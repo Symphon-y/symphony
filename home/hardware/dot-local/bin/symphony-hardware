@@ -54,6 +54,16 @@ log() {
   printf '==> %s\n' "$*"
 }
 
+# Root steps go through sudo from a user session; inside the installer's chroot this
+# already runs as root, where sudo is neither needed nor guaranteed to be on PATH.
+as_root() {
+  if ((EUID == 0)); then
+    "$@"
+  else
+    sudo "$@"
+  fi
+}
+
 # The payload ships a unit as a user unit when it sits under some home/<pkg>/dot-config/systemd/user/.
 is_user_unit() {
   compgen -G "$USER_UNITS/*/dot-config/systemd/user/$1" >/dev/null
@@ -116,10 +126,10 @@ apply_modprobe() {
   local f
   for f in "${files[@]}"; do
     log "installing /etc/modprobe.d/$f"
-    sudo install -D -m 0644 -o root -g root "$SYSTEM_DIR/modprobe/$f" "$ROOT/etc/modprobe.d/$f"
+    as_root install -D -m 0644 -o root -g root "$SYSTEM_DIR/modprobe/$f" "$ROOT/etc/modprobe.d/$f"
   done
   # A module option can matter in early boot; the UKIs carry the drop-ins.
-  sudo mkinitcpio -P
+  as_root mkinitcpio -P
 }
 
 apply_files() {
@@ -129,7 +139,7 @@ apply_files() {
   local m
   for m in "${manifests[@]}"; do
     log "installing files from $m"
-    sudo "$PAYLOAD/install/sync-system" ${ROOT:+--root "$ROOT"} --manifest "$SYSTEM_DIR/hardware/$m" apply
+    as_root "$PAYLOAD/install/sync-system" ${ROOT:+--root "$ROOT"} --manifest "$SYSTEM_DIR/hardware/$m" apply
   done
 }
 
@@ -145,7 +155,7 @@ apply_services() {
       systemctl --user enable --now "$u"
     elif ((! user_only)); then
       log "enabling $u"
-      sudo systemctl enable --now "$u"
+      as_root systemctl enable --now "$u"
     fi
   done
 }

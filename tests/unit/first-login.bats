@@ -90,6 +90,21 @@ calls() {
   assert [ ! -e "$SYMPHONY_FIRST_LOGIN_MARKER" ]
 }
 
+@test "first run: enables this machine's hardware user units after the services (Phase 19), and a failure there does not block the marker" {
+  printf '#!/usr/bin/env bash\necho "symphony-hardware $*" >>"$STUB_LOG"\nexit "${STUB_HW_RC:-0}"\n' >"$BATS_TEST_TMPDIR/hardware-stub"
+  chmod +x "$BATS_TEST_TMPDIR/hardware-stub"
+  export SYMPHONY_HARDWARE_SCRIPT="$BATS_TEST_TMPDIR/hardware-stub"
+  run "$SCRIPT"
+  assert_success
+  run calls
+  assert_line "symphony-hardware apply --user-only"
+  assert [ -e "$SYMPHONY_FIRST_LOGIN_MARKER" ]
+  rm "$SYMPHONY_FIRST_LOGIN_MARKER"
+  STUB_HW_RC=1 run "$SCRIPT"
+  assert_success
+  assert [ -e "$SYMPHONY_FIRST_LOGIN_MARKER" ]
+}
+
 @test "second run: the marker already exists, so it's a no-op" {
   mkdir -p "$(dirname "$SYMPHONY_FIRST_LOGIN_MARKER")"
   touch "$SYMPHONY_FIRST_LOGIN_MARKER"

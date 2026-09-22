@@ -27,6 +27,7 @@ REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO_ROOT
 readonly ENABLE_USER_SERVICES="${SYMPHONY_ENABLE_USER_SERVICES_SCRIPT:-$REPO_ROOT/install/enable-user-services}"
 readonly MATUGEN="${SYMPHONY_MATUGEN:-matugen}"
+readonly HARDWARE="${SYMPHONY_HARDWARE_SCRIPT:-$REPO_ROOT/home/hardware/dot-local/bin/symphony-hardware}"
 readonly MARKER="${SYMPHONY_FIRST_LOGIN_MARKER:-$HOME/.local/state/symphony/first-login-done}"
 readonly VERIFY_ATTEMPTS=5
 readonly VERIFY_DELAY="${SYMPHONY_FIRST_LOGIN_VERIFY_DELAY:-2}"
@@ -58,6 +59,10 @@ main() {
   render_theme
   "$ENABLE_USER_SERVICES" apply
   verify_services
+  # Hardware-specific user units (system/hardware.txt, Phase 19) -- e.g. the AlienFX
+  # theme -- need a session too. Optional by nature: a failure here must not stop the
+  # marker, or a machine with an odd device would re-run bring-up on every login.
+  "$HARDWARE" apply --user-only || echo "first-login: hardware user units failed (see above); continuing" >&2
 
   mkdir -p "$(dirname "$MARKER")"
   touch "$MARKER"

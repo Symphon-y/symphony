@@ -37,9 +37,10 @@ make_installed_payload() {
   mkdir -p "$dir/install" "$dir/scripts" "$dir/packages" "$dir/migrations" "$dir/home" "$dir/system"
   echo "$version" >"$dir/VERSION"
   local tool
-  for tool in install/sync-system install/link-home install/enable-user-services install/enable-root-services install/install-packages scripts/migrate scripts/hwpkglist; do
+  for tool in install/sync-system install/link-home install/enable-user-services install/enable-root-services install/install-packages scripts/migrate scripts/hwpkglist home/hardware/dot-local/bin/symphony-hardware; do
     # shellcheck disable=SC2016 # stub body expands when the stub runs
-    printf '#!/usr/bin/env bash\necho "%s${*:+ $*} from $(cat "$(dirname "$0")/../VERSION")" >>"$STUB_LOG"\n' "${tool##*/}" >"$dir/$tool"
+    mkdir -p "$dir/$(dirname "$tool")"
+    printf '#!/usr/bin/env bash\nd=$(dirname "$0"); while [[ ! -e $d/VERSION ]]; do d=$(dirname "$d"); done\necho "%s${*:+ $*} from $(cat "$d/VERSION")" >>"$STUB_LOG"\n' "${tool##*/}" >"$dir/$tool"
     chmod +x "$dir/$tool"
   done
   echo "old-package" >"$dir/packages/base.txt"
@@ -53,9 +54,12 @@ make_release() {
   local repo="$BATS_TEST_TMPDIR/repo-$tag"
   mkdir -p "$repo/install" "$repo/scripts" "$repo/packages" "$repo/migrations" "$repo/home" "$repo/system"
   local tool
-  for tool in install/sync-system install/link-home install/enable-user-services install/enable-root-services install/install-packages scripts/migrate scripts/hwpkglist; do
+  for tool in install/sync-system install/link-home install/enable-user-services install/enable-root-services install/install-packages scripts/migrate scripts/hwpkglist home/hardware/dot-local/bin/symphony-hardware; do
     # shellcheck disable=SC2016 # stub body expands when the stub runs
-    printf '#!/usr/bin/env bash\necho "%s${*:+ $*} from $(cat "$(dirname "$0")/../VERSION")" >>"$STUB_LOG"\n' "${tool##*/}" >"$repo/$tool"
+    mkdir -p "$repo/$(dirname "$tool")"
+    # The release's stubs must find VERSION wherever the payload lands (current/ after
+    # the swap, or previous/ after a rollback): walk up from $0 to the dir holding it.
+    printf '#!/usr/bin/env bash\nd=$(dirname "$0"); while [[ ! -e $d/VERSION ]]; do d=$(dirname "$d"); done\necho "%s${*:+ $*} from $(cat "$d/VERSION")" >>"$STUB_LOG"\n' "${tool##*/}" >"$repo/$tool"
     chmod +x "$repo/$tool"
   done
   echo "$package" >"$repo/packages/base.txt"
@@ -281,6 +285,20 @@ installed_version() {
   assert_line "enable-root-services apply from 2026.09.22"
   assert_line "migrate apply from 2026.09.22"
   refute_output --partial "from 2026.09.01"
+}
+
+@test "apply: this machine's hardware is (re)applied from the new payload, after the packages and before the migrations (Phase 19)" {
+  echo "2026.09.01" >"$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
+  run "$SCRIPT" apply
+  assert_success
+  run calls
+  assert_line "symphony-hardware apply --no-packages from 2026.09.22"
+  local pkgs hw mig
+  pkgs=$(grep -n '^install-packages' "$STUB_LOG" | cut -d: -f1 | head -1)
+  hw=$(grep -n '^symphony-hardware' "$STUB_LOG" | cut -d: -f1 | head -1)
+  mig=$(grep -n '^migrate' "$STUB_LOG" | cut -d: -f1 | head -1)
+  assert [ "$pkgs" -lt "$hw" ]
+  assert [ "$hw" -lt "$mig" ]
 }
 
 @test "apply: root-only steps go through sudo, user-level ones do not" {
