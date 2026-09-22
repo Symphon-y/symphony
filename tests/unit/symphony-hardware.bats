@@ -324,6 +324,19 @@ EOF
   refute_output --partial "muted"
 }
 
+@test "scan: /dev/bus/usb not traversable by users (a chmod slip; every USB userspace tool fails with EACCES) is reported" {
+  export SYMPHONY_DEV="$BATS_TEST_TMPDIR/dev"
+  mkdir -p "$SYMPHONY_DEV/bus/usb"
+  chmod 666 "$SYMPHONY_DEV/bus/usb"
+  run "$SCRIPT" scan
+  assert_success
+  assert_output --partial "/dev/bus/usb"
+  assert_output --partial "755"
+  chmod 755 "$SYMPHONY_DEV/bus/usb"
+  run "$SCRIPT" scan
+  refute_output --partial "/dev/bus/usb"
+}
+
 @test "scan: a device an entry already covers is not reported as unhandled" {
   usb 2-1 187c 0525
   list alienfx alienfx

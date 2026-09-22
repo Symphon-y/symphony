@@ -36,6 +36,7 @@ readonly PAYLOAD="${SYMPHONY_PAYLOAD_DIR:-/usr/local/share/symphony/current}"
 readonly SYS="${SYMPHONY_SYS:-/sys}"
 readonly PROC="${SYMPHONY_PROC:-/proc}"
 readonly ROOT="${SYMPHONY_ROOT:-}"
+readonly DEV="${SYMPHONY_DEV:-/dev}"
 readonly HWMATCH="$PAYLOAD/scripts/hwmatch"
 readonly SYSTEM_DIR="${SYMPHONY_SYSTEM_DIR:-$PAYLOAD/system}"
 readonly USER_UNITS="$PAYLOAD/home"
@@ -265,10 +266,25 @@ muted_codecs() {
   done
 }
 
+# devtmpfs makes /dev/bus/usb 0755; a chmod on the directory instead of a node
+# (an easy slip with a shell-expanded path) takes the execute bits away, and every
+# libusb tool then fails with EACCES no matter what udev grants on the nodes.
+# Found on the dev seat, this way (Phase 19).
+usb_dir_not_traversable() {
+  local dir="$DEV/bus/usb"
+  [[ -d $dir ]] || return 0
+  local mode
+  mode=$(stat -c %a "$dir")
+  if [[ $mode != *[1357] ]]; then
+    printf 'usb not usable     %s is mode %s (needs 755: users cannot reach the device nodes)\n' "$dir" "$mode"
+  fi
+}
+
 scan() {
   COVERED=$(covered_keys)
   local report
   report=$(
+    usb_dir_not_traversable
     unbound_devices
     firmware_failures
     muted_codecs
