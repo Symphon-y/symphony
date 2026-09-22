@@ -12,9 +12,8 @@ setup() {
   mkdir -p "$TARGET"
   export STUB_LOG="$BATS_TEST_TMPDIR/calls.log"
   : >"$STUB_LOG"
-  # Absent by default so seed_release_marker no-ops in every test that
-  # doesn't explicitly exercise it -- a real /etc/autarchy-release on the
-  # machine running these tests must never leak in.
+  # The live ISO's release marker is configure-base-system's business now
+  # (the payload's VERSION); this script must not read it at all.
   export AUTARCHY_LIVE_RELEASE_FILE="$BATS_TEST_TMPDIR/no-release-file"
   # Quirks come from this machine's DMI; hermetic unless a test stubs them (D-0076).
   stub "$BATS_TEST_TMPDIR/no-quirks" 'exit 0'

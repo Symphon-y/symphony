@@ -19,8 +19,8 @@ runs as `travis` on `alien` (the Alienware 14, installed from the release ISO --
 Phase 12's access model; the VM-and-SSH seat of D-0021 is retired). The machine
 is both the dev seat and a real install: the repo checkout at `~/Projects/Arch`
 is the source of truth, and the running system uses the root-owned payload at
-`/usr/local/share/autarchy/current` -- fix things in the checkout, then deploy
-(`docs/runbooks/dev-deploy.md` until Phase 18's update pipeline replaces it).
+`/usr/local/share/autarchy/current` -- fix things in the checkout, then the user
+deploys with `autarchy-update apply --from ~/Projects/Arch` (`docs/runbooks/update.md`).
 Claude never uses `sudo` (enforced by root-owned managed settings); the user
 runs any command that needs `sudo` themselves.
 

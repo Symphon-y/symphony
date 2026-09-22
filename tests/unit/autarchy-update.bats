@@ -39,7 +39,7 @@ make_installed_payload() {
   local tool
   for tool in install/sync-system install/link-home install/enable-user-services install/enable-root-services install/install-packages scripts/migrate scripts/hwpkglist; do
     # shellcheck disable=SC2016 # stub body expands when the stub runs
-    printf '#!/usr/bin/env bash\necho "%s $* from $(cat "$(dirname "$0")/../VERSION")" >>"$STUB_LOG"\n' "${tool##*/}" >"$dir/$tool"
+    printf '#!/usr/bin/env bash\necho "%s${*:+ $*} from $(cat "$(dirname "$0")/../VERSION")" >>"$STUB_LOG"\n' "${tool##*/}" >"$dir/$tool"
     chmod +x "$dir/$tool"
   done
   echo "old-package" >"$dir/packages/base.txt"
@@ -55,11 +55,12 @@ make_release() {
   local tool
   for tool in install/sync-system install/link-home install/enable-user-services install/enable-root-services install/install-packages scripts/migrate scripts/hwpkglist; do
     # shellcheck disable=SC2016 # stub body expands when the stub runs
-    printf '#!/usr/bin/env bash\necho "%s $* from $(cat "$(dirname "$0")/../VERSION")" >>"$STUB_LOG"\n' "${tool##*/}" >"$repo/$tool"
+    printf '#!/usr/bin/env bash\necho "%s${*:+ $*} from $(cat "$(dirname "$0")/../VERSION")" >>"$STUB_LOG"\n' "${tool##*/}" >"$repo/$tool"
     chmod +x "$repo/$tool"
   done
   echo "$package" >"$repo/packages/base.txt"
   echo "echo migrated" >"$repo/migrations/1-new.sh"
+  echo 'readonly PAYLOAD_CONTENT=(home install migrations packages scripts system)' >"$repo/install/configure-base-system"
   git -C "$repo" init -q -b main
   git -C "$repo" add -A
   git -C "$repo" commit -q -m "release $tag"
@@ -117,8 +118,9 @@ done
 echo "Signature and comment signature verified"
 EOF
 
-  # sudo: log, then run the command as-is (the tests are not root; the payload dir is ours).
-  printf '#!/usr/bin/env bash\necho "sudo $*" >>"$STUB_LOG"\nexec "$@"\n' >"$bin/sudo"
+  # sudo: log, then run the command as-is -- except chown, which a non-root test
+  # cannot do and only needs to have been asked for (the payload dir is ours).
+  printf '#!/usr/bin/env bash\necho "sudo $*" >>"$STUB_LOG"\n[[ $1 == chown ]] && exit 0\nexec "$@"\n' >"$bin/sudo"
   printf '#!/usr/bin/env bash\necho "snapper $*" >>"$STUB_LOG"\n' >"$bin/snapper"
   printf '#!/usr/bin/env bash\necho "notify-send $*" >>"$STUB_LOG"\n' >"$bin/notify-send"
   chmod +x "$bin"/*
@@ -278,7 +280,7 @@ installed_version() {
   run "$SCRIPT" apply
   assert_success
   run calls
-  assert_line --regexp "^hwpkglist .*from 2026.09.22"
+  assert_line "hwpkglist from 2026.09.22"
 }
 
 @test "apply: the swap is the same physical path (stow keeps its links) and previous is replaced, not nested" {

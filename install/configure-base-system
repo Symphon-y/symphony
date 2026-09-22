@@ -340,7 +340,7 @@ link_home() {
   in_target runuser -u "$USERNAME" -- bash -c "cd $PAYLOAD_DIR && install/link-home apply"
 }
 
-# scripts/update takes a pre-update `snapper create`, which fails on a machine
+# autarchy-update takes a pre-update `snapper create`, which fails on a machine
 # with no root config -- and base-install.md's manual snapper steps never ran on
 # an ISO install. Written directly from snapper's own shipped template (with the
 # same settings that runbook applies) instead of `snapper create-config`, which

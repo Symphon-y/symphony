@@ -1,0 +1,295 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/autarchy-update (linked by install/link-home)
+#
+# autarchy-update: the one way an installed machine moves from one payload to the
+# next (Phase 18, D-0079). An installed machine has no repo -- its OS content is the
+# root-owned payload at /usr/local/share/autarchy/current (D-0067) -- so an update is
+# a new payload: a signed tarball from a GitHub Release, verified with minisign
+# against the key shipped at /etc/autarchy/release.pub, unpacked beside the current
+# one and swapped in at the same path (stow records links by resolved path, so the
+# path must not move), then the same appliers the installer ran, from the new payload.
+#
+# Usage: autarchy-update check                 what the latest release would change
+#        autarchy-update apply [--yes]         download, verify, snapshot, swap, re-apply
+#        autarchy-update apply --from DIR      the same from a checkout (the dev seat)
+#        autarchy-update rollback              previous/ back to current/, re-apply
+#        autarchy-update version               the installed release
+#
+# Root is needed for the snapshot, the swap and the two root-owned appliers; each is
+# its own `sudo` call, and the user runs this, never an agent. Nothing is applied
+# automatically: update-notify only informs (D-0059).
+set -euo pipefail
+
+readonly PAYLOAD_ROOT="${AUTARCHY_PAYLOAD_ROOT:-/usr/local/share/autarchy}"
+readonly CURRENT="$PAYLOAD_ROOT/current"
+readonly PREVIOUS="$PAYLOAD_ROOT/previous"
+readonly PUBKEY="${AUTARCHY_RELEASE_PUBKEY:-/etc/autarchy/release.pub}"
+readonly PACMAN_LOCK="${AUTARCHY_PACMAN_LOCK:-/var/lib/pacman/db.lck}"
+readonly RELEASE_REPO="${AUTARCHY_RELEASE_REPO:-Symphon-y/autarchy}"
+readonly API="https://api.github.com/repos/$RELEASE_REPO/releases/latest"
+readonly DOWNLOAD="https://github.com/$RELEASE_REPO/releases/download"
+
+work=""
+trap '[[ -n $work ]] && rm -rf "$work"' EXIT
+
+die() {
+  printf 'autarchy-update: %s\n' "$*" >&2
+  exit 1
+}
+
+usage() {
+  echo "usage: autarchy-update check | apply [--yes | --from DIR] | rollback | version" >&2
+  exit 2
+}
+
+log() {
+  printf '==> %s\n' "$*"
+}
+
+installed_version() {
+  [[ -r $CURRENT/VERSION ]] || die "no payload at $CURRENT -- is this an installed machine?"
+  tr -d '[:space:]' <"$CURRENT/VERSION"
+}
+
+# A release tag is date-shaped (2026.09.22); anything else (local-<sha>, unreleased)
+# is a build that no release supersedes automatically.
+is_release() {
+  [[ $1 =~ ^20[0-9]{2}\.[0-9]{2}\.[0-9]{2}(-[A-Za-z0-9.]+)?$ ]]
+}
+
+# Newest non-prerelease, as GitHub defines releases/latest. The same flags
+# install/claude-code uses for its downloads: https only, TLS 1.2+, fail on HTTP errors.
+fetch() {
+  curl --proto '=https' --tlsv1.2 -fsSL --max-time 30 "$@"
+}
+
+latest_release() {
+  local json
+  json=$(fetch -H 'Accept: application/vnd.github+json' "$API") ||
+    die "could not fetch the latest release from github.com/$RELEASE_REPO"
+  local tag
+  tag=$(sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' <<<"$json" | head -n1)
+  [[ -n $tag ]] || die "could not read a release tag from GitHub's answer"
+  echo "$tag"
+}
+
+# sort -V orders 2026.09.01 < 2026.09.22 and a bare tag after its pre-releases.
+newer() {
+  local a=$1 b=$2 # true when b is newer than a
+  [[ $a != "$b" && $(printf '%s\n%s\n' "$a" "$b" | sort -V | tail -n1) == "$b" ]]
+}
+
+# What a payload brings that an update would want to know about: the package lists
+# and migrations differ, or they don't.
+summarize() {
+  local old=$1 new=$2
+  echo "changed packages/ and migrations/:"
+  diff -rq "$old/packages" "$new/packages" 2>/dev/null | sed 's/^/  /' || true
+  diff -rq "$old/migrations" "$new/migrations" 2>/dev/null | sed 's/^/  /' || true
+  diff -r "$old/packages" "$new/packages" 2>/dev/null | grep -E '^[<>]' | sed 's/^/  /' || true
+}
+
+# --- fetching and verifying a release ----------------------------------------------
+
+# Downloads the three assets for TAG into $work and verifies them; prints the
+# archive path. Nothing on the system is touched before this returns.
+fetch_release() {
+  local tag=$1
+  local name="autarchy-$tag-payload.tar.zst" asset
+  for asset in "$name" "$name.minisig" "$name.sha256"; do
+    fetch -o "$work/$asset" "$DOWNLOAD/$tag/$asset" ||
+      die "could not download $asset for $tag"
+  done
+  [[ -r $PUBKEY ]] || die "no release public key at $PUBKEY"
+  minisign -V -q -p "$PUBKEY" -x "$work/$name.minisig" -m "$work/$name" >/dev/null ||
+    die "signature verification failed for $name -- not applying it"
+  (cd "$work" && sha256sum -c --quiet "$name.sha256") ||
+    die "checksum mismatch for $name -- not applying it"
+  echo "$work/$name"
+}
+
+# Unpacks an archive into $work/stage, so what will become current/ is complete
+# before anything moves.
+stage_archive() {
+  local archive=$1
+  mkdir -p "$work/stage"
+  tar --zstd -xf "$archive" -C "$work/stage"
+  [[ -r $work/stage/VERSION ]] || die "the payload has no VERSION file"
+}
+
+# The dev seat: the working tree of a checkout, versioned by its commit, uncommitted
+# changes included (they are what is being tried) but said out loud.
+stage_checkout() {
+  local dir=$1
+  [[ -d $dir/.git && -r $dir/install/configure-base-system ]] ||
+    die "$dir is not a checkout of this repo"
+  local content_line
+  content_line=$(grep -E '^readonly PAYLOAD_CONTENT=\(' "$dir/install/configure-base-system")
+  content_line=${content_line#*=\(}
+  local -a content
+  read -ra content <<<"${content_line%)}"
+
+  local short
+  short=$(git -C "$dir" rev-parse --short HEAD)
+  if [[ -n $(git -C "$dir" status --porcelain) ]]; then
+    echo "autarchy-update: $dir has uncommitted changes -- they are deployed too" >&2
+  fi
+  mkdir -p "$work/stage"
+  local item
+  for item in "${content[@]}"; do
+    cp -a "$dir/$item" "$work/stage/"
+  done
+  echo "local-$short" >"$work/stage/VERSION"
+}
+
+# --- the swap and the appliers -----------------------------------------------------
+
+# current/ -> previous/, stage -> current/, at the same physical path, root-owned.
+# Two renames; the only window with no current/ is between them.
+swap_in() {
+  local staging="$PAYLOAD_ROOT/staging.$$"
+  sudo rm -rf "$staging"
+  sudo cp -a "$work/stage" "$staging"
+  sudo chown -R root:root "$staging"
+  sudo rm -rf "$PREVIOUS"
+  sudo mv "$CURRENT" "$PREVIOUS"
+  sudo mv "$staging" "$CURRENT"
+}
+
+# Everything runs from the payload that is now current/, in the order the installer
+# and rebuild.md use. Packages first: an applier may need one.
+apply_payload() {
+  local -a hardware=()
+  log "installing packages"
+  mapfile -t hardware < <("$CURRENT/scripts/hwpkglist")
+  "$CURRENT/install/install-packages" "${hardware[@]}"
+  log "applying system config"
+  sudo "$CURRENT/install/sync-system" apply
+  log "applying home config"
+  "$CURRENT/install/link-home" apply
+  log "enabling user services"
+  "$CURRENT/install/enable-user-services" apply
+  log "enabling root services"
+  sudo "$CURRENT/install/enable-root-services" apply
+}
+
+snapshot() {
+  log "taking a Btrfs snapshot"
+  sudo snapper -c root create -d "$1"
+}
+
+# --- subcommands --------------------------------------------------------------------
+
+version() {
+  installed_version
+}
+
+check() {
+  local current latest
+  current=$(installed_version)
+  latest=$(latest_release)
+  if [[ $current == "$latest" ]]; then
+    echo "autarchy-update: up to date ($current)"
+    return 0
+  fi
+  if ! is_release "$current"; then
+    echo "autarchy-update: this machine runs $current, not a release; the latest release is $latest"
+    echo "  'autarchy-update apply --yes' would replace it"
+    return 0
+  fi
+  if ! newer "$current" "$latest"; then
+    echo "autarchy-update: installed $current is newer than the latest release $latest"
+    return 0
+  fi
+  echo "autarchy-update: $current -> $latest"
+  local archive
+  archive=$(fetch_release "$latest")
+  stage_archive "$archive"
+  summarize "$CURRENT" "$work/stage"
+}
+
+apply() {
+  local yes=0 from=""
+  while (($#)); do
+    case $1 in
+      --yes) yes=1 ;;
+      --from)
+        [[ -n ${2:-} ]] || usage
+        from=$2
+        shift
+        ;;
+      *) usage ;;
+    esac
+    shift
+  done
+
+  local current
+  current=$(installed_version)
+  [[ ! -e $PACMAN_LOCK ]] || die "a pacman transaction is running ($PACMAN_LOCK exists) -- try again when it is done"
+
+  local target
+  if [[ -n $from ]]; then
+    stage_checkout "$from"
+    target=$(<"$work/stage/VERSION")
+  else
+    target=$(latest_release)
+    if [[ $current == "$target" ]]; then
+      echo "autarchy-update: up to date ($current)"
+      return 0
+    fi
+    if ! is_release "$current" && ((! yes)); then
+      die "this machine runs $current, not a release -- 'apply --yes' to replace it with $target"
+    fi
+    if is_release "$current" && ! newer "$current" "$target" && ((! yes)); then
+      die "installed $current is newer than $target -- 'apply --yes' to downgrade"
+    fi
+    log "downloading and verifying $target"
+    local archive
+    archive=$(fetch_release "$target")
+    stage_archive "$archive"
+  fi
+
+  echo "autarchy-update: $current -> $target"
+  snapshot "pre-update: $current -> $target"
+  log "installing the payload"
+  swap_in
+  apply_payload
+  log "running pending migrations"
+  "$CURRENT/scripts/migrate" apply
+  echo "autarchy-update: now at $target"
+}
+
+rollback() {
+  local current previous
+  current=$(installed_version)
+  [[ -r $PREVIOUS/VERSION ]] || die "nothing to roll back to: no $PREVIOUS"
+  previous=$(tr -d '[:space:]' <"$PREVIOUS/VERSION")
+  [[ ! -e $PACMAN_LOCK ]] || die "a pacman transaction is running ($PACMAN_LOCK exists) -- try again when it is done"
+
+  echo "autarchy-update: rolling back $current -> $previous"
+  snapshot "pre-rollback: $current -> $previous"
+  local staging="$PAYLOAD_ROOT/staging.$$"
+  sudo mv "$PREVIOUS" "$staging"
+  sudo mv "$CURRENT" "$PREVIOUS"
+  sudo mv "$staging" "$CURRENT"
+  apply_payload
+  echo "autarchy-update: now at $previous"
+  echo "note: migrations that $current ran are not undone -- see snapper for the pre-update snapshot"
+}
+
+main() {
+  case ${1:-} in
+    check | rollback | version)
+      (($# == 1)) || usage
+      "$1"
+      ;;
+    apply)
+      shift
+      apply "$@"
+      ;;
+    *) usage ;;
+  esac
+}
+
+work=$(mktemp -d)
+main "$@"

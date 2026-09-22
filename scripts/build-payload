@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# build-payload: pack a release payload -- what an installed machine runs from
+# (D-0067: home/ install/ migrations/ packages/ scripts/ system/, plus VERSION) --
+# from a committed ref of this repo, as autarchy-<tag>-payload.tar.zst with a
+# .sha256 beside it. The release workflow signs the result; autarchy-update
+# unpacks it over /usr/local/share/autarchy/current (Phase 18, D-0078).
+#
+# Usage: scripts/build-payload REPO REF TAG OUT_DIR
+#
+# From the commit, never the working tree (`git archive`), so only committed
+# content ships -- the same rule scripts/build-iso applies. The allow-list is
+# install/configure-base-system's PAYLOAD_CONTENT, read from that file rather than
+# repeated here: the installer and the updater must agree on what a payload is.
+# Fixed mtime, owner and sort order make the archive reproducible for a commit.
+set -euo pipefail
+
+usage() {
+  echo "usage: build-payload REPO REF TAG OUT_DIR" >&2
+  exit 2
+}
+
+die() {
+  printf 'build-payload: %s\n' "$*" >&2
+  exit 1
+}
+
+(($# == 4)) || usage
+repo=$1 ref=$2 tag=$3 out=$4
+
+git -C "$repo" rev-parse --verify --quiet "$ref^{commit}" >/dev/null ||
+  die "no such ref '$ref' in $repo"
+
+# The one home of the allow-list, as the array literal that file defines.
+content_line=$(git -C "$repo" show "$ref:install/configure-base-system" |
+  grep -E '^readonly PAYLOAD_CONTENT=\(' || true)
+[[ -n $content_line ]] || die "install/configure-base-system at $ref defines no PAYLOAD_CONTENT"
+content_line=${content_line#*=\(}
+read -ra content <<<"${content_line%)}"
+
+archive="$out/autarchy-$tag-payload.tar.zst"
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+
+mkdir -p "$work/tree" "$out"
+# Git tracks no empty directory, so archive what the ref has and create the rest:
+# every payload carries all six, and the updater never has to wonder.
+present=()
+for dir in "${content[@]}"; do
+  if git -C "$repo" ls-tree -d --name-only "$ref" -- "$dir" | grep -qx "$dir"; then
+    present+=("$dir")
+  else
+    mkdir -p "$work/tree/$dir"
+  fi
+done
+((${#present[@]})) || die "$ref has none of: ${content[*]}"
+git -C "$repo" archive --format=tar "$ref" -- "${present[@]}" | tar -x -C "$work/tree"
+printf '%s\n' "$tag" >"$work/tree/VERSION"
+
+commit_time=$(git -C "$repo" log -1 --format=%ct "$ref")
+tar --zstd -cf "$archive" -C "$work/tree" \
+  --sort=name --mtime="@$commit_time" --owner=0 --group=0 --numeric-owner \
+  VERSION "${content[@]}"
+(cd "$out" && sha256sum "${archive##*/}" >"${archive##*/}.sha256")
+
+echo "build-payload: $archive"

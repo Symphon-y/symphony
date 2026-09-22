@@ -423,7 +423,7 @@ calls() {
 }
 
 @test "creates snapper's root config from its shipped template, matching the runbook's settings (Phase 16)" {
-  # scripts/update takes a pre-update `snapper -c root create`, which fails on a
+  # autarchy-update takes a pre-update `snapper -c root create`, which fails on a
   # machine with no root config -- and base-install.md's manual snapper steps
   # never ran on an ISO install. The config is written directly (not via
   # `snapper create-config`, which insists on creating its own /.snapshots
@@ -474,7 +474,7 @@ calls() {
   local payload="$TARGET/usr/local/share/autarchy/current"
   assert [ -e "$payload/install/configure-base-system" ]
   assert [ -e "$payload/install/link-home" ]
-  assert [ -e "$payload/scripts/update" ]
+  assert [ -e "$payload/home/update/dot-local/bin/autarchy-update" ]
   assert [ -e "$payload/system/files.txt" ]
   assert [ -e "$payload/home/bash/dot-bashrc" ]
   assert [ -e "$payload/packages/desktop.txt" ]

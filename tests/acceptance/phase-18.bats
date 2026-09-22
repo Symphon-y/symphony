@@ -13,11 +13,11 @@ setup() {
 # --- the release ------------------------------------------------------------------
 
 @test "release: the workflow builds, signs and publishes the payload in its own job, before the ISO" {
-  run yq '.jobs | keys | .[]' "$WORKFLOW"
+  run yq -r '.jobs | keys | .[]' "$WORKFLOW"
   assert_success
   assert_line "payload"
-  run yq '.jobs["build-and-release"].needs' "$WORKFLOW"
-  assert_output --partial "payload"
+  run yq -r '.jobs["build-and-release"].needs' "$WORKFLOW"
+  assert_output "payload"
   run grep -F 'scripts/build-payload' "$WORKFLOW"
   assert_success
   run grep -E 'minisign -S' "$WORKFLOW"
@@ -61,7 +61,7 @@ setup() {
 @test "updater: one command, four subcommands, in the payload (home/), never in scripts/" {
   assert [ -x "$UPDATE/autarchy-update" ]
   assert [ ! -e "$REPO_ROOT/scripts/update" ]
-  run grep -E 'check \| apply \| rollback \| version' "$UPDATE/autarchy-update"
+  run grep -E 'usage: autarchy-update check \| apply .* \| rollback \| version' "$UPDATE/autarchy-update"
   assert_success
 }
 
@@ -74,7 +74,8 @@ setup() {
 
 @test "updater: the payload path stays physically the same across updates (stow, D-0067)" {
   # current/ is a real directory replaced by rename, never a symlink.
-  run grep -E 'mv .*staging.* .*current' "$UPDATE/autarchy-update"
+  # shellcheck disable=SC2016 # matching the script's literal text, not expanding it
+  run grep -E 'mv "\$staging" "\$CURRENT"' "$UPDATE/autarchy-update"
   assert_success
   run grep -E 'ln -s' "$UPDATE/autarchy-update"
   assert_failure
@@ -100,7 +101,7 @@ setup() {
   local doc="$REPO_ROOT/docs/runbooks/update.md"
   local word
   for word in 'autarchy-update check' 'autarchy-update apply' 'autarchy-update rollback' 'autarchy-update version' '--from'; do
-    run grep -F "$word" "$doc"
+    run grep -F -e "$word" "$doc"
     assert_success
   done
   assert [ ! -e "$REPO_ROOT/docs/runbooks/dev-deploy.md" ]

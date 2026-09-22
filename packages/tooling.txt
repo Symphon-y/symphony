@@ -1,7 +1,7 @@
 # Tools for working on this repository from inside the machine.
 
 git             # version control for this repo
-github-cli      # `gh`: HTTPS login to the private repo, no SSH keys needed
+github-cli      # `gh`: HTTPS login for pushing to the repo, no SSH keys needed
 bats            # test runner for unit and acceptance tests (D-0005)
 bats-assert     # assertion helpers used by every test suite
 bats-support    # required by bats-assert

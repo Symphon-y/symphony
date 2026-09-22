@@ -254,5 +254,5 @@ installed packages: 704
 - **Install history:** `2026.09.17-test14` (base, Phase 14), `2026.09.18-test2` (GUI,
   Phase 15), `2026.09.19-test1` (desktop round 1, Phase 16), `local-5c8bcf1` (2026-09-20,
   the current install, Phase 17's D-0074 commit; later checkouts deployed over it with
-  `docs/runbooks/dev-deploy.md`). It will not be reinstalled to test ISOs -- it is the dev
+  `autarchy-update apply --from`, Phase 18). It will not be reinstalled to test ISOs -- it is the dev
   seat; fresh-install proofs need a second machine.

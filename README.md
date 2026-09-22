@@ -58,11 +58,25 @@ tests/acceptance/             bats tests asserting system state, one file per ph
 Component directories (`hypr/`, `waybar/`, `shell/`, …) are created by the phase that
 first needs them, not in advance.
 
+## Installing and updating
+
+- **Install:** download `autarchy-<tag>.iso` from the latest
+  [release](https://github.com/Symphon-y/autarchy/releases) (reassemble the
+  `.part` files if it was split; check the `.sha256`), write it to a USB stick, boot
+  it. A graphical installer collects everything once and installs offline;
+  the first boot lands on the desktop. Details: `docs/runbooks/base-install.md`.
+- **Update:** `autarchy-update check`, then `autarchy-update apply`. Every release
+  ships a signed payload; the machine verifies it before touching anything and
+  takes a Btrfs snapshot first. `autarchy-update rollback` goes back one.
+  Details: `docs/runbooks/update.md`.
+- **Own it:** fork, change `home/`, `system/` and `packages/`, tag -- CI builds your
+  ISO and your signed payload (your own minisign key in the repository secrets).
+
 ## Status
 
 Phases 0-17 complete except Phase 12's hardware bonuses. A release ISO installs the
 whole system offline through a GTK4 guided installer (with an optional Wi-Fi step) and
 boots into a themed Hyprland desktop with a working network bar; the Alienware 14 it
-runs on is now the development seat (`docs/environment/alienware-14.md`). Next:
-Phase 18, a release payload and update pipeline for installed machines. See
+runs on is now the development seat (`docs/environment/alienware-14.md`). Phase 18
+(in progress) adds the signed release payload and `autarchy-update`. See
 [`docs/roadmap.md`](docs/roadmap.md).

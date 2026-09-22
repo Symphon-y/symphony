@@ -77,7 +77,7 @@ calls() {
   STUB_LATEST=2026.08.01 run "$SCRIPT"
   assert_success
   run calls
-  refute_output --partial "autarchy"
+  refute_output --partial "notify-send"
 }
 
 @test "a local-* payload (the dev seat) is not nagged about releases" {

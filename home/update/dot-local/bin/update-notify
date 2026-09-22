@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/update-notify (linked by install/link-home)
+#
+# update-notify: notify the desktop when the set of pending package updates
+# changes (Phase 9, D-0059), and when a newer autarchy release exists (Phase 18).
+# Never applies anything -- unattended `-Syu` risks a partial upgrade, the
+# well-known Arch anti-pattern, and an OS update is the user's call; this only
+# ever informs, once per new thing.
+#
+# `checkupdates --change` (pacman-contrib) does the package half: it exits 2 with
+# no output when nothing is pending, exits 0 with output only the first time a
+# given set of updates is seen (silently re-exits 0 with no output on repeat
+# runs against the same pending set, verified against its own source -- so
+# this naturally doesn't spam a notification every single day for the same
+# untouched updates).
+#
+# The release half is one GET to GitHub's releases/latest (no token, nothing
+# sent but the request, a short timeout so a hung network cannot hang the
+# timer), compared with the installed payload's VERSION; a marker file makes it
+# one toast per new tag. Offline, or on a local-* build (the dev seat, which
+# no release supersedes), it stays silent.
+set -uo pipefail
+
+readonly PAYLOAD_ROOT="${AUTARCHY_PAYLOAD_ROOT:-/usr/local/share/autarchy}"
+readonly STATE_DIR="${AUTARCHY_STATE:-$HOME/.local/state/autarchy}"
+readonly RELEASE_REPO="${AUTARCHY_RELEASE_REPO:-Symphon-y/autarchy}"
+readonly API="https://api.github.com/repos/$RELEASE_REPO/releases/latest"
+
+notify_packages() {
+  local output rc
+  output=$(checkupdates --change 2>/dev/null)
+  rc=$?
+
+  case $rc in
+    2) return 0 ;;     # nothing pending
+    0) ;;              # fall through: new, or unchanged (output empty either way)
+    *) return "$rc" ;; # real failure
+  esac
+
+  [[ -z $output ]] && return 0 # pending, but already notified about this exact set
+
+  local count plural
+  count=$(wc -l <<<"$output")
+  plural=$([[ $count -eq 1 ]] && echo "" || echo "s")
+  notify-send --app-name="Package updates" \
+    "$count update$plural available" \
+    "Run 'sudo pacman -Syu' when ready. ($(echo "$output" | cut -d' ' -f1 | paste -sd, -))"
+}
+
+notify_release() {
+  local installed
+  [[ -r $PAYLOAD_ROOT/current/VERSION ]] || return 0
+  installed=$(tr -d '[:space:]' <"$PAYLOAD_ROOT/current/VERSION")
+  [[ $installed =~ ^20[0-9]{2}\.[0-9]{2}\.[0-9]{2} ]] || return 0 # local-*/unreleased: not for releases
+
+  local json latest
+  json=$(curl --proto '=https' --tlsv1.2 -fsSL --max-time 10 \
+    -H 'Accept: application/vnd.github+json' "$API" 2>/dev/null) || return 0
+  latest=$(sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' <<<"$json" | head -n1)
+  [[ -n $latest && $latest != "$installed" ]] || return 0
+  [[ $(printf '%s\n%s\n' "$installed" "$latest" | sort -V | tail -n1) == "$latest" ]] || return 0
+
+  local marker="$STATE_DIR/release-notified"
+  [[ -r $marker && $(<"$marker") == "$latest" ]] && return 0
+  mkdir -p "$STATE_DIR"
+  echo "$latest" >"$marker"
+  notify-send --app-name="autarchy" \
+    "autarchy $latest available" \
+    "Installed: $installed. Run 'autarchy-update check', then 'autarchy-update apply'."
+}
+
+notify_packages
+notify_release

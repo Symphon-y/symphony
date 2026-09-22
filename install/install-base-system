@@ -48,11 +48,6 @@ readonly SWAP_MAPPER=cryptswap
 # unlocks this device early via rd.luks.name= -- no separate
 # rd.luks.key= cmdline parameter needed.
 readonly SWAP_KEYFILE=/etc/cryptsetup-keys.d/$SWAP_MAPPER.key
-# The live ISO's own release marker (baked in by release-iso.yml, Phase 10;
-# scripts/update reads the same file post-install) -- not present on a
-# plain stock-ISO manual install.
-readonly LIVE_RELEASE_FILE="${AUTARCHY_LIVE_RELEASE_FILE:-/etc/autarchy-release}"
-
 trap 'printf "install-base-system: failed at line %s: %s\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
 
 log() {
@@ -253,23 +248,6 @@ configure_swap() {
   echo "FILES=($SWAP_KEYFILE)" >"$TARGET/etc/mkinitcpio.conf.d/20-swap-resume.conf"
 }
 
-# Only meaningful when booted from a release ISO (the live environment's own
-# /etc/autarchy-release, written by the CI build -- not anything on
-# $TARGET). A no-op for a plain stock-ISO manual install, where this file
-# doesn't exist. Runs after configure-base-system so $USERNAME's home
-# already exists to seed.
-seed_release_marker() {
-  [[ -r $LIVE_RELEASE_FILE ]] || return 0
-  local release
-  release=$(<"$LIVE_RELEASE_FILE")
-  [[ -n $release && $release != unreleased ]] || return 0
-
-  log "Recording the installed release ($release) for scripts/update"
-  install -d -m 0755 "$TARGET/home/$USERNAME/.local/state/autarchy"
-  echo "$release" >"$TARGET/home/$USERNAME/.local/state/autarchy/current-release"
-  arch-chroot "$TARGET" chown -R "$USERNAME:$USERNAME" "/home/$USERNAME/.local"
-}
-
 main() {
   (($# >= 1 && $# <= 2)) || usage
   local vars_file=$1
@@ -294,7 +272,6 @@ main() {
     export AUTARCHY_KERNEL_PARAMS="$KERNEL_PARAMS"
   fi
   "$CONFIGURE_SCRIPT" "$vars_file" "$TARGET"
-  seed_release_marker
 }
 
 main "$@"

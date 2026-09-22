@@ -22,6 +22,8 @@ make_repo() {
     mkdir -p "$REPO/$dir"
     echo "x" >"$REPO/$dir/file"
   done
+  # The allow-list's one home: the fixture carries the same line the real file has.
+  echo 'readonly PAYLOAD_CONTENT=(home install migrations packages scripts system)' >"$REPO/install/configure-base-system"
   echo "secret" >"$REPO/base-install.local.vars"
   echo "# readme" >"$REPO/README.md"
   git -C "$REPO" init -q -b main
@@ -79,6 +81,14 @@ listing() {
   assert_success
   run bash -c "cd '$OUT' && sha256sum -c autarchy-2026.09.22-payload.tar.zst.sha256"
   assert_success
+}
+
+@test "fails clearly when the ref has no allow-list to read (the installer file is the contract)" {
+  git -C "$REPO" rm -q install/configure-base-system
+  git -C "$REPO" commit -q -m "drop"
+  run "$SCRIPT" "$REPO" HEAD 2026.09.22 "$OUT"
+  assert_failure
+  assert_output --partial "PAYLOAD_CONTENT"
 }
 
 @test "fails clearly on a ref that does not exist" {

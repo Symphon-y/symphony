@@ -1752,7 +1752,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   was read from the machine itself. `test -x` fixes it; an acceptance test refuses the bracket.
 - **Consequences:** An installed machine has no way to update itself yet (`scripts/update` is
   git-based) -- Phase 18's scope; until then the dev seat is updated by hand
-  (`docs/runbooks/dev-deploy.md`), which is the shape the update will take: snapshot, replace the
+  (`docs/runbooks/dev-deploy.md`, since replaced by `autarchy-update apply --from`, D-0079), which is the shape the update takes: snapshot, replace the
   payload's contents at the same path, re-run the appliers from the payload. Every applier must
   run *from the payload*, never from a checkout (stow's ownership rule). The full "zero manual
   steps from a fresh install" signal has been observed on the mechanism's parts (payload,

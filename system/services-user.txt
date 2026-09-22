@@ -14,4 +14,4 @@ hyprpolkitagent.service   # polkit authentication agent (Phase 4)
 waybar.service            # status bar (Phase 5)
 cliphist.service          # clipboard history watcher (Phase 5)
 update-notify.timer       # daily checkupdates-backed notification (Phase 9);
-                          # a custom unit (home/update-notify/), not package-shipped
+                          # a custom unit (home/update/), not package-shipped
