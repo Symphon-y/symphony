@@ -158,6 +158,48 @@ list() {
   assert_line "sudo $PAYLOAD/install/sync-system --root $ROOT --manifest $PAYLOAD/system/hardware/alienfx.txt apply"
 }
 
+@test "apply: after a files= manifest that installs udev rules, the rules are reloaded and re-applied to devices already plugged in" {
+  usb 2-1 187c 0525
+  printf '0644 hardware/60-alienfx.rules /etc/udev/rules.d/60-alienfx.rules\n' >"$PAYLOAD/system/hardware/alienfx.txt"
+  entry 'usb:187c:0525  files=alienfx.txt'
+  # shellcheck disable=SC2016 # stub body expands when the stub runs
+  printf '#!/usr/bin/env bash\necho "udevadm $*" >>"$STUB_LOG"\n' >"$BATS_TEST_TMPDIR/bin/udevadm"
+  chmod +x "$BATS_TEST_TMPDIR/bin/udevadm"
+  mkdir -p "$ROOT/run/udev" && python3 -c "import socket,sys; socket.socket(socket.AF_UNIX).bind(sys.argv[1])" "$ROOT/run/udev/control"
+  run "$SCRIPT" apply
+  assert_success
+  run calls
+  assert_line "sudo udevadm control --reload"
+  assert_line --regexp "^sudo udevadm trigger .*--action=add"
+}
+
+@test "apply: a files= manifest with no udev rule does not touch udev" {
+  usb 2-1 187c 0525
+  printf '0644 hardware/thing.conf /etc/thing.conf\n' >"$PAYLOAD/system/hardware/thing.txt"
+  entry 'usb:187c:0525  files=thing.txt'
+  # shellcheck disable=SC2016 # stub body expands when the stub runs
+  printf '#!/usr/bin/env bash\necho "udevadm $*" >>"$STUB_LOG"\n' >"$BATS_TEST_TMPDIR/bin/udevadm"
+  chmod +x "$BATS_TEST_TMPDIR/bin/udevadm"
+  mkdir -p "$ROOT/run/udev" && python3 -c "import socket,sys; socket.socket(socket.AF_UNIX).bind(sys.argv[1])" "$ROOT/run/udev/control"
+  run "$SCRIPT" apply
+  assert_success
+  run calls
+  refute_output --partial "udevadm"
+}
+
+@test "apply: udev is not touched where it is not running (the installer's chroot)" {
+  usb 2-1 187c 0525
+  printf '0644 hardware/60-alienfx.rules /etc/udev/rules.d/60-alienfx.rules\n' >"$PAYLOAD/system/hardware/alienfx.txt"
+  entry 'usb:187c:0525  files=alienfx.txt'
+  # shellcheck disable=SC2016 # stub body expands when the stub runs
+  printf '#!/usr/bin/env bash\necho "udevadm $*" >>"$STUB_LOG"\n' >"$BATS_TEST_TMPDIR/bin/udevadm"
+  chmod +x "$BATS_TEST_TMPDIR/bin/udevadm"
+  run "$SCRIPT" apply
+  assert_success
+  run calls
+  refute_output --partial "udevadm"
+}
+
 @test "apply: a service= is enabled as a user unit when it is one, else as a system unit via sudo" {
   usb 2-1 187c 0525
   mkdir -p "$PAYLOAD/home/hardware/dot-config/systemd/user"

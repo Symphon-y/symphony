@@ -20,6 +20,23 @@ readonly THEME="$THEME_DIR/symphony.json"
 [[ -r $THEME_ENV ]] || exit 0
 command -v alienfx >/dev/null || exit 0
 
+# Is the controller there, and can this user talk to it? alienfx itself retries an
+# inaccessible device forever, one error line per packet, so the check is made here:
+# one line, once. Absent device: nothing to do. Present but not writable: the udev
+# rule (system/hardware/60-alienfx.rules) has not been applied to it yet.
+readonly SYS="${SYMPHONY_SYS:-/sys}" DEV="${SYMPHONY_DEV:-/dev}"
+node=""
+for d in "$SYS"/bus/usb/devices/*; do
+  [[ -r $d/idVendor && $(<"$d/idVendor") == 187c && $(<"$d/idProduct") == 0525 ]] || continue
+  node=$(printf '%s/bus/usb/%03d/%03d' "$DEV" "$(<"$d/busnum")" "$(<"$d/devnum")")
+  break
+done
+[[ -n $node ]] || exit 0
+if [[ ! -w $node ]]; then
+  echo "alienfx-theme: the AlienFX controller at $node is not writable by $USER -- is the udev rule applied? (symphony-hardware apply)" >&2
+  exit 0
+fi
+
 primary=$(sed -n 's/^PRIMARY=#\?\([0-9A-Fa-f]\{6\}\).*/\1/p' "$THEME_ENV" | head -n1)
 [[ -n $primary ]] || exit 0
 

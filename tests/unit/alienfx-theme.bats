@@ -12,6 +12,14 @@ setup() {
   : >"$STUB_LOG"
   mkdir -p "$HOME/.config/symphony" "$BATS_TEST_TMPDIR/bin"
   printf 'PRIMARY=#3fa7d6\nBACKGROUND=#101418\n' >"$HOME/.config/symphony/theme.env"
+  # The controller, present and writable (the udev rule applied), in fake sysfs/dev.
+  export SYMPHONY_SYS="$BATS_TEST_TMPDIR/sys" SYMPHONY_DEV="$BATS_TEST_TMPDIR/dev"
+  mkdir -p "$SYMPHONY_SYS/bus/usb/devices/2-1" "$SYMPHONY_DEV/bus/usb/002"
+  printf '187c\n' >"$SYMPHONY_SYS/bus/usb/devices/2-1/idVendor"
+  printf '0525\n' >"$SYMPHONY_SYS/bus/usb/devices/2-1/idProduct"
+  printf '2\n' >"$SYMPHONY_SYS/bus/usb/devices/2-1/busnum"
+  printf '4\n' >"$SYMPHONY_SYS/bus/usb/devices/2-1/devnum"
+  : >"$SYMPHONY_DEV/bus/usb/002/004"
   # shellcheck disable=SC2016 # stub body expands when the stub runs
   printf '#!/usr/bin/env bash\necho "alienfx $*" >>"$STUB_LOG"\n[[ $1 == --theme ]] && cp "$HOME/.config/alienfx/$2.json" "$STUB_LOG.theme" 2>/dev/null\n' >"$BATS_TEST_TMPDIR/bin/alienfx"
   chmod +x "$BATS_TEST_TMPDIR/bin/alienfx"
@@ -58,11 +66,34 @@ print(sorted(k for k in t if k!='speed'))
 }
 
 @test "alienfx not installed (a machine without the controller): silent, exit 0" {
+  # Removing the stub is not enough on a machine that has the real tool (the dev
+  # seat): give the script a PATH with only what it needs and no alienfx.
   rm "$BATS_TEST_TMPDIR/bin/alienfx"
-  run "$SCRIPT"
+  local tool
+  for tool in bash sed head mkdir; do ln -s "$(command -v "$tool")" "$BATS_TEST_TMPDIR/bin/$tool"; done
+  run env PATH="$BATS_TEST_TMPDIR/bin" "$SCRIPT"
   assert_success
   run calls
   assert_output ""
+}
+
+@test "no controller on the bus (a machine that got the package by mistake, or it is unplugged): silent, exit 0" {
+  rm -rf "$SYMPHONY_SYS/bus/usb/devices/2-1"
+  run "$SCRIPT"
+  assert_success
+  assert_output ""
+  run calls
+  assert_output ""
+}
+
+@test "a controller present but not writable (udev rule not applied yet) gives one line on stderr, never alienfx's retry flood" {
+  chmod 444 "$SYMPHONY_DEV/bus/usb/002/004"
+  run --separate-stderr "$SCRIPT"
+  assert_success
+  [[ $stderr == *"not writable"* ]]
+  [[ $stderr == *"/dev/bus/usb/002/004"* ]]
+  run calls
+  refute_output --partial "alienfx --theme"
 }
 
 @test "alienfx failing (device unplugged, no access) is reported on stderr but does not fail the caller" {

@@ -136,11 +136,21 @@ apply_files() {
   local -a manifests
   mapfile -t manifests < <("$HWMATCH" --kind files)
   ((${#manifests[@]})) || return 0
-  local m
+  local m udev=0
   for m in "${manifests[@]}"; do
     log "installing files from $m"
     as_root "$PAYLOAD/install/sync-system" ${ROOT:+--root "$ROOT"} --manifest "$SYSTEM_DIR/hardware/$m" apply
+    grep -qE '[[:space:]]/etc/udev/rules\.d/' "$SYSTEM_DIR/hardware/$m" && udev=1
   done
+  # A udev rule only fires on events: a device plugged in before the rule existed
+  # (every device, on an update) never gets its tags or ACLs until re-triggered.
+  # Only where udev is running (its control socket exists) -- not in the installer's
+  # chroot, whose target boots fresh with the rule already in place.
+  if ((udev)) && [[ -S $ROOT/run/udev/control ]]; then
+    log "reloading udev rules and re-applying them to present devices"
+    as_root udevadm control --reload
+    as_root udevadm trigger --subsystem-match=usb --action=add
+  fi
 }
 
 apply_services() {

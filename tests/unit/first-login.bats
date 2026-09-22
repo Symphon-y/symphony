@@ -16,6 +16,12 @@ setup() {
   export SYMPHONY_ENABLE_USER_SERVICES_SCRIPT="$BATS_TEST_TMPDIR/enable-user-services-stub"
   export SYMPHONY_MATUGEN="$BATS_TEST_TMPDIR/matugen-stub"
   export SYMPHONY_FIRST_LOGIN_VERIFY_DELAY=0
+  # Never the real symphony-hardware: it would enable real units on the machine
+  # running the tests (it did, once -- the dev seat's AlienFX unit).
+  export SYMPHONY_HARDWARE_SCRIPT="$BATS_TEST_TMPDIR/hardware-stub"
+  # shellcheck disable=SC2016 # the stub body expands when the stub runs
+  printf '#!/usr/bin/env bash\necho "symphony-hardware $*" >>"$STUB_LOG"\nexit "${STUB_HW_RC:-0}"\n' >"$BATS_TEST_TMPDIR/hardware-stub"
+  chmod +x "$BATS_TEST_TMPDIR/hardware-stub"
   cat >"$SYMPHONY_ENABLE_USER_SERVICES_SCRIPT" <<EOF
 #!/usr/bin/env bash
 echo "enable-user-services \$*" >>"$STUB_LOG"
@@ -91,10 +97,6 @@ calls() {
 }
 
 @test "first run: enables this machine's hardware user units after the services (Phase 19), and a failure there does not block the marker" {
-  # shellcheck disable=SC2016 # the stub body expands when the stub runs
-  printf '#!/usr/bin/env bash\necho "symphony-hardware $*" >>"$STUB_LOG"\nexit "${STUB_HW_RC:-0}"\n' >"$BATS_TEST_TMPDIR/hardware-stub"
-  chmod +x "$BATS_TEST_TMPDIR/hardware-stub"
-  export SYMPHONY_HARDWARE_SCRIPT="$BATS_TEST_TMPDIR/hardware-stub"
   run "$SCRIPT"
   assert_success
   run calls
