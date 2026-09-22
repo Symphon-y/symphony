@@ -21,9 +21,9 @@
 
 # --- Alienware 14 (2014, P39G) ----------------------------------------------------
 
-# Broadcom BCM4352 802.11ac (Dell DW1550): no open driver; the proprietary wl via
-# DKMS, built against both installed kernels (D-0074).
-pci:14e4:43b1  packages=broadcom-wl
+# No open driver; the proprietary wl via DKMS, built against both installed
+# kernels (D-0074). The trailing note is what the installer's Wi-Fi page shows.
+pci:14e4:43b1  packages=broadcom-wl  # Broadcom BCM4352 802.11ac (Dell DW1550)
 
 # The BIOS reports an airplane-mode slider through ACPI; dell_rbtn turns it into a
 # hard-blocked rfkill that software cannot clear, and udev reloads the module on
