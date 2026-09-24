@@ -183,6 +183,23 @@ Red confirmed: 2026-09-22 · Green confirmed: |
   raises a mako toast: a keybinding has nowhere to print, which is exactly why the key
   looked dead rather than broken. Five tests, red first.
 
+### 2026-09-24 (wallpapers move to where pictures live -- D-0086)
+- The directory the last three findings kept circling, `~/.local/share/backgrounds`, was
+  the problem underneath them: one folder holding a shipped asset, the runtime pointer
+  and the user's library at once, which is why `SUPER+CTRL+W` searched a place nobody
+  fills. Split three ways -- library `~/Pictures/Wallpapers` (asked from `xdg-user-dir`,
+  so a relocated Pictures takes it along), pointer `~/.local/state/symphony/wallpaper`
+  (no extension: matugen reads contents, not names -- probed), shipped default
+  `~/.local/share/symphony/default-wallpaper.png` as a stow link. All four paths and
+  hyprpaper's config body -- by then copied into three files -- now live in
+  `scripts/lib/wallpaper.bash`; the two `home/hyprpaper` scripts reach it from their own
+  `realpath`, since they run as stow links. `link-home` seeds the library with a link to
+  the shipped default so the binding works on a fresh install, and its
+  `--ignore='current\.png$'` and `wallpaper-random`'s by-name skip both go away. The
+  migration moves any images the user had there, carries the showing wallpaper through
+  `wallpaper-set` (shipped default when it no longer resolves -- the live state with the
+  photo share unmounted), and removes the old directory. 31 tests red first.
+
 ## VM → physical hardware notes
 
 - Everything here is verified on the Alienware: the codec pins, the HID controller, the

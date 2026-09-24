@@ -2320,3 +2320,46 @@ and `wallpaper-set` drives the config file instead.)_
   and so passed for weeks with the picture frozen; it now asserts that
   `hyprctl hyprpaper listactive` names the file just set, and a static test forbids
   `hyprctl hyprpaper` anywhere in the tree.
+
+## D-0086 — the wallpaper library is `~/Pictures/Wallpapers`; the pointer is state (amends D-0085)
+
+- **Status:** Accepted (2026-09-24, Phase 19)
+- **Decision:** Three concepts get three homes. The user's **library** is
+  `~/Pictures/Wallpapers` -- the pictures directory as XDG reports it, plus a
+  `Wallpapers` folder -- and is what `wallpaper-random` searches with no argument. The
+  **pointer** at what is showing moves from `~/.local/share/backgrounds/current.png` to
+  `~/.local/state/symphony/wallpaper`, beside `first-login-done` and the migration
+  markers. The **shipped default** becomes a stow-linked payload asset at
+  `~/.local/share/symphony/default-wallpaper.png`. `~/.local/share/backgrounds` is gone,
+  and with it `install/link-home`'s `--ignore='current\.png$'` and `wallpaper-random`'s
+  by-name skip of `current.png`. All four paths and hyprpaper's config shape live in one
+  new file, `scripts/lib/wallpaper.bash`, sourced by both `wallpaper-*` scripts (which
+  resolve the payload from their own `realpath`, since they run as stow links) and by
+  `install/link-home` and `install/first-login`.
+- **Alternatives considered:** leave the library where it was and only rename it -- it
+  would still be a directory no user thinks to fill. Hardcode `~/Pictures` rather than
+  asking `xdg-user-dir` -- breaks for anyone who relocates the folder, and the answer is
+  one command away. Keep the pointer in `~/.local/share/backgrounds` and move only the
+  library -- leaves a second name for "wallpapers" wrapped around a single file. Copy
+  each chosen image into the library so a wallpaper on an unmounted share survives --
+  considered and declined by the user as a nice-to-have; a missing mount means no
+  wallpaper, and only the migration falls back to the shipped default, because it
+  otherwise cannot finish.
+- **Reasoning:** `~/.local/share/backgrounds` was Phase 6's single wallpaper directory,
+  and it mixed all three concepts: a shipped asset, runtime state rewritten on every
+  change, and the place a person is expected to keep their own photos. The practical
+  cost showed up live -- `SUPER+CTRL+W` searched a directory holding two symlinks and
+  nothing the user had ever put there. XDG already answers where pictures go, and
+  `~/.local/state` already holds this system's per-user state, so both moves are to
+  homes that exist rather than to new inventions. Pulling the paths into a lib also
+  collapsed hyprpaper's config body, which by then appeared in three places.
+- **Consequences:** a migration moves any images the user had put in the old directory,
+  carries the wallpaper that was showing through `wallpaper-set` (falling back to the
+  shipped default when it no longer resolves -- the live state while the photo share was
+  unmounted), and removes the old directory, leaving behind anything it does not
+  recognise and saying so. `install/link-home` seeds the library with
+  `symphony-default.png`, a link to the shipped image, so the binding has something to
+  choose on a fresh install. The pointer has no extension: matugen reads the file's
+  contents, not its name (verified). Two `home/hyprpaper` scripts now depend on being
+  reachable from the payload root, which is how they are always installed and how the
+  unit tests already invoke them.

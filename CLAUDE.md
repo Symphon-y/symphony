@@ -54,7 +54,7 @@ phase exit.
 | **L**iskov substitution | A replaceable component satisfies its role's contract (e.g. any terminal behind the terminal role supports `-e <cmd>`). Prefer existing standards (xdg-terminal-exec, xdg-mime) over custom wrappers. |
 | **I**nterface segregation | Many small scripts with narrow jobs, not one monolithic CLI. |
 | **D**ependency inversion | Keybindings and menus call *roles* (`$terminal`, `$launcher`), never hardcoded executables. |
-| Clean Code | Clear names, small functions, `set -euo pipefail`, comments explain *why*, shellcheck-clean. |
+| Clean Code | Clear names, small functions, `set -euo pipefail`, shellcheck-clean. The code documents itself; comments stay succinct and explain *why* — a reason, a probe result, a trap someone would otherwise re-enter — never what the next line plainly does. |
 | DRY | Each piece of *knowledge* has one home (package lists, palette, role definitions). Similar-looking text is not automatically duplication. "No custom abstraction when a standard primitive suffices" beats DRY. |
 | TDD | **Acceptance:** `tests/acceptance/phase-NN.bats` asserts system state. **Unit:** bats tests with stubbed commands for every script in `scripts/` and `install/`. **Static:** `shellcheck`, `shfmt -d`, `Hyprland --verify-config`, `systemd-analyze verify`, headless nvim startup. |
 | Where not applicable | Manual runbooks get acceptance checks, not unit tests. Declarative config gets validators, not mocks. Pure documentation gets no tests. |

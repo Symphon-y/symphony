@@ -25,6 +25,8 @@ set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO_ROOT
+# shellcheck source-path=SCRIPTDIR source=../scripts/lib/wallpaper.bash
+source "$REPO_ROOT/scripts/lib/wallpaper.bash"
 readonly ENABLE_USER_SERVICES="${SYMPHONY_ENABLE_USER_SERVICES_SCRIPT:-$REPO_ROOT/install/enable-user-services}"
 readonly MATUGEN="${SYMPHONY_MATUGEN:-matugen}"
 readonly HARDWARE="${SYMPHONY_HARDWARE_SCRIPT:-$REPO_ROOT/home/hardware/dot-local/bin/symphony-hardware}"
@@ -34,11 +36,11 @@ readonly VERIFY_DELAY="${SYMPHONY_FIRST_LOGIN_VERIFY_DELAY:-2}"
 
 # --source-color-index 0 skips matugen's interactive source-color prompt, the
 # same flag (and reason) as home/hyprpaper/dot-local/bin/wallpaper-set. Rendered
-# straight from current.png rather than through wallpaper-set: that also pushes
-# the image to hyprpaper over IPC, which may not be listening yet this early.
+# straight from the pointer rather than through wallpaper-set, which would restart
+# a hyprpaper that has not started yet.
 render_theme() {
   "$MATUGEN" --config "$HOME/.config/matugen/config.toml" \
-    image "$HOME/.local/share/backgrounds/current.png" --source-color-index 0
+    image "$(wallpaper_pointer)" --source-color-index 0
 }
 
 # enable --now returns as soon as systemd has queued each start, so a check

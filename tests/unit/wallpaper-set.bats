@@ -14,11 +14,12 @@ setup() {
   export HOME="$BATS_TEST_TMPDIR/home"
   export STUB_LOG="$BATS_TEST_TMPDIR/calls.log"
   : >"$STUB_LOG"
-  mkdir -p "$HOME/.config/hypr" "$HOME/.local/share/backgrounds" "$BATS_TEST_TMPDIR/bin"
+  unset XDG_CONFIG_HOME
+  mkdir -p "$HOME/.config/hypr" "$BATS_TEST_TMPDIR/bin"
   IMAGE="$BATS_TEST_TMPDIR/photo.jpg"
   : >"$IMAGE"
   CONF="$HOME/.config/hypr/hyprpaper.conf"
-  CURRENT="$HOME/.local/share/backgrounds/current.png"
+  POINTER="$HOME/.local/state/symphony/wallpaper"
   make_stubs
 }
 
@@ -67,18 +68,31 @@ calls() {
   assert_output --partial "ipc = on"
 }
 
-@test "the config names the image, never the current.png symlink (one answer everywhere)" {
+@test "the config names the image, never the pointer symlink (one answer everywhere)" {
   run "$SCRIPT" "$IMAGE"
   assert_success
   run cat "$CONF"
-  refute_output --partial "current.png"
+  refute_output --partial "state/symphony/wallpaper"
 }
 
-@test "repoints current.png at the same image (the palette's stable input)" {
+@test "repoints the wallpaper pointer at the same image (the palette's stable input)" {
   run "$SCRIPT" "$IMAGE"
   assert_success
-  assert [ -L "$CURRENT" ]
-  assert_equal "$(readlink -f "$CURRENT")" "$IMAGE"
+  assert [ -L "$POINTER" ]
+  assert_equal "$(readlink -f "$POINTER")" "$IMAGE"
+}
+
+@test "creates the pointer's directory on a home that has never had one (D-0086)" {
+  assert [ ! -d "$HOME/.local/state/symphony" ]
+  run "$SCRIPT" "$IMAGE"
+  assert_success
+  assert [ -L "$POINTER" ]
+}
+
+@test "nothing is written to the old backgrounds directory any more (D-0086)" {
+  run "$SCRIPT" "$IMAGE"
+  assert_success
+  assert [ ! -e "$HOME/.local/share/backgrounds" ]
 }
 
 @test "restarts hyprpaper when it is running, so the picture changes now" {
@@ -124,7 +138,7 @@ calls() {
   assert_success
   run cat "$CONF"
   assert_output --partial "path = $spaced"
-  assert_equal "$(readlink -f "$CURRENT")" "$spaced"
+  assert_equal "$(readlink -f "$POINTER")" "$spaced"
 }
 
 @test "re-running with another image replaces the config rather than appending a second block" {

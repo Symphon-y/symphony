@@ -6,10 +6,13 @@ setup() {
   load '../helpers/common'
   SCRIPT="$REPO_ROOT/home/hyprpaper/dot-local/bin/wallpaper-random"
   export HOME="$BATS_TEST_TMPDIR/home"
+  unset XDG_CONFIG_HOME
   export STUB_LOG="$BATS_TEST_TMPDIR/calls.log"
   : >"$STUB_LOG"
   DIR="$BATS_TEST_TMPDIR/walls"
-  mkdir -p "$DIR" "$HOME/.local/share/backgrounds" "$BATS_TEST_TMPDIR/bin"
+  LIBRARY="$HOME/Pictures/Wallpapers"
+  POINTER="$HOME/.local/state/symphony/wallpaper"
+  mkdir -p "$DIR" "$LIBRARY" "$(dirname "$POINTER")" "$BATS_TEST_TMPDIR/bin"
   # shellcheck disable=SC2016 # stub bodies expand when the stubs run
   printf '#!/usr/bin/env bash\nprintf "wallpaper-set %%s\\n" "$1" >>"$STUB_LOG"\n' >"$BATS_TEST_TMPDIR/bin/wallpaper-set"
   # shellcheck disable=SC2016
@@ -51,7 +54,7 @@ calls() {
 @test "never picks the wallpaper already showing, so a small directory still changes" {
   : >"$DIR/a.jpg"
   : >"$DIR/b.jpg"
-  ln -sfn "$DIR/a.jpg" "$HOME/.local/share/backgrounds/current.png"
+  ln -sfn "$DIR/a.jpg" "$POINTER"
   local _attempt
   for _attempt in 1 2 3 4 5 6; do
     : >"$STUB_LOG"
@@ -64,7 +67,7 @@ calls() {
 
 @test "a directory with only the current wallpaper in it sets it again rather than failing" {
   : >"$DIR/only.jpg"
-  ln -sfn "$DIR/only.jpg" "$HOME/.local/share/backgrounds/current.png"
+  ln -sfn "$DIR/only.jpg" "$POINTER"
   run "$SCRIPT" "$DIR"
   assert_success
   run calls
@@ -73,16 +76,17 @@ calls() {
 
 @test "with no wallpaper set yet, every image is a candidate" {
   : >"$DIR/a.jpg"
-  rm -f "$HOME/.local/share/backgrounds/current.png"
+  rm -f "$POINTER"
   run "$SCRIPT" "$DIR"
   assert_success
   run calls
   assert_output "wallpaper-set $DIR/a.jpg"
 }
 
-@test "an image reachable through a symlink counts: the default directory holds only links" {
-  # ~/.local/share/backgrounds is exactly this -- default.png links into the payload --
-  # so `find -type f` found nothing there and SUPER+CTRL+W silently did nothing.
+@test "an image reachable through a symlink counts: the library is seeded with one" {
+  # install/link-home seeds symphony-default.png as a link into the payload, and a user
+  # may link rather than copy their own photos -- so `find -type f` found nothing and
+  # SUPER+CTRL+W silently did nothing.
   : >"$BATS_TEST_TMPDIR/real.png"
   ln -s "$BATS_TEST_TMPDIR/real.png" "$DIR/default.png"
   run "$SCRIPT" "$DIR"
@@ -91,13 +95,13 @@ calls() {
   assert_output "wallpaper-set $DIR/default.png"
 }
 
-@test "the current.png pointer is never itself a candidate, even though it is a link to an image" {
-  : >"$DIR/a.jpg"
-  ln -s "$DIR/a.jpg" "$DIR/current.png"
+@test "a file called current.png is an ordinary wallpaper now: the pointer lives elsewhere" {
+  # It used to be skipped by name, because the pointer sat in the same directory.
+  : >"$DIR/current.png"
   run "$SCRIPT" "$DIR"
   assert_success
   run calls
-  assert_output "wallpaper-set $DIR/a.jpg"
+  assert_output "wallpaper-set $DIR/current.png"
 }
 
 @test "a failure is shown, not swallowed: a keybinding has nowhere to print" {
@@ -123,14 +127,20 @@ calls() {
   refute_output --partial "wallpaper-set"
 }
 
-@test "with no argument it uses ~/.local/share/backgrounds, as SUPER+CTRL+W does" {
-  # Exactly the shipped shape: default.png links into the payload, current.png points
-  # at whatever is showing. The binding must still find something to set.
+@test "with no argument it uses ~/Pictures/Wallpapers, as SUPER+CTRL+W does (D-0086)" {
+  # Exactly the shipped shape on a fresh install: the library holds one link into the
+  # payload and the pointer names it. The binding must still find something to set.
   : >"$BATS_TEST_TMPDIR/payload-default.png"
-  ln -s "$BATS_TEST_TMPDIR/payload-default.png" "$HOME/.local/share/backgrounds/default.png"
-  ln -s "$BATS_TEST_TMPDIR/payload-default.png" "$HOME/.local/share/backgrounds/current.png"
+  ln -s "$BATS_TEST_TMPDIR/payload-default.png" "$LIBRARY/symphony-default.png"
+  ln -s "$BATS_TEST_TMPDIR/payload-default.png" "$POINTER"
   run "$SCRIPT"
   assert_success
   run calls
-  assert_output "wallpaper-set $HOME/.local/share/backgrounds/default.png"
+  assert_output "wallpaper-set $LIBRARY/symphony-default.png"
+}
+
+@test "with no argument and an empty library, the error names the library" {
+  run "$SCRIPT"
+  assert_failure
+  assert_output --partial "$LIBRARY"
 }

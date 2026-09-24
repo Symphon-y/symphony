@@ -20,7 +20,7 @@ setup() {
 # --- theming (matugen, wallpaper-driven) -----------------------------------------
 
 @test "theming: matugen renders the GTK templates from an image seed" {
-  local seed="$HOME/.local/share/backgrounds/current.png"
+  local seed="$HOME/.local/state/symphony/wallpaper"
   run matugen --config "$HOME/.config/matugen/config.toml" image "$seed" --source-color-index 0
   assert_success
   assert [ -s "$HOME/.config/gtk-3.0/gtk.css" ]
@@ -46,8 +46,20 @@ setup() {
 
 # --- wallpaper -----------------------------------------------------------------------
 
-@test "wallpaper: current.png resolves to a real file" {
-  assert [ -s "$HOME/.local/share/backgrounds/current.png" ]
+@test "wallpaper: the pointer resolves to a real file" {
+  assert [ -s "$HOME/.local/state/symphony/wallpaper" ]
+}
+
+@test "wallpaper: the library is a Wallpapers folder in the pictures directory (D-0086)" {
+  local library
+  library="$(xdg-user-dir PICTURES)/Wallpapers"
+  assert [ -d "$library" ]
+}
+
+@test "wallpaper: the old backgrounds directory is gone, library and state separated (D-0086)" {
+  # It mixed the user's library, the pointer and a shipped asset in one place, and
+  # wallpaper-random defaulted at it -- a folder no user ever fills.
+  assert [ ! -e "$HOME/.local/share/backgrounds" ]
 }
 
 @test "wallpaper: hyprpaper.conf uses the current block-based wallpaper syntax" {
@@ -93,7 +105,7 @@ setup() {
   # showing the payload's default.png, because the IPC it used had gone away (D-0085).
   # Assert what the user sees -- hyprpaper is showing the file we just set.
   local before after chosen
-  chosen=$(realpath "$HOME/.local/share/backgrounds/current.png")
+  chosen=$(realpath "$HOME/.local/state/symphony/wallpaper")
   before=$(stat -c %Y "$HOME/.config/waybar/colors.css" 2>/dev/null || echo 0)
   sleep 1
   run wallpaper-set "$chosen"

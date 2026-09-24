@@ -11,6 +11,7 @@ setup() {
   export STUB_LOG="$BATS_TEST_TMPDIR/calls.log"
   : >"$STUB_LOG"
   export HOME="$BATS_TEST_TMPDIR/home"
+  unset XDG_CONFIG_HOME
   mkdir -p "$HOME"
   export SYMPHONY_FIRST_LOGIN_MARKER="$BATS_TEST_TMPDIR/state/first-login-done"
   export SYMPHONY_ENABLE_USER_SERVICES_SCRIPT="$BATS_TEST_TMPDIR/enable-user-services-stub"
@@ -63,7 +64,7 @@ calls() {
   run "$SCRIPT"
   assert_success
   run calls
-  assert_line --index 0 "matugen --config $HOME/.config/matugen/config.toml image $HOME/.local/share/backgrounds/current.png --source-color-index 0"
+  assert_line --index 0 "matugen --config $HOME/.config/matugen/config.toml image $HOME/.local/state/symphony/wallpaper --source-color-index 0"
   assert_line --index 1 "enable-user-services apply"
 }
 
