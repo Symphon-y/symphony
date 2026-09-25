@@ -133,6 +133,9 @@ print(sorted(k for k in t if k!='speed'))
 }
 
 @test "a controller present but not writable (udev rule not applied yet) gives one line on stderr, never alienfx's retry flood" {
+  # Root writes a read-only node regardless of its mode, so this state cannot be
+  # staged there at all (CI's container is root).
+  if ((EUID == 0)); then skip "root can write a 0444 node; the unwritable case cannot be staged"; fi
   chmod 444 "$SYMPHONY_DEV/bus/usb/002/004"
   run --separate-stderr "$SCRIPT"
   assert_success

@@ -19,6 +19,10 @@ setup() {
   mkdir -p "$SYS/bus/pci/devices" "$SYS/bus/usb/devices" "$SYS/class/dmi/id" "$PROC/asound" \
     "$ROOT/etc/modprobe.d" "$PAYLOAD/system/modprobe" "$PAYLOAD/system/hardware" \
     "$PAYLOAD/packages/hardware" "$PAYLOAD/scripts" "$PAYLOAD/install"
+  # Pin the sudo path: whether as_root escalates otherwise depends on the runner's
+  # uid, and CI's container is root -- the assertions below are about the commands,
+  # not about who happened to be running the tests.
+  export SYMPHONY_SUDO=sudo
   export SYMPHONY_SYS="$SYS" SYMPHONY_PROC="$PROC" SYMPHONY_ROOT="$ROOT" \
     SYMPHONY_PAYLOAD_DIR="$PAYLOAD" SYMPHONY_JOURNAL="$BATS_TEST_TMPDIR/journal.txt"
   export SYMPHONY_HARDWARE_MAP="$PAYLOAD/system/hardware.txt" \

@@ -57,8 +57,12 @@ log() {
 
 # Root steps go through sudo from a user session; inside the installer's chroot this
 # already runs as root, where sudo is neither needed nor guaranteed to be on PATH.
+# SYMPHONY_SUDO pins which path is taken whatever the caller's uid, so the tests
+# cover the escalation on a root runner too (CI's container is root).
 as_root() {
-  if ((EUID == 0)); then
+  if [[ -n ${SYMPHONY_SUDO:-} ]]; then
+    "$SYMPHONY_SUDO" "$@"
+  elif ((EUID == 0)); then
     "$@"
   else
     sudo "$@"
