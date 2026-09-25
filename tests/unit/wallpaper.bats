@@ -24,18 +24,23 @@ setup() {
 }
 
 @test "a relocated pictures directory takes the library with it" {
-  cat >"$HOME/.config/user-dirs.dirs" <<DIRS
-XDG_PICTURES_DIR="\$HOME/Photos"
-DIRS
-  run wallpaper_library
+  # xdg-user-dir is stubbed, not exercised: the contract under test is that we ask it
+  # and honour the answer. CI has no xdg-user-dirs installed, which is what the
+  # fallback tests below cover.
+  mkdir -p "$BATS_TEST_TMPDIR/bin"
+  printf '#!/usr/bin/env bash\necho "%s/Photos"\n' "$HOME" >"$BATS_TEST_TMPDIR/bin/xdg-user-dir"
+  chmod +x "$BATS_TEST_TMPDIR/bin/xdg-user-dir"
+  PATH="$BATS_TEST_TMPDIR/bin:$PATH" run wallpaper_library
   assert_output "$HOME/Photos/Wallpapers"
 }
 
 @test "a fresh account with no user-dirs.dirs yet still gets ~/Pictures/Wallpapers" {
-  # xdg-user-dirs-update has not run: xdg-user-dir answers $HOME, which would put the
-  # library straight in the home directory.
-  rm -f "$HOME/.config/user-dirs.dirs"
-  run wallpaper_library
+  # What the real xdg-user-dir prints for a key it has no answer for, which would
+  # otherwise put the library straight in the home directory.
+  mkdir -p "$BATS_TEST_TMPDIR/bin"
+  printf '#!/usr/bin/env bash\necho "%s"\n' "$HOME" >"$BATS_TEST_TMPDIR/bin/xdg-user-dir"
+  chmod +x "$BATS_TEST_TMPDIR/bin/xdg-user-dir"
+  PATH="$BATS_TEST_TMPDIR/bin:$PATH" run wallpaper_library
   assert_output "$HOME/Pictures/Wallpapers"
 }
 
