@@ -183,6 +183,10 @@ apply_payload() {
   "$CURRENT/install/enable-user-services" apply
   log "enabling root services"
   sudo "$CURRENT/install/enable-root-services" apply
+  # A release may declare new hardware knowledge (system/hardware.txt): drop-ins,
+  # files, units for what this machine has. Packages were just installed above.
+  log "applying hardware entries"
+  "$CURRENT/home/hardware/dot-local/bin/symphony-hardware" apply --no-packages
 }
 
 snapshot() {

@@ -1,19 +1,47 @@
 #!/usr/bin/env bash
 # Target: ~/.local/bin/wallpaper-random (linked by install/link-home)
 #
-# Picks a random image from a directory (default: ~/.local/share/backgrounds, where
-# the user can drop their own images alongside the generated default) and hands it to
-# wallpaper-set. `find -type f` naturally skips current.png, since that's always a
-# symlink, not a regular file.
+# Picks a random image from a directory and hands it to wallpaper-set. The default is
+# the wallpaper library -- ~/Pictures/Wallpapers (D-0086) -- which install/link-home
+# seeds with a link to the shipped default so SUPER+CTRL+W works on a fresh install.
+#
+# Symlinks count (`find -L`): the library's seeded default links into the payload and a
+# user may link rather than copy their own photos, so a plain `-type f` found nothing
+# and SUPER+CTRL+W silently did nothing.
+#
+# The one currently showing is excluded, so a small directory still changes every time:
+# with four images a uniform pick repeats about a quarter of the time, which reads as
+# "the wallpaper is stuck" rather than as chance. A directory holding only the current
+# wallpaper sets it again rather than failing -- re-rendering the palette is harmless.
 set -euo pipefail
 
-dir=${1:-"$HOME/.local/share/backgrounds"}
+# realpath first: this runs as ~/.local/bin/wallpaper-random, a stow link into the payload.
+ROOT=$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../../../.." && pwd)
+readonly ROOT
+# shellcheck source-path=SCRIPTDIR source=../../../../scripts/lib/wallpaper.bash
+source "$ROOT/scripts/lib/wallpaper.bash"
 
-mapfile -t images < <(find "$dir" -maxdepth 1 -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' -o -iname '*.bmp' \))
+dir=${1:-$(wallpaper_library)}
 
+mapfile -t images < <(find -L "$dir" -maxdepth 1 -type f \
+  \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' -o -iname '*.bmp' \) 2>/dev/null)
+
+# Reached from a keybinding as often as from a shell, and a keybinding has nowhere to
+# print: say it on screen too, or the key just looks dead (it did).
 if [[ ${#images[@]} -eq 0 ]]; then
   echo "wallpaper-random: no images found in $dir" >&2
+  command -v notify-send >/dev/null &&
+    notify-send -a wallpaper -u normal "No wallpapers found" "Nothing to choose from in $dir"
   exit 1
+fi
+
+pointer=$(wallpaper_pointer)
+current=""
+[[ -e $pointer ]] && current=$(realpath "$pointer")
+
+if ((${#images[@]} > 1)) && [[ -n $current ]]; then
+  mapfile -t candidates < <(printf '%s\n' "${images[@]}" | grep -vxF "$current" || true)
+  ((${#candidates[@]})) && images=("${candidates[@]}")
 fi
 
 wallpaper-set "${images[RANDOM % ${#images[@]}]}"

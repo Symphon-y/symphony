@@ -2,8 +2,8 @@
 
 One-time changes to an already-configured system, run exactly once by
 `scripts/migrate`. Modeled on Omarchy's own `migrations/<timestamp>.sh` +
-completion-marker pattern (`docs/omarchy-influences.md`, "Update and migration
-mechanism") — its channel/mirror/pacman-guard infrastructure is not part of this.
+completion-marker pattern (D-0051) — its channel/mirror/pacman-guard
+infrastructure is not part of this.
 
 This is **not** where ordinary config changes go — those are just edits to
 `home/`/`system/` files, applied the normal way (`install/link-home apply`,

@@ -236,18 +236,6 @@ bar_json() {
   done
 }
 
-@test "docs: omarchy-influences.md classifies network / Wi-Fi and Bluetooth" {
-  run grep -E '^### Network and Wi-Fi' "$REPO_ROOT/docs/omarchy-influences.md"
-  assert_success
-  run grep -E '^### Bluetooth' "$REPO_ROOT/docs/omarchy-influences.md"
-  assert_success
-}
-
-@test "docs: the install runbook says Wi-Fi is optional and how to join from a terminal" {
-  run grep -F 'nmtui' "$REPO_ROOT/docs/runbooks/base-install.md"
-  assert_success
-}
-
 # --- Hotfix: diagnosing a blocked or missing Wi-Fi radio on the live ISO ------------
 
 @test "iso: the live ISO carries the tools to diagnose Wi-Fi hardware (iw, lspci, lsusb, evtest)" {
@@ -256,11 +244,6 @@ bar_json() {
     run grep -Fx "$pkg" "$ISO/packages.x86_64"
     assert_success
   done
-}
-
-@test "docs: the runbook explains symphony.nogui for a terminal on the live ISO" {
-  run grep -F 'symphony.nogui' "$REPO_ROOT/docs/runbooks/base-install.md"
-  assert_success
 }
 
 # --- Hardware that needs extra packages: the PCI-ID map (Broadcom BCM4352) ---------------

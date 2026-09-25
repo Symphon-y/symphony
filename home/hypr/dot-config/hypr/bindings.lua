@@ -4,8 +4,7 @@
 -- exit. Phase 5 adds the real keybinding scheme: launcher, power menu, clipboard
 -- history, screenshots/recording, and workspace navigation.
 --
--- Modifier convention (recorded from Phase 3's Omarchy research,
--- docs/omarchy-influences.md): SUPER = primary actions, SUPER+SHIFT =
+-- Modifier convention (adapted from Omarchy's, D-0033): SUPER = primary actions, SUPER+SHIFT =
 -- move/secondary, SUPER+CTRL = panels/toggles, SUPER+ALT = secondary window
 -- actions. PRINT family = capture, matching that same research.
 --

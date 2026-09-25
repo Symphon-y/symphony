@@ -14,10 +14,43 @@ set -euo pipefail
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 readonly REPO_ROOT
 readonly PACKAGES_DIR="$REPO_ROOT/home"
+# shellcheck source-path=SCRIPTDIR source=../scripts/lib/wallpaper.bash
+source "$REPO_ROOT/scripts/lib/wallpaper.bash"
 
 usage() {
   echo "usage: link-home apply|check" >&2
   exit 2
+}
+
+# A fresh home has no wallpaper library, no pointer and no hyprpaper config, and all
+# three must exist before the first login or the session comes up bare and SUPER+CTRL+W
+# has nothing to choose. None is stow's to manage: the library is the user's, the
+# pointer is a symlink wallpaper-set repoints to an arbitrary path outside this repo,
+# and hyprpaper.conf is generated (D-0085) -- stow would keep restoring its own copy
+# over what wallpaper-set writes. Seeded here, once; never overwritten, so a machine
+# keeps whatever the user last chose.
+seed_wallpaper() {
+  local default="$PACKAGES_DIR/hyprpaper/dot-local/share/symphony/default-wallpaper.png"
+  local library pointer
+  library=$(wallpaper_library)
+  pointer=$(wallpaper_pointer)
+  local config="$HOME/.config/hypr/hyprpaper.conf"
+
+  mkdir -p "$library"
+  [[ -e $library/symphony-default.png ]] || ln -s "$default" "$library/symphony-default.png"
+
+  if [[ ! -e $pointer ]]; then
+    mkdir -p "$(dirname "$pointer")"
+    ln -s "$default" "$pointer"
+  fi
+
+  # Points at the pointer, not at a resolved image: this runs before any wallpaper has
+  # been chosen, and the symlink is the only thing that exists to name. wallpaper-set
+  # replaces this with the real path the first time it runs.
+  if [[ ! -e $config ]]; then
+    mkdir -p "$(dirname "$config")"
+    hyprpaper_config "$pointer" >"$config"
+  fi
 }
 
 apply() {
@@ -26,25 +59,10 @@ apply() {
     dir=${dir%/}
     names+=("${dir##*/}")
   done
-  # current.png (home/hyprpaper) is deliberately not stow's to manage past its
-  # initial checkout: wallpaper-set repoints it to an arbitrary absolute path
-  # outside this repo by design (Phase 6), which stow would otherwise (correctly)
-  # refuse to restow over -- and since a single combined `stow` call checks every
-  # package before changing any of them, that one conflict used to abort every
-  # other package's linking too. Ignoring it here lets the rest restow normally
-  # regardless of whether wallpaper-set has ever run.
   stow --dir="$PACKAGES_DIR" --target="$HOME" --dotfiles --no-folding --restow \
-    --ignore='current\.png$' "${names[@]}"
+    "${names[@]}"
 
-  # Ignored by stow (above), so a truly fresh checkout needs this seeded by hand:
-  # hyprpaper.conf always points at current.png, and it must exist before first
-  # login for the session to have any wallpaper at all. wallpaper-set/-random
-  # repoint it later; never overwrite an existing one.
-  local current="$HOME/.local/share/backgrounds/current.png"
-  if [[ ! -e $current ]]; then
-    mkdir -p "$(dirname "$current")"
-    ln -s "$PACKAGES_DIR/hyprpaper/dot-local/share/backgrounds/default.png" "$current"
-  fi
+  seed_wallpaper
 
   echo "linked: ${names[*]}"
 }

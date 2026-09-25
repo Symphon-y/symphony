@@ -64,9 +64,9 @@ and the old entry is marked `Superseded by D-XXXX`.
 ## D-0004 — Phase lifecycle: plan mode, tracking document, snapshot
 
 - **Status:** Accepted (2026-09-12, Phase 0)
-- **Decision:** Work proceeds in numbered phases (`docs/roadmap.md`). Every phase
+- **Decision:** Work proceeds in numbered phases. Every phase
   starts with its own plan mode, and every plan produces a tracking document in
-  `docs/phases/` that records implementation progress. Every VM-changing phase starts
+  a tracking document that records implementation progress. Every VM-changing phase starts
   from a named Unraid snapshot. One Git branch per phase. Full lifecycle in `CLAUDE.md`.
   _(Snapshot requirement superseded by D-0008.)_
 - **Alternatives considered:**
@@ -157,7 +157,7 @@ and the old entry is marked `Superseded by D-XXXX`.
 ## D-0009 — Manual base install from a runbook, with one scripted step
 
 - **Status:** Accepted (2026-09-13, Phase 1)
-- **Decision:** Install by following `docs/runbooks/base-install.md`. The package set
+- **Decision:** Install by following the base-install runbook. The package set
   comes from `packages/*.txt` through `scripts/pkglist`. Step 6 (configuring the new
   system) runs as `install/configure-base-system`: unit-tested, validates every input
   before changing anything, and safe to re-run.
@@ -165,7 +165,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   - archinstall with a saved config: fast, but hides the steps this phase exists to
     understand.
   - Omarchy's ISO configurator and Python orchestrator on archinstall: REJECT (see
-    `docs/omarchy-influences.md`).
+    the Omarchy research).
   - Script the whole install now: premature; install automation belongs to Phase 8.
 - **Reasoning:** "Build manually first." Step 6 was scripted at the user's request: it
   was the longest, most error-prone typing, done through a console without paste.
@@ -338,7 +338,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   moving. The token lives in `gh`'s own storage, which Claude's managed settings already
   deny reading (`Read(~/.config/gh/**)`, D-0018).
 - **Consequences:** Revisit the token's scope and storage once a keyring exists (VM →
-  hardware notes, `docs/phases/phase-02-agent-handoff.md`).
+  hardware notes).
 
 ## D-0020 — Config deployment: GNU stow for home, a root-owned copy script for system files
 
@@ -385,7 +385,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   desktop early. Restricting both the firewall rule and every key's `from=` to one known
   LAN address keeps the exposure to "reachable only from a machine already inside the
   house."
-- **Consequences:** `docs/environment/vm-lab.md` and `scripts/system-report` mask
+- **Consequences:** the environment docs and `scripts/system-report` mask
   addresses before anything reaches git (D-0022). No SSH or remote-desktop access beyond
   this jump-host path until Phase 4.
 
@@ -830,7 +830,7 @@ and the old entry is marked `Superseded by D-XXXX`.
 - **Reasoning:** fixes waybar's workspace/audio/network module icons, which
   rendered as empty "tofu" boxes with no Nerd Font installed at all (flagged during
   Phase 5's live-session check). The fontconfig-override pattern was already
-  recorded as adopted in Phase 3 (`docs/omarchy-influences.md`); this phase makes
+  recorded as adopted in Phase 3's Omarchy research; this phase makes
   the actual font choice.
 - **Consequences:** any app that reads the generic `monospace` family automatically
   gets Nerd Font glyph coverage; apps with their own font-resolution logic (Ghostty)
@@ -863,6 +863,9 @@ and the old entry is marked `Superseded by D-XXXX`.
   attached to either GTK template for this reason.
 
 ## D-0042 — hyprpaper's config and IPC syntax corrected (amends D-0028)
+
+_(The IPC half is superseded by D-0085: hyprpaper 0.8.4 removed the string protocol,
+and `wallpaper-set` drives the config file instead.)_
 
 - **Status:** Accepted (2026-09-14, Phase 6)
 - **Decision:** `hyprpaper.conf` rewritten to the current block-based config syntax
@@ -1108,7 +1111,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   completion markers, ADAPTed here) plus its channel/mirror/pacman-guard
   infrastructure (REJECTed already in Phase 3's research, not revisited).
 - **Reasoning:** this exact pattern was already the recorded plan for Phase 8
-  (`docs/omarchy-influences.md`, "Update and migration mechanism") before this
+  (the Omarchy research's "Update and migration mechanism") before this
   phase started -- Phase 3's research had already concluded it was "a strong
   candidate for 'idempotent bootstrap.'" Giving it one real migration instead
   of an empty directory proves the mechanism end-to-end rather than leaving it
@@ -1138,7 +1141,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   (`~/.gitconfig.local`, D-0048; the nvim config clone, D-0045; `gh`/Claude
   Code's own auth) is either trivially re-creatable by hand or already
   durable in its own separate store, so none of it needed a backup
-  mechanism, just documentation (`docs/runbooks/rebuild.md`'s inventory
+  mechanism, just documentation (the rebuild runbook's inventory
   table).
 - **Consequences:** found and fixed two real snags taking the backup for
   real, not hypothetically: `sshd` needed starting on-demand first (D-0021),
@@ -1152,7 +1155,7 @@ and the old entry is marked `Superseded by D-XXXX`.
 ## D-0053 — Consolidated rebuild runbook and user-services list
 
 - **Status:** Accepted (2026-09-15, Phase 8)
-- **Decision:** `docs/runbooks/rebuild.md`, picking up exactly where
+- **Decision:** A rebuild runbook, picking up exactly where
   `base-install.md` ends, consolidating every manual command Phases 2-7
   scattered across their own tracking docs into one repeatable sequence, plus
   an out-of-repo state inventory table. `system/services-user.txt` +
@@ -1347,7 +1350,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   $(scripts/pkglist packages/*.txt)`) after the user pointed out this exact
   command had been retyped from memory every phase since Phase 4, including
   two real past mistakes (Phase 8, Phase 9) where plain `pacman -S` silently
-  aborted on AUR-only packages — `docs/runbooks/rebuild.md` updated to use it.
+  aborted on AUR-only packages — the rebuild runbook updated to use it.
 
 ## D-0061 — Installable release ISO: our own archiso profile, no custom mirror
 
@@ -1374,7 +1377,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   Omarchy's own `omarchy-iso` works — REJECTed, since research confirmed it
   depends on a self-hosted package mirror and custom repo to work around
   archiso's real limitation (no AUR during a build), exactly the shape
-  `docs/omarchy-influences.md` already REJECTed (D-0050); pre-building this
+  the Omarchy research already REJECTed (D-0050); pre-building this
   project's own small AUR footprint (`yay`, `xdg-terminal-exec`,
   `bibata-cursor-theme-bin`) into a local repo baked into the ISO —
   structurally the same rejected shape even at three packages, so left for
@@ -1389,7 +1392,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   `archiso` itself (root/privileged `mkarchiso`, no AUR during a build) is
   Arch's own standard tool, confirmed via its real upstream source, not
   invented for this project.
-- **Consequences:** `docs/runbooks/base-install.md` now documents two
+- **Consequences:** The base-install runbook now documented two
   equivalent paths (release ISO, kept-as-fallback manual runbook) rather
   than one. `packages/tooling.txt` gained `yq` (YAML syntax checking for
   `.github/workflows/*.yml`, mirroring the existing `jq`/JSON check in
@@ -1418,8 +1421,8 @@ and the old entry is marked `Superseded by D-XXXX`.
   class of problem `install/install-packages` (D-0060) already solved for
   the package-install command.
 - **Reasoning:** `snap-pac` only fires on pacman transactions; nothing
-  equivalent existed for the config-only reapply cycle `docs/runbooks/
-  rebuild.md` already documents. An unconditional snapshot on every
+  equivalent existed for the config-only reapply cycle the rebuild
+  runbook already documents. An unconditional snapshot on every
   `scripts/update apply` run — package changes included, since it runs
   before `install/install-packages` too — makes an update exactly as
   recoverable as a plain `pacman -S` already is, with no judgment call about
@@ -1431,7 +1434,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   validated before the snapshot is taken, matching this repo's established
   "validate everything before touching anything" pattern
   (`install/configure-base-system`, `install/install-base-system`).
-  `docs/runbooks/update.md` documents the normal update flow and the
+  An update runbook documented the normal update flow and the
   rollback path if a mid-update step fails.
 
 ## D-0063 — Offline-capable release ISO: a build-time-only local repo, extends D-0061
@@ -1487,7 +1490,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   built file's size and only splits it (`split -d -b 1800M`, numbered
   `.NN.part` files) when it actually needs to; a future smaller build still
   publishes as a single file exactly like D-0061's original ISO did.
-  `docs/runbooks/base-install.md` documents reassembly (`cat` the parts,
+  The base-install runbook documented reassembly (`cat` the parts,
   `sha256sum -c` the result) before writing to USB. Disk space on the
   GitHub-hosted runner was never actually the constraint research flagged
   as a real risk (72 GB total, peaked at 33 GB used, well under the
@@ -1625,7 +1628,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   item, not the full hibernate-then-resume verification itself. Also
   worth recording: this exact interaction (`resume=` set unconditionally
   whenever a swap mapper exists, with no `rd.luks.name=` counterpart)
-  was never discussed in `docs/phases/phase-12-alienware-migration.md`
+  was never discussed in Phase 12's plan
   or tested by any acceptance/unit test before this — every existing
   test in this area was a stub-based string/content assertion,
   structurally incapable of catching a boot-time ordering bug like this
@@ -1709,7 +1712,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   not repeated.
 - **Consequences:** a future "quick access to a terminal for debugging
   from inside the GUI" feature is a real, deferred idea (noted in
-  `docs/phases/phase-15-gui-installer.md`), not yet designed — `cage`'s
+  Phase 15's plan), not yet designed — `cage`'s
   lack of any keybindings means it needs its own mechanism, not a
   keyboard shortcut assumed to already work. `GSK_RENDERER=gl` is
   pinned because GTK ≥4.16 defaults to a Vulkan renderer on Wayland and
@@ -1755,7 +1758,7 @@ and the old entry is marked `Superseded by D-XXXX`.
   was read from the machine itself. `test -x` fixes it; an acceptance test refuses the bracket.
 - **Consequences:** An installed machine has no way to update itself yet (`scripts/update` is
   git-based) -- Phase 18's scope; until then the dev seat is updated by hand
-  (`docs/runbooks/dev-deploy.md`, since replaced by `symphony-update apply --from`, D-0079), which is the shape the update takes: snapshot, replace the
+  (the dev-deploy runbook, since replaced by `symphony-update apply --from`, D-0079), which is the shape the update takes: snapshot, replace the
   payload's contents at the same path, re-run the appliers from the payload. Every applier must
   run *from the payload*, never from a checkout (stow's ownership rule). The full "zero manual
   steps from a fresh install" signal has been observed on the mechanism's parts (payload,
@@ -2280,3 +2283,183 @@ and the old entry is marked `Superseded by D-XXXX`.
   this entry is the record of when. Phase docs and decisions before this one were
   renamed too -- the alternative, a mixed record, reads worse. The GitHub repository is
   renamed by `gh repo rename`, which keeps redirects from the old slug.
+
+## D-0082 — One hardware map, four key kinds, one parser (`system/hardware.txt` + `scripts/hwmatch`)
+
+- **Status:** Accepted (2026-09-24, Phase 19)
+- **Decision:** What this machine's hardware needs is *data*, in one file:
+  `system/hardware.txt`, one entry per line, a key and one or more `kind=value` targets.
+  Four key kinds, each matched against real kernel surfaces: `pci:VVVV:DDDD` and
+  `usb:VVVV:PPPP` against `/sys/bus/*/devices/*`, `dmi:*:svnVendor:pnProduct*:*` as a glob
+  against the modalias, and `hda:` against `/proc/asound/card*/codec#*`. Five value kinds,
+  each with exactly one meaning: `packages=` (a list under `packages/hardware/`, expanded
+  through `scripts/pkglist`), `cmdline=` (a kernel parameter the installer puts on the boot
+  line), `modprobe=` (a drop-in from `system/modprobe/`), `files=` (a `sync-system`
+  manifest from `system/hardware/`) and `service=` (a unit to enable). Phase 17's separate
+  `system/quirks.txt` is folded in — one map, not two. **`scripts/hwmatch` is the only
+  thing that parses it**; `hwpkglist` and `quirkparams` become thin wrappers over it, and
+  it fails closed on an unknown key or value kind, or a target file that is missing.
+  `SYMPHONY_SYS`/`SYMPHONY_PROC`/`SYMPHONY_HARDWARE_MAP` let the tests feed it a fake
+  machine.
+- **Alternatives considered:** a script per vendor or per device, which is Omarchy's shape
+  (`bin/omarchy-apply-hardware` and friends) — rejected again here, as D-0074 rejected it:
+  the knowledge is a table, and a table in code is a table you cannot test without running
+  it. Keep `quirks.txt` separate from the package map — two grammars and two parsers for
+  one question ("what does this machine need?"). Detect hardware at boot with a udev rule
+  instead of a map — the kernel already does that for drivers; what we add is the handful
+  of cases where it cannot.
+- **Reasoning:** the map is the whole point: adding support for a device should be a line
+  of data with a comment naming the device, reviewable without reading any shell. Four key
+  kinds cover every case this project actually hit — a Wi-Fi chip by PCI ID, a firmware
+  airplane-mode slider by DMI, an LED controller by USB ID, an audio codec by name — and
+  the parser being singular is what lets `hwpkglist` (used by `pacstrap` at install time,
+  before anything is running) and `symphony-hardware` (used on a live system) agree about
+  what matches without sharing anything but data.
+- **Consequences:** `pacstrap` takes this machine's packages at install time from
+  `hwpkglist`; kernel parameters go on the boot line there, not later. A malformed line
+  fails the build rather than being silently skipped — `phase-19.bats` asserts every
+  shipped line parses. Three entries ship today: `pci:14e4:43b1` → `broadcom-wl`,
+  `dmi:*:svnAlienware:pnAlienware*14:*` → `module_blacklist=dell_rbtn`, `usb:187c:0525` →
+  `alienfx` plus its udev rule and user unit.
+
+## D-0083 — `symphony-hardware`, and what "search for drivers" honestly is on Arch
+
+- **Status:** Accepted (2026-09-24, Phase 19)
+- **Decision:** One command carries the map out: `symphony-hardware check` (what matches
+  this machine and what each entry would do, or has done), `apply` (install packages,
+  modprobe drop-ins and files, enable units — present entries only, `sudo` per root step,
+  `--no-packages` for the installer's chroot where `pacstrap` already took them,
+  `--user-only` for `first-login` where there is no root), and `scan` (hardware nothing
+  handles: PCI/USB devices with no driver bound, firmware the kernel failed to load, HDA
+  codecs with every output pin muted, and a `/dev/bus/usb` that lost its execute bits).
+  One function per value kind, and nothing in it knows *which* hardware exists — that is
+  the map's job. Called by `install/configure-base-system` at install, `install/first-login`
+  once, `symphony-update` after every apply, and by hand.
+- **Alternatives considered:** a driver-search that queries something. There is nothing to
+  query: on Arch the kernel's modalias autoloading plus `linux-firmware` *is* the driver
+  database, and every remaining case is a judgement call (a DKMS package, a blacklist, a
+  userspace tool). A curated online database of our own — unmaintainable for one person and
+  wrong the moment it is stale. Make `scan` fix what it finds — it would be guessing;
+  reporting is honest and the map is the place a fix gets recorded.
+- **Reasoning:** the phase was asked for "an automated way to search and install the
+  correct drivers". Taken literally that does not exist on Arch, and pretending otherwise
+  would ship a script that looks capable and quietly does nothing. What a search honestly
+  is here is a list of what is *unhandled*, printed with the exact identity a map entry
+  needs, so the answer to "sound does not work" is a short loop: `scan`, read the key, add
+  a line, `apply`. A udev rule only fires on events, so `apply` reloads and re-triggers
+  after installing one — a device plugged in before the rule existed otherwise never gets
+  its ACLs, which is exactly what happened with AlienFX.
+- **Consequences:** `scan` found two real things on the dev seat it was written against: a
+  `/dev/bus/usb` left at mode 666 by an earlier `chmod` on the directory instead of a node
+  (every libusb tool then fails with EACCES no matter what udev grants), and the muted-codec
+  case that the global soft-mixer rule used to cause. Bridges (PCI class `06xx`) are
+  excluded — they are wiring, driven without a bound driver. A machine with no matching
+  entry gets nothing, and the unit tests assert that.
+
+## D-0084 — Our own PKGBUILD when the AUR's is broken or wrong for our hardware
+
+- **Status:** Accepted (2026-09-24, Phase 19)
+- **Decision:** A package we cannot take from the AUR as published gets its own PKGBUILD in
+  `packages/aur/<name>/`, built from that directory rather than fetched by name.
+  `install/install-packages` splits its argument list: anything with a
+  `packages/aur/<name>/PKGBUILD` is built with `makepkg -si` from a copy of the directory
+  and skipped when the installed version already equals the PKGBUILD's; everything else
+  goes to `yay -S --needed`. `iso/build-offline-repo` builds the same directories, so the
+  package is in the ISO's offline repo too.
+- **Alternatives considered:** patch the system after installing the broken package —
+  invisible, and undone by the next upgrade. Open an AUR request and wait — fine for the
+  upstream fix, useless for an install that has to work now. Vendor the tool's source
+  directly into this repo and skip packaging — loses `pacman`'s file ownership, upgrade path
+  and `pkg-audit` visibility.
+- **Reasoning:** the AUR's `alienfx` is uninstallable as published (it depends on
+  `python-pkg_resources`, which no longer exists) and, once installed, wrong for this
+  machine twice over: it drops a `MODE=666` udev rule that makes the LED controller
+  world-writable, and its zone map does not match the Alienware 14's — `zonescan` on the
+  machine found seven zones at different bitmasks. All three are packaging problems, so the
+  fix belongs in a PKGBUILD: pinned `_commit`, a `depends` line that is true, the udev rule
+  removed in favour of ours (a `uaccess` tag, so only the logged-in seat can write), and the
+  zone map as a real patch file with a name that says where it came from.
+- **Consequences:** `pkg-audit` sees these as ours, not as drift. The version skip keeps
+  `install-packages` idempotent, which matters because `symphony-update` runs it on every
+  apply. A hardware entry's package is built this way like any other, so a machine without
+  the hardware never builds it.
+
+## D-0085 — hyprpaper is driven by its config file, rewritten and reloaded by `wallpaper-set` (amends D-0042)
+
+- **Status:** Accepted (2026-09-22, Phase 19)
+- **Decision:** `wallpaper-set` writes `~/.config/hypr/hyprpaper.conf` with the chosen
+  image's resolved path and restarts `hyprpaper.service` (only when it is running), then
+  renders the palette. The config is a *generated* file, no longer stow-linked from the
+  payload: `install/link-home` seeds one for a fresh home (pointing at `current.png`,
+  the only path that exists before a choice is made) and never overwrites it; a
+  migration replaces the old stow link on installed machines. `current.png` stays as the
+  stable "what is the wallpaper" answer for anything that asks without parsing a config
+  (`install/first-login` renders from it before any service is up). The repo's tracked
+  `home/hyprpaper/.../current.png` symlink -- never read, ignored by stow, overwritten at
+  runtime -- is deleted.
+- **Alternatives considered:** keep the config pointing at `current.png` and only restart
+  the service -- fewer moving parts, but `hyprctl hyprpaper listactive`, the config and
+  the journal would then disagree about what is showing, and a stale service shows a
+  stale image with no hint why. Replace hyprpaper with `swww`/`swaybg` for a working IPC
+  -- a new dependency and a reversal of D-0031 for a bug this specific. Keep using the
+  IPC -- it is gone (below).
+- **Reasoning:** hyprpaper 0.8.4 renders only what its config declares and resolves that
+  path once at startup. Its old string IPC was replaced by Hyprwire, and the requests
+  `wallpaper-set` used are dead: probed on the machine, `preload`, `listloaded`, `unload`
+  and `reload` answer `error: invalid hyprpaper request`, while `wallpaper <mon>,<path>`
+  is *accepted and silently ignored* (a nonexistent path does answer `bad path`, so the
+  request is parsed, then dropped). The script's own comment recorded verifying that IPC
+  live -- true when written (Phase 6, an older hyprpaper on the VM), false after the
+  upgrade. Found when a wallpaper picked from an SMB share of photos re-themed the bar,
+  the terminal and the AlienFX zones while the screen kept showing the payload's
+  `default.png`; `systemctl --user restart hyprpaper` put the picture up at once.
+- **Consequences:** ~200 ms of black while hyprpaper restarts, which is also the only
+  moment a wrong path shows up as an error. The choice now survives a login without the
+  symlink being involved at all. The lesson is recorded in the test: Phase 6's
+  live-session test asserted that `colors.css` had been re-rendered -- a side effect --
+  and so passed for weeks with the picture frozen; it now asserts that
+  `hyprctl hyprpaper listactive` names the file just set, and a static test forbids
+  `hyprctl hyprpaper` anywhere in the tree.
+
+## D-0086 — the wallpaper library is `~/Pictures/Wallpapers`; the pointer is state (amends D-0085)
+
+- **Status:** Accepted (2026-09-24, Phase 19)
+- **Decision:** Three concepts get three homes. The user's **library** is
+  `~/Pictures/Wallpapers` -- the pictures directory as XDG reports it, plus a
+  `Wallpapers` folder -- and is what `wallpaper-random` searches with no argument. The
+  **pointer** at what is showing moves from `~/.local/share/backgrounds/current.png` to
+  `~/.local/state/symphony/wallpaper`, beside `first-login-done` and the migration
+  markers. The **shipped default** becomes a stow-linked payload asset at
+  `~/.local/share/symphony/default-wallpaper.png`. `~/.local/share/backgrounds` is gone,
+  and with it `install/link-home`'s `--ignore='current\.png$'` and `wallpaper-random`'s
+  by-name skip of `current.png`. All four paths and hyprpaper's config shape live in one
+  new file, `scripts/lib/wallpaper.bash`, sourced by both `wallpaper-*` scripts (which
+  resolve the payload from their own `realpath`, since they run as stow links) and by
+  `install/link-home` and `install/first-login`.
+- **Alternatives considered:** leave the library where it was and only rename it -- it
+  would still be a directory no user thinks to fill. Hardcode `~/Pictures` rather than
+  asking `xdg-user-dir` -- breaks for anyone who relocates the folder, and the answer is
+  one command away. Keep the pointer in `~/.local/share/backgrounds` and move only the
+  library -- leaves a second name for "wallpapers" wrapped around a single file. Copy
+  each chosen image into the library so a wallpaper on an unmounted share survives --
+  considered and declined by the user as a nice-to-have; a missing mount means no
+  wallpaper, and only the migration falls back to the shipped default, because it
+  otherwise cannot finish.
+- **Reasoning:** `~/.local/share/backgrounds` was Phase 6's single wallpaper directory,
+  and it mixed all three concepts: a shipped asset, runtime state rewritten on every
+  change, and the place a person is expected to keep their own photos. The practical
+  cost showed up live -- `SUPER+CTRL+W` searched a directory holding two symlinks and
+  nothing the user had ever put there. XDG already answers where pictures go, and
+  `~/.local/state` already holds this system's per-user state, so both moves are to
+  homes that exist rather than to new inventions. Pulling the paths into a lib also
+  collapsed hyprpaper's config body, which by then appeared in three places.
+- **Consequences:** a migration moves any images the user had put in the old directory,
+  carries the wallpaper that was showing through `wallpaper-set` (falling back to the
+  shipped default when it no longer resolves -- the live state while the photo share was
+  unmounted), and removes the old directory, leaving behind anything it does not
+  recognise and saying so. `install/link-home` seeds the library with
+  `symphony-default.png`, a link to the shipped image, so the binding has something to
+  choose on a fresh install. The pointer has no extension: matugen reads the file's
+  contents, not its name (verified). Two `home/hyprpaper` scripts now depend on being
+  reachable from the payload root, which is how they are always installed and how the
+  unit tests already invoke them.

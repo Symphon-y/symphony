@@ -1,12 +1,30 @@
 #!/usr/bin/env bash
 # Target: ~/.local/bin/wallpaper-set (linked by install/link-home)
 #
-# Points hyprpaper at <path> (repointing ~/.local/share/backgrounds/current.png, so
-# the same file survives future logins via hyprpaper.conf's static config), pushes it
-# live over hyprpaper's IPC, then re-derives the whole system's palette from that same
-# image via matugen. The wallpaper *is* the theme (Phase 6: no named-theme library,
-# just whatever's currently on screen) -- every matugen template re-renders here.
+# Sets the wallpaper and re-derives the whole system's palette from it. The wallpaper
+# *is* the theme (Phase 6: no named-theme library, just whatever's currently on
+# screen) -- every matugen template re-renders here, and hardware that shows the theme
+# colour repaints.
+#
+# How the picture is applied (D-0085): hyprpaper 0.8.4 renders only what its *config*
+# declares, resolving that path once at startup. Its runtime IPC is gone -- `hyprctl
+# hyprpaper preload` answers "invalid hyprpaper request" and `... wallpaper <mon>,<path>`
+# is accepted and silently ignored (probed on the machine; the old string protocol this
+# script used until now was verified against an older hyprpaper and stopped working on
+# the upgrade, changing the palette but never the picture). So: write the config with
+# the real path, then restart the service. The config persists, so the choice survives
+# the next login too.
 set -euo pipefail
+
+# realpath first: this runs as ~/.local/bin/wallpaper-set, a stow link into the payload.
+ROOT=$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../../../.." && pwd)
+readonly ROOT
+# shellcheck source-path=SCRIPTDIR source=../../../../scripts/lib/wallpaper.bash
+source "$ROOT/scripts/lib/wallpaper.bash"
+
+readonly CONFIG="$HOME/.config/hypr/hyprpaper.conf"
+POINTER=$(wallpaper_pointer)
+readonly POINTER
 
 if [[ $# -ne 1 ]]; then
   echo "usage: wallpaper-set <path>" >&2
@@ -14,21 +32,32 @@ if [[ $# -ne 1 ]]; then
 fi
 
 path=$(realpath "$1")
-if [[ ! -f "$path" ]]; then
+if [[ ! -f $path ]]; then
   echo "wallpaper-set: no such file: $path" >&2
   exit 1
 fi
 
-backgrounds_dir="$HOME/.local/share/backgrounds"
-mkdir -p "$backgrounds_dir"
-ln -sfn "$path" "$backgrounds_dir/current.png"
+# The pointer stays the stable "what is the wallpaper" answer for anything that asks
+# without parsing a config -- install/first-login renders the palette from it before
+# any service is up.
+mkdir -p "$(dirname "$POINTER")"
+ln -sfn "$path" "$POINTER"
 
-# Empty monitor field = all monitors. hyprpaper's IPC apply() step only accepts an
-# empty string or a real, currently-registered monitor name -- "*" (the config file's
-# own preferred wildcard spelling) is rejected here with "Invalid monitor", confirmed
-# by actually running it.
-hyprctl hyprpaper wallpaper ",$path,cover"
+# The image itself, never the pointer, so hyprpaper's `listactive`, this file and the
+# journal all name the same thing.
+mkdir -p "$(dirname "$CONFIG")"
+hyprpaper_config "$path" >"$CONFIG"
+
+# Only when it is running: a TTY login or an install-time run has no hyprpaper to
+# restart, and the config is already right for its next start.
+if systemctl --user is-active --quiet hyprpaper.service; then
+  systemctl --user restart hyprpaper.service
+fi
 
 # --source-color-index 0 (most dominant color) skips matugen's interactive
 # source-color prompt, which would otherwise hang a keybind-triggered run with no TTY.
 matugen --config "$HOME/.config/matugen/config.toml" image "$path" --source-color-index 0
+
+# Hardware that shows the theme colour (AlienFX, Phase 19): repaint from the fresh
+# palette. A no-op wherever there is no such hardware; never fails this script.
+command -v alienfx-theme >/dev/null && alienfx-theme || true

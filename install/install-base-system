@@ -3,10 +3,10 @@
 # then hand off to configure-base-system (runbook step 6).
 #
 # Usage: install/install-base-system VARS_FILE [TARGET]
-#   VARS_FILE  per-install values (docs/runbooks/base-install.vars.example)
+#   VARS_FILE  per-install values (install/base-install.vars.example)
 #   TARGET     where the new system is mounted (default: /mnt)
 #
-# Covers base-install.md steps 4-5 (partition/LUKS/Btrfs/ESP/pacstrap/fstab),
+# Covers partitioning, LUKS, Btrfs, the ESP, pacstrap and fstab,
 # then runs configure-base-system (step 6) as its last step. Driven entirely
 # by the vars file and system/storage/{layout.conf,subvolumes.txt}. The one
 # interactive moment that's always present is a destructive-action
@@ -103,7 +103,7 @@ resolve_hardware_packages() {
   fi
 }
 
-# Which kernel parameters this machine's firmware quirks need (system/quirks.txt, e.g.
+# Which kernel parameters this machine's firmware quirks need (system/hardware.txt, e.g.
 # module_blacklist=dell_rbtn on the Alienware 14). Resolved up front for the same reason as
 # the hardware packages: a broken map stops the install before the disk is touched.
 resolve_kernel_params() {
@@ -162,9 +162,8 @@ encrypt_and_format() {
   # from the same fd would just get EOF -- the underlying file offset is
   # shared once a fd is inherited, it isn't reset per process. Falls back
   # to cryptsetup's own interactive prompt (today's exact behavior) when
-  # fd 9 isn't open, so the documented manual/recovery runbook path
-  # (base-install.md), which calls this script directly with no
-  # collector at all, stays unaffected.
+  # fd 9 isn't open, so a manual or recovery run that calls this script
+  # directly, with no collector at all, stays unaffected.
   if [[ -e /dev/fd/9 ]]; then
     read -r passphrase <&9
     printf '%s' "$passphrase" | cryptsetup luksFormat --type luks2 --key-file - "$luks_dev"

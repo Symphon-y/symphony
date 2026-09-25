@@ -3,7 +3,7 @@
 # (runbook step 6).
 #
 # Usage: install/configure-base-system VARS_FILE [TARGET]
-#   VARS_FILE  per-install values (docs/runbooks/base-install.vars.example)
+#   VARS_FILE  per-install values (install/base-install.vars.example)
 #   TARGET     mounted root of the new system (default: /mnt)
 #
 # Runs from the live ISO, outside the chroot, so the repo's system/ files are at
@@ -185,7 +185,7 @@ configure_boot() {
     [[ -n $swap_uuid ]] || die "cannot read the UUID of $swap_device"
     cmdline+=" rd.luks.name=$swap_uuid=$swap_mapper resume=$SYMPHONY_RESUME_DEVICE resumeflags=x-systemd.device-timeout=30s"
   fi
-  # Firmware quirks chosen by DMI (system/quirks.txt, resolved by install-base-system,
+  # Firmware quirks chosen by DMI (system/hardware.txt, resolved by install-base-system,
   # D-0076): parameters the kernel enforces itself, e.g. module_blacklist=dell_rbtn. On the
   # command line they reach every unified kernel image, with no initramfs step of their own.
   if [[ -n ${SYMPHONY_KERNEL_PARAMS:-} ]]; then
@@ -307,6 +307,16 @@ install_payload() {
   in_target chown -R root:root "$PAYLOAD_ROOT"
 }
 
+# What this machine's hardware needs beyond packages (system/hardware.txt, Phase 19):
+# modprobe drop-ins, files such as udev rules, system units. Packages were pacstrapped
+# from hwpkglist and the kernel parameters are on the boot line (configure_boot), so
+# --no-packages; user units wait for first-login. Runs inside the target as root,
+# where sudo is not needed and symphony-hardware knows to skip it.
+apply_hardware() {
+  log "Applying hardware entries"
+  in_target env SYMPHONY_PAYLOAD_DIR="$PAYLOAD_DIR" "$PAYLOAD_DIR/home/hardware/dot-local/bin/symphony-hardware" apply --no-packages
+}
+
 # Which directories get created is system/xdg/user-dirs.defaults (installed by
 # sync-system, so already in place here); this only runs xdg-user-dirs-update
 # once, as the new user, so they exist before first login. HOME is set
@@ -341,9 +351,9 @@ link_home() {
 }
 
 # symphony-update takes a pre-update `snapper create`, which fails on a machine
-# with no root config -- and base-install.md's manual snapper steps never ran on
-# an ISO install. Written directly from snapper's own shipped template (with the
-# same settings that runbook applies) instead of `snapper create-config`, which
+# with no root config, and an ISO install never ran the manual snapper steps.
+# Written directly from snapper's own shipped template instead of
+# `snapper create-config`, which
 # insists on creating its own /.snapshots subvolume: @snapshots is already
 # mounted there (system/storage/subvolumes.txt), by design kept out of
 # snapshots of /.
@@ -438,6 +448,7 @@ main() {
   configure_boot
   create_user
   install_payload
+  apply_hardware
   create_xdg_dirs
   link_home
   configure_autologin

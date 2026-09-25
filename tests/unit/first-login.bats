@@ -11,11 +11,18 @@ setup() {
   export STUB_LOG="$BATS_TEST_TMPDIR/calls.log"
   : >"$STUB_LOG"
   export HOME="$BATS_TEST_TMPDIR/home"
+  unset XDG_CONFIG_HOME
   mkdir -p "$HOME"
   export SYMPHONY_FIRST_LOGIN_MARKER="$BATS_TEST_TMPDIR/state/first-login-done"
   export SYMPHONY_ENABLE_USER_SERVICES_SCRIPT="$BATS_TEST_TMPDIR/enable-user-services-stub"
   export SYMPHONY_MATUGEN="$BATS_TEST_TMPDIR/matugen-stub"
   export SYMPHONY_FIRST_LOGIN_VERIFY_DELAY=0
+  # Never the real symphony-hardware: it would enable real units on the machine
+  # running the tests (it did, once -- the dev seat's AlienFX unit).
+  export SYMPHONY_HARDWARE_SCRIPT="$BATS_TEST_TMPDIR/hardware-stub"
+  # shellcheck disable=SC2016 # the stub body expands when the stub runs
+  printf '#!/usr/bin/env bash\necho "symphony-hardware $*" >>"$STUB_LOG"\nexit "${STUB_HW_RC:-0}"\n' >"$BATS_TEST_TMPDIR/hardware-stub"
+  chmod +x "$BATS_TEST_TMPDIR/hardware-stub"
   cat >"$SYMPHONY_ENABLE_USER_SERVICES_SCRIPT" <<EOF
 #!/usr/bin/env bash
 echo "enable-user-services \$*" >>"$STUB_LOG"
@@ -57,7 +64,7 @@ calls() {
   run "$SCRIPT"
   assert_success
   run calls
-  assert_line --index 0 "matugen --config $HOME/.config/matugen/config.toml image $HOME/.local/share/backgrounds/current.png --source-color-index 0"
+  assert_line --index 0 "matugen --config $HOME/.config/matugen/config.toml image $HOME/.local/state/symphony/wallpaper --source-color-index 0"
   assert_line --index 1 "enable-user-services apply"
 }
 
@@ -88,6 +95,18 @@ calls() {
   STUB_MATUGEN_FAIL=1 run "$SCRIPT"
   assert_failure
   assert [ ! -e "$SYMPHONY_FIRST_LOGIN_MARKER" ]
+}
+
+@test "first run: enables this machine's hardware user units after the services (Phase 19), and a failure there does not block the marker" {
+  run "$SCRIPT"
+  assert_success
+  run calls
+  assert_line "symphony-hardware apply --user-only"
+  assert [ -e "$SYMPHONY_FIRST_LOGIN_MARKER" ]
+  rm "$SYMPHONY_FIRST_LOGIN_MARKER"
+  STUB_HW_RC=1 run "$SCRIPT"
+  assert_success
+  assert [ -e "$SYMPHONY_FIRST_LOGIN_MARKER" ]
 }
 
 @test "second run: the marker already exists, so it's a no-op" {

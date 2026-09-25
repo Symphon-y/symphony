@@ -10,14 +10,19 @@
 setup() {
   load '../helpers/common'
   REPO_COPY="$BATS_TEST_TMPDIR/repo"
-  mkdir -p "$REPO_COPY/install" "$REPO_COPY/home/shell" "$REPO_COPY/home/app/dot-config/app"
+  mkdir -p "$REPO_COPY/install" "$REPO_COPY/scripts" "$REPO_COPY/home/shell" "$REPO_COPY/home/app/dot-config/app"
   cp "$REPO_ROOT/install/link-home" "$REPO_COPY/install/"
+  cp -R "$REPO_ROOT/scripts/lib" "$REPO_COPY/scripts/"
   echo "# fixture" >"$REPO_COPY/home/shell/dot-profile"
   echo "# fixture" >"$REPO_COPY/home/app/dot-config/app/config.toml"
   SCRIPT="$REPO_COPY/install/link-home"
 
   export HOME="$BATS_TEST_TMPDIR/home"
+  unset XDG_CONFIG_HOME
   mkdir -p "$HOME"
+  DEFAULT="$REPO_COPY/home/hyprpaper/dot-local/share/symphony/default-wallpaper.png"
+  LIBRARY="$HOME/Pictures/Wallpapers"
+  POINTER="$HOME/.local/state/symphony/wallpaper"
   export STUB_LOG="$BATS_TEST_TMPDIR/calls.log"
   : >"$STUB_LOG"
 
@@ -41,6 +46,56 @@ link_all() {
   done < <(find "$REPO_COPY/home" -type f)
 }
 
+# --- seeding (a fresh home has no wallpaper, no library and no hyprpaper config) -----
+
+# The shipped default, where the stow package keeps it (D-0086).
+seed_default() {
+  mkdir -p "$(dirname "$DEFAULT")"
+  : >"$DEFAULT"
+}
+
+@test "apply seeds the wallpaper library so SUPER+CTRL+W has something to choose" {
+  seed_default
+  run "$SCRIPT" apply
+  assert_success
+  assert [ -d "$LIBRARY" ]
+  assert_equal "$(readlink -f "$LIBRARY/symphony-default.png")" "$DEFAULT"
+}
+
+@test "apply seeds the pointer and hyprpaper.conf so the first login has a wallpaper" {
+  seed_default
+  run "$SCRIPT" apply
+  assert_success
+  assert [ -L "$POINTER" ]
+  assert_equal "$(readlink -f "$POINTER")" "$DEFAULT"
+  run cat "$HOME/.config/hypr/hyprpaper.conf"
+  assert_output --partial "wallpaper {"
+  assert_output --partial "path = $POINTER"
+}
+
+@test "apply never overwrites a wallpaper, a library entry or a config the user already has" {
+  seed_default
+  mkdir -p "$(dirname "$POINTER")" "$LIBRARY" "$HOME/.config/hypr"
+  : >"$BATS_TEST_TMPDIR/chosen.jpg"
+  ln -s "$BATS_TEST_TMPDIR/chosen.jpg" "$POINTER"
+  echo "# not a link" >"$LIBRARY/symphony-default.png"
+  echo "# mine" >"$HOME/.config/hypr/hyprpaper.conf"
+  run "$SCRIPT" apply
+  assert_success
+  assert_equal "$(readlink -f "$POINTER")" "$BATS_TEST_TMPDIR/chosen.jpg"
+  run cat "$LIBRARY/symphony-default.png"
+  assert_output "# not a link"
+  run cat "$HOME/.config/hypr/hyprpaper.conf"
+  assert_output "# mine"
+}
+
+@test "apply leaves the old backgrounds directory uncreated (D-0086)" {
+  seed_default
+  run "$SCRIPT" apply
+  assert_success
+  assert [ ! -e "$HOME/.local/share/backgrounds" ]
+}
+
 @test "fails with usage when no command is given" {
   run "$SCRIPT"
   assert_failure 2
@@ -51,7 +106,7 @@ link_all() {
   run "$SCRIPT" apply
   assert_success
   run cat "$STUB_LOG"
-  assert_line "stow --dir=$REPO_COPY/home --target=$HOME --dotfiles --no-folding --restow --ignore=current\.png$ app shell"
+  assert_line "stow --dir=$REPO_COPY/home --target=$HOME --dotfiles --no-folding --restow app shell"
 }
 
 @test "apply fails when stow reports a conflict" {

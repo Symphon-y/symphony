@@ -1,0 +1,327 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/symphony-hardware (linked by install/link-home)
+#
+# symphony-hardware: enable what this machine's hardware needs, as declared in
+# system/hardware.txt (Phase 19, D-0082), and name what nothing declares.
+#
+# Usage: symphony-hardware check                  what matches this machine, and what each
+#                                                 entry would do (or has done)
+#        symphony-hardware apply [--no-packages] [--user-only]
+#                                                 install packages, modprobe drop-ins and
+#                                                 files, enable units -- for the present
+#                                                 entries only; sudo per root step
+#        symphony-hardware scan                   hardware nothing handles: PCI/USB devices
+#                                                 with no driver bound, firmware the kernel
+#                                                 failed to load, audio codecs with every
+#                                                 output muted. Reports; never changes anything
+#
+# The knowledge lives in the map; this script only carries it out, one function per
+# value kind. "Search for drivers" has no backend on Arch -- the kernel's modalias
+# autoloading and linux-firmware are the driver database -- so `scan` is what a search
+# honestly is: a list of what is unhandled, with the identity a map entry needs.
+#
+# Who calls it: install/configure-base-system at install (--no-packages: pacstrap
+# already took the packages from hwpkglist; kernel parameters go on the boot line
+# there, not here), install/first-login once (--user-only: no root in that hook),
+# symphony-update after every apply, and the user by hand.
+#
+# SYMPHONY_SYS, SYMPHONY_PROC, SYMPHONY_ROOT (the filesystem root to write under),
+# SYMPHONY_PAYLOAD_DIR (where hwmatch, pkglist and the appliers are) and
+# SYMPHONY_JOURNAL (a file instead of journalctl) exist for the tests and the chroot.
+set -euo pipefail
+
+export LC_ALL=C
+
+readonly PAYLOAD="${SYMPHONY_PAYLOAD_DIR:-/usr/local/share/symphony/current}"
+readonly SYS="${SYMPHONY_SYS:-/sys}"
+readonly PROC="${SYMPHONY_PROC:-/proc}"
+readonly ROOT="${SYMPHONY_ROOT:-}"
+readonly DEV="${SYMPHONY_DEV:-/dev}"
+readonly HWMATCH="$PAYLOAD/scripts/hwmatch"
+readonly SYSTEM_DIR="${SYMPHONY_SYSTEM_DIR:-$PAYLOAD/system}"
+readonly USER_UNITS="$PAYLOAD/home"
+
+die() {
+  printf 'symphony-hardware: %s\n' "$*" >&2
+  exit 1
+}
+
+usage() {
+  echo "usage: symphony-hardware check | apply [--no-packages] [--user-only] | scan" >&2
+  exit 2
+}
+
+log() {
+  printf '==> %s\n' "$*"
+}
+
+# Root steps go through sudo from a user session; inside the installer's chroot this
+# already runs as root, where sudo is neither needed nor guaranteed to be on PATH.
+as_root() {
+  if ((EUID == 0)); then
+    "$@"
+  else
+    sudo "$@"
+  fi
+}
+
+# The payload ships a unit as a user unit when it sits under some home/<pkg>/dot-config/systemd/user/.
+is_user_unit() {
+  compgen -G "$USER_UNITS/*/dot-config/systemd/user/$1" >/dev/null
+}
+
+is_installed() {
+  pacman -Qq "$1" >/dev/null 2>&1
+}
+
+# --- check --------------------------------------------------------------------------
+
+check() {
+  local status key values found=0
+  while IFS=$'\t' read -r status key values; do
+    [[ -n $key ]] || continue
+    found=1
+    if [[ $status == present ]]; then
+      echo "present  $key"
+      local v kind name
+      for v in $values; do
+        kind=${v%%=*} name=${v#*=}
+        case $kind in
+          packages)
+            local pkg
+            while IFS= read -r pkg; do
+              if is_installed "$pkg"; then
+                echo "           package $pkg (installed)"
+              else
+                echo "           package $pkg (to install)"
+              fi
+            done < <("$PAYLOAD/scripts/pkglist" "${SYMPHONY_HARDWARE_PACKAGES:-$PAYLOAD/packages/hardware}/$name.txt")
+            ;;
+          cmdline) echo "           kernel parameter $name (set by the installer on the boot line)" ;;
+          modprobe) echo "           modprobe drop-in $name -> /etc/modprobe.d/" ;;
+          files) echo "           files from $name" ;;
+          service) echo "           unit $name" ;;
+        esac
+      done
+    else
+      echo "absent   $key  ($values)"
+    fi
+  done < <("$HWMATCH" --all)
+  ((found)) || echo "symphony-hardware: the map is empty"
+}
+
+# --- apply ----------------------------------------------------------------------------
+
+apply_packages() {
+  local -a packages
+  mapfile -t packages < <("$HWMATCH" --kind packages)
+  ((${#packages[@]})) || return 0
+  log "installing ${packages[*]}"
+  "$PAYLOAD/install/install-packages" "${packages[@]}"
+}
+
+apply_modprobe() {
+  local -a files
+  mapfile -t files < <("$HWMATCH" --kind modprobe)
+  ((${#files[@]})) || return 0
+  local f
+  for f in "${files[@]}"; do
+    log "installing /etc/modprobe.d/$f"
+    as_root install -D -m 0644 -o root -g root "$SYSTEM_DIR/modprobe/$f" "$ROOT/etc/modprobe.d/$f"
+  done
+  # A module option can matter in early boot; the UKIs carry the drop-ins.
+  as_root mkinitcpio -P
+}
+
+apply_files() {
+  local -a manifests
+  mapfile -t manifests < <("$HWMATCH" --kind files)
+  ((${#manifests[@]})) || return 0
+  local m udev=0
+  for m in "${manifests[@]}"; do
+    log "installing files from $m"
+    as_root "$PAYLOAD/install/sync-system" ${ROOT:+--root "$ROOT"} --manifest "$SYSTEM_DIR/hardware/$m" apply
+    grep -qE '[[:space:]]/etc/udev/rules\.d/' "$SYSTEM_DIR/hardware/$m" && udev=1
+  done
+  # A udev rule only fires on events: a device plugged in before the rule existed
+  # (every device, on an update) never gets its tags or ACLs until re-triggered.
+  # Only where udev is running (its control socket exists) -- not in the installer's
+  # chroot, whose target boots fresh with the rule already in place.
+  if ((udev)) && [[ -S $ROOT/run/udev/control ]]; then
+    log "reloading udev rules and re-applying them to present devices"
+    as_root udevadm control --reload
+    as_root udevadm trigger --subsystem-match=usb --action=add
+  fi
+}
+
+apply_services() {
+  local user_only=$1
+  local -a units
+  mapfile -t units < <("$HWMATCH" --kind service)
+  ((${#units[@]})) || return 0
+  local u
+  for u in "${units[@]}"; do
+    if is_user_unit "$u"; then
+      log "enabling user unit $u"
+      systemctl --user enable --now "$u"
+    elif ((! user_only)); then
+      log "enabling $u"
+      as_root systemctl enable --now "$u"
+    fi
+  done
+}
+
+report_cmdline() {
+  local -a params
+  mapfile -t params < <("$HWMATCH" --kind cmdline)
+  ((${#params[@]})) || return 0
+  echo "kernel parameters this hardware needs (set at install time by the installer, on the boot line): ${params[*]}"
+}
+
+apply() {
+  local with_packages=1 user_only=0
+  while (($#)); do
+    case $1 in
+      --no-packages) with_packages=0 ;;
+      --user-only) user_only=1 ;;
+      *) usage ;;
+    esac
+    shift
+  done
+
+  if [[ -z $("$HWMATCH") ]]; then
+    echo "symphony-hardware: nothing in the map matches this machine"
+    return 0
+  fi
+
+  if ((user_only)); then
+    apply_services 1
+    return 0
+  fi
+  ((with_packages)) && apply_packages
+  apply_modprobe
+  apply_files
+  apply_services 0
+  report_cmdline
+}
+
+# --- scan ------------------------------------------------------------------------------
+
+# Every key the map covers, so a handled device is not reported as unhandled.
+covered_keys() {
+  "$HWMATCH" --all | awk -F'\t' '{ print $2 }'
+}
+
+# PCI and USB devices with no driver bound: sysfs has no `driver` link for them.
+unbound_devices() {
+  local dir modalias key
+  for dir in "$SYS"/bus/pci/devices/* "$SYS"/bus/usb/devices/*; do
+    [[ -r $dir/modalias ]] || continue
+    [[ -e $dir/driver ]] && continue
+    modalias=$(<"$dir/modalias")
+    case $dir in
+      */pci/*)
+        [[ -r $dir/vendor && -r $dir/device ]] || continue
+        # Bridges (class 06xx: host bridge, PCI-PCI bridge, ...) are wiring, not
+        # devices; the kernel drives them without binding a driver.
+        [[ -r $dir/class && $(<"$dir/class") == 0x06* ]] && continue
+        key="pci:$(sed 's/^0x//' "$dir/vendor"):$(sed 's/^0x//' "$dir/device")"
+        ;;
+      */usb/*)
+        # Interfaces (2-1:1.0) have no idVendor; only whole devices count.
+        [[ -r $dir/idVendor && -r $dir/idProduct ]] || continue
+        key="usb:$(<"$dir/idVendor"):$(<"$dir/idProduct")"
+        ;;
+      *) continue ;;
+    esac
+    grep -qx "$key" <<<"$COVERED" && continue
+    printf 'no driver bound   %s   (%s)\n' "$key" "$modalias"
+  done
+}
+
+firmware_failures() {
+  local lines
+  if [[ -n ${SYMPHONY_JOURNAL:-} ]]; then
+    lines=$(cat "$SYMPHONY_JOURNAL")
+  else
+    lines=$(journalctl -b -k --no-pager -o cat 2>/dev/null || true)
+  fi
+  grep -oE 'Direct firmware load for [^ ]+ failed[^$]*|firmware: failed to load [^ ]+' <<<"$lines" |
+    sort -u | sed 's/^/firmware missing   /'
+}
+
+# Reading a codec file talks to the controller. A card that is suspended, or stuck
+# part-way through a resume, blocks that read inside the kernel -- uninterruptibly, so
+# not even `timeout` gets its process back. Found on the dev seat, whose NVIDIA HDMI
+# function sits in `resuming` while the GPU is idle; it hung `hwmatch`, and so would
+# hang pacstrap at install time. A card with no runtime power management has no status
+# file at all and is safe to read.
+awake() {
+  local card=${1#"$PROC"/asound/}
+  local status="$SYS/class/sound/${card%%/*}/device/power/runtime_status"
+  [[ ! -r $status || $(<"$status") == active ]]
+}
+
+# An HDA codec whose every output pin is muted (Amp-Out bit 7) -- what a soft-mixer
+# rule or a lost alsa state leaves behind; nothing plays until something unmutes it.
+muted_codecs() {
+  local file name outs muted
+  for file in "$PROC"/asound/card*/codec#*; do
+    [[ -r $file ]] || continue
+    awake "$file" || continue
+    name=$(sed -n 's/^Codec: //p' "$file" | head -n1)
+    outs=$(awk '/^Node .*Pin Complex/ { pin = 1; next } pin && /Amp-Out vals/ { print; pin = 0 }' "$file")
+    [[ -n $outs ]] || continue
+    muted=$(grep -c '\[0x8' <<<"$outs" || true)
+    if [[ $(wc -l <<<"$outs") -eq $muted ]]; then
+      printf 'audio muted        %s   (every output pin muted in hardware: %s)\n' "$name" "$file"
+    fi
+  done
+}
+
+# devtmpfs makes /dev/bus/usb 0755; a chmod on the directory instead of a node
+# (an easy slip with a shell-expanded path) takes the execute bits away, and every
+# libusb tool then fails with EACCES no matter what udev grants on the nodes.
+# Found on the dev seat, this way (Phase 19).
+usb_dir_not_traversable() {
+  local dir="$DEV/bus/usb"
+  [[ -d $dir ]] || return 0
+  local mode
+  mode=$(stat -c %a "$dir")
+  if [[ $mode != *[1357] ]]; then
+    printf 'usb not usable     %s is mode %s (needs 755: users cannot reach the device nodes)\n' "$dir" "$mode"
+  fi
+}
+
+scan() {
+  COVERED=$(covered_keys)
+  local report
+  report=$(
+    usb_dir_not_traversable
+    unbound_devices
+    firmware_failures
+    muted_codecs
+  )
+  if [[ -n $report ]]; then
+    echo "$report"
+    echo "(a map entry in system/hardware.txt is how these get handled -- D-0082)"
+  else
+    echo "symphony-hardware: nothing unhandled"
+  fi
+}
+
+main() {
+  case ${1:-} in
+    check | scan)
+      (($# == 1)) || usage
+      "$1"
+      ;;
+    apply)
+      shift
+      apply "$@"
+      ;;
+    *) usage ;;
+  esac
+}
+
+main "$@"

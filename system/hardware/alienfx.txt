@@ -1,0 +1,3 @@
+# Extra root-owned files for the AlienFX controller (installed by symphony-hardware
+# through sync-system --manifest, only where system/hardware.txt matches).
+0644  hardware/60-alienfx.rules  /etc/udev/rules.d/60-alienfx.rules

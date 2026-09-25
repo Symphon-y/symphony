@@ -1,67 +1,8 @@
 #!/usr/bin/env bash
-# quirkparams: print the kernel parameters this machine's firmware quirks need (D-0076).
+# quirkparams: the kernel parameters this machine's firmware quirks need --
+# `scripts/hwmatch --kind cmdline` under the name install-base-system calls
+# (Phase 17, D-0076; one parser since Phase 19, D-0082).
 #
 # Usage: scripts/quirkparams
-#
-# system/quirks.txt maps a DMI pattern to one kernel parameter. This prints, sorted and
-# de-duplicated, one line per parameter of every entry whose pattern matches this
-# machine's DMI modalias (/sys/class/dmi/id/modalias) -- so a quirk (say, keeping the
-# dell_rbtn driver from hard-blocking Wi-Fi) reaches only the hardware that has the
-# problem. install-base-system resolves these before the disk is touched and
-# configure-base-system appends them to /etc/kernel/cmdline. Same shape as hwpkglist.
-#
-# Like hwpkglist it fails closed: a malformed line prints nothing and exits 1, so a
-# broken map stops the install rather than putting a half-read parameter on the boot
-# command line. Every line is checked, matching or not.
-#
-# SYMPHONY_SYS and SYMPHONY_QUIRKS_MAP override the sysfs root and the map (tests).
 set -euo pipefail
-
-# Byte-order sorting, so output is identical on every machine.
-export LC_ALL=C
-
-REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-readonly REPO_ROOT
-readonly SYS="${SYMPHONY_SYS:-/sys}"
-readonly MAP="${SYMPHONY_QUIRKS_MAP:-$REPO_ROOT/system/quirks.txt}"
-readonly MODALIAS_FILE="$SYS/class/dmi/id/modalias"
-
-# A plain kernel parameter: a name, optionally =value with no whitespace or shell
-# metacharacters. It is written into the boot command line.
-readonly PARAM_PATTERN='^[A-Za-z_][A-Za-z0-9_.-]*(=[A-Za-z0-9_.,:/@%+-]+)?$'
-
-die() {
-  printf 'quirkparams: %s\n' "$*" >&2
-  exit 1
-}
-
-main() {
-  [[ -e $MAP ]] || return 0
-
-  local modalias=""
-  if [[ -r $MODALIAS_FILE ]]; then
-    modalias=$(<"$MODALIAS_FILE")
-  fi
-
-  local line pattern param extra n=0 selected=()
-  while IFS= read -r line || [[ -n $line ]]; do
-    n=$((n + 1))
-    line=${line%%#*}
-    pattern="" param="" extra=""
-    read -r pattern param extra <<<"$line"
-    [[ -n $pattern ]] || continue
-    if [[ -z $param || -n $extra || ! $param =~ $PARAM_PATTERN ]]; then
-      die "$MAP:$n: expected '<dmi-modalias-pattern> <kernel-parameter>'"
-    fi
-    # The pattern is a shell glob on purpose: unquoted on the right of ==.
-    # shellcheck disable=SC2053
-    if [[ -n $modalias && $modalias == $pattern ]]; then
-      selected+=("$param")
-    fi
-  done <"$MAP"
-
-  ((${#selected[@]} > 0)) || return 0
-  printf '%s\n' "${selected[@]}" | sort -u
-}
-
-main "$@"
+exec "$(dirname "${BASH_SOURCE[0]}")/hwmatch" --kind cmdline

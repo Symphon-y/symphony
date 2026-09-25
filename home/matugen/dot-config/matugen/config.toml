@@ -7,7 +7,7 @@
 # (home/hyprpaper/dot-local/bin/) via `matugen image <path>` every time it changes.
 #
 # Manual re-render (e.g. after editing a template): matugen image
-# ~/.local/share/backgrounds/current.png --source-color-index 0
+# ~/.local/state/symphony/wallpaper --source-color-index 0
 # `matugen color hex "#1e1e2e"` still works too (any seed color, not just an image).
 #
 # Output paths are absolute (~/...), not relative to this file: config.toml is a
@@ -49,3 +49,7 @@ output_path = "~/.config/gtk-3.0/gtk.css"
 [templates.gtk4]
 input_path = "./templates/gtk4.css"
 output_path = "~/.config/gtk-4.0/gtk.css"
+
+[templates.theme_env]
+input_path = "./templates/theme.env"
+output_path = "~/.config/symphony/theme.env"

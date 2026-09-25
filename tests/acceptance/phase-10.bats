@@ -93,14 +93,3 @@ setup() {
   assert_output --partial "rollback"
   assert [ ! -e "$REPO_ROOT/scripts/update" ]
 }
-
-@test "docs: base-install.md documents both the release-ISO path and the manual fallback" {
-  run grep -qi "release" "$REPO_ROOT/docs/runbooks/base-install.md"
-  assert_success
-  run grep -qi "install-base-system" "$REPO_ROOT/docs/runbooks/base-install.md"
-  assert_success
-}
-
-@test "docs: docs/runbooks/update.md exists" {
-  assert [ -f "$REPO_ROOT/docs/runbooks/update.md" ]
-}

@@ -18,6 +18,9 @@ readonly BLANK_DBPATH=/tmp/offline-repo-blank-db
 # Can't be resolved by pacman -Syw; built from source, same as this repo's
 # own VM already does via yay (D-0030).
 readonly AUR_PACKAGES=(xdg-terminal-exec bibata-cursor-theme-bin yay)
+# Our own PKGBUILDs (packages/aur/<name>/PKGBUILD, Phase 19): built the same way,
+# from the tree instead of an AUR clone. Named by directory.
+readonly OWN_PKGBUILDS="$REPO_ROOT/packages/aur"
 
 log() {
   printf '==> %s\n' "$*"
@@ -35,8 +38,13 @@ main() {
   # machine's PCI devices call for (scripts/hwpkglist), but an offline install can only
   # add what is baked in here, so every list goes in.
   mapfile -t all_pkgs < <("$REPO_ROOT/scripts/pkglist" "$REPO_ROOT"/packages/*.txt "$REPO_ROOT"/packages/hardware/*.txt)
+  local own_pkgs=()
+  local dir
+  for dir in "$OWN_PKGBUILDS"/*/; do
+    [[ -e $dir/PKGBUILD ]] && own_pkgs+=("$(basename "$dir")")
+  done
   mapfile -t official_pkgs < <(printf '%s\n' "${all_pkgs[@]}" |
-    grep -vxFf <(printf '%s\n' "${AUR_PACKAGES[@]}"))
+    grep -vxFf <(printf '%s\n' "${AUR_PACKAGES[@]}" "${own_pkgs[@]}"))
   # A blank dbpath, not the container's real one: pacman -Syw against an
   # already-populated database resolves dependencies incorrectly (Arch
   # Wiki, "Pacman/Tips and tricks" -- Custom local repository).
@@ -59,6 +67,21 @@ main() {
       mv -- *.pkg.tar.zst '$WORK_DIR/'
     "
   done
+
+  if ((${#own_pkgs[@]})); then
+    log "Building our own PKGBUILDs: ${own_pkgs[*]}"
+    local own
+    for own in "${own_pkgs[@]}"; do
+      cp -r "$OWN_PKGBUILDS/$own" "$WORK_DIR/own-$own"
+      chown -R builder:builder "$WORK_DIR/own-$own"
+      su builder -c "
+        set -eu
+        cd '$WORK_DIR/own-$own'
+        makepkg -s --noconfirm
+        mv -- *.pkg.tar.zst '$WORK_DIR/'
+      "
+    done
+  fi
 
   log "Building the local repo database"
   cp "$WORK_DIR"/*.pkg.tar.zst "$REPO_DIR/"

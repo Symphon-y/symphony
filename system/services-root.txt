@@ -12,3 +12,4 @@ btrfs-scrub@-.timer               # monthly scrub of the root filesystem (Phase 
                                    # single Btrfs filesystem (root, home, .snapshots,
                                    # var/cache/pacman/pkg, var/log are all one subvol set)
 pacman-filesdb-refresh.timer      # keeps `pacman -F`/-Fl current (Phase 9)
+power-profiles-daemon.service     # platform power profiles for the laptop (Phase 19)

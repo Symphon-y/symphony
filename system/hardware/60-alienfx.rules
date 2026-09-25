@@ -1,0 +1,5 @@
+# AlienFX lighting controller: let the seated user talk to it over libusb (alienfx
+# detaches the HID driver and claims the interface, which needs write access to the
+# device node). uaccess -- an ACL for the active seat's user -- not a world-writable
+# node. Installed only on machines that have the device (system/hardware.txt).
+SUBSYSTEM=="usb", ATTR{idVendor}=="187c", ATTR{idProduct}=="0525", TAG+="uaccess"

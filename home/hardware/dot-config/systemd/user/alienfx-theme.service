@@ -1,0 +1,17 @@
+# Target: ~/.config/systemd/user/alienfx-theme.service (linked by install/link-home)
+#
+# Paints the AlienFX zones in the theme's primary colour at login (Phase 19,
+# D-0084). Enabled only on machines with the controller, by symphony-hardware
+# from system/hardware.txt -- never by services-user.txt. Later repaints come
+# from wallpaper-set, which calls alienfx-theme after every render.
+[Unit]
+Description=AlienFX lighting in the theme colour
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/alienfx-theme
+
+[Install]
+WantedBy=graphical-session.target

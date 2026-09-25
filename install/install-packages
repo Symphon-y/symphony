@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# install-packages: install every package declared across packages/*.txt.
+# install-packages: install every package declared across packages/*.txt, plus any
+# named on the command line (this machine's hardware packages, from hwpkglist).
 #
-# Usage: install/install-packages [--packages-dir DIR] [yay-args...]
+# Usage: install/install-packages [--packages-dir DIR] [package|yay-arg...]
 #
 # Thin wrapper around `yay -S --needed $(scripts/pkglist packages/*.txt)` -- the
 # exact command every phase since Phase 4 had the user retype from memory,
@@ -9,6 +10,13 @@
 # used instead and silently aborted the whole transaction on the AUR-only
 # packages in packages/desktop.txt (pacman validates every target before
 # installing anything). One script, one name, nothing left to misremember.
+#
+# A package that has our own PKGBUILD (packages/aur/<name>/PKGBUILD, Phase 19,
+# D-0084: upstream's AUR package is broken or wrong for our hardware) is not
+# fetched from the AUR under that name -- it is built from a copy of that directory
+# with makepkg, as this user, and installed (makepkg calls sudo pacman -U itself).
+# Skipped when the installed version already matches the PKGBUILD's. The ISO's
+# offline repo builds the same PKGBUILDs (iso/build-offline-repo).
 set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -18,11 +26,50 @@ if [[ ${1:-} == --packages-dir ]]; then
   packages_dir=$2
   shift 2
 fi
+readonly OWN_PKGBUILDS="$packages_dir/aur"
 
 if ! command -v yay &>/dev/null; then
   echo "install-packages: yay not found -- bootstrap it first (see packages/external.md)" >&2
   exit 1
 fi
 
+# The PKGBUILD's pkgver-pkgrel, as pacman -Q prints an installed version.
+pkgbuild_version() {
+  local pkgver pkgrel
+  pkgver=$(sed -n 's/^pkgver=\(.*\)$/\1/p' "$1" | head -n1)
+  pkgrel=$(sed -n 's/^pkgrel=\(.*\)$/\1/p' "$1" | head -n1)
+  printf '%s-%s' "$pkgver" "$pkgrel"
+}
+
+build_own() {
+  local name=$1
+  local src="$OWN_PKGBUILDS/$name" installed wanted
+  installed=$(pacman -Q "$name" 2>/dev/null | awk '{ print $2 }' || true)
+  wanted=$(pkgbuild_version "$src/PKGBUILD")
+  if [[ $installed == "$wanted" ]]; then
+    echo "install-packages: $name $wanted already installed"
+    return 0
+  fi
+  local work
+  work=$(mktemp -d)
+  cp -r "$src/." "$work/"
+  echo "install-packages: building $name $wanted from $src"
+  (cd "$work" && makepkg -si --needed --noconfirm)
+  rm -rf "$work"
+}
+
 mapfile -t packages < <("$REPO_ROOT/scripts/pkglist" "$packages_dir"/*.txt)
-exec yay -S --needed "$@" "${packages[@]}"
+yay_args=()
+own=()
+for arg in "$@" "${packages[@]}"; do
+  if [[ $arg != -* && -e $OWN_PKGBUILDS/$arg/PKGBUILD ]]; then
+    own+=("$arg")
+  else
+    yay_args+=("$arg")
+  fi
+done
+
+yay -S --needed "${yay_args[@]}"
+for name in "${own[@]}"; do
+  build_own "$name"
+done

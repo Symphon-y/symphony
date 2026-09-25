@@ -27,16 +27,6 @@ setup() {
   assert_success
 }
 
-@test "rebuild runbook exists and references the real scripts it documents" {
-  run cat "$REPO_ROOT/docs/runbooks/rebuild.md"
-  assert_success
-  assert_output --partial "scripts/pkg-audit"
-  assert_output --partial "scripts/migrate"
-  assert_output --partial "install/enable-user-services"
-  assert_output --partial "install/link-home"
-  assert_output --partial "install/sync-system"
-}
-
 @test "packages: a machine's own list (packages/local/) is gitignored and outside every install-time glob" {
   # scripts/pkg-audit reads packages/local/<hostname>.txt as declared-on-purpose;
   # nothing that installs or builds an ISO may see it.
