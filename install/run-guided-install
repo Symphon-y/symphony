@@ -12,7 +12,7 @@
 #                        shows its own Reboot/Stay UI instead, calling
 #                        install/finish-install itself on "Reboot."
 #   VARS_FILE  per-install values, already written by whichever collector
-#              is running (docs/runbooks/base-install.vars.example)
+#              is running (install/base-install.vars.example)
 #
 # No install logic here -- see install/install-base-system, the real,
 # already-tested, unattended installer this just execs. If fd 8 (user

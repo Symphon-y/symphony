@@ -250,12 +250,25 @@ firmware_failures() {
     sort -u | sed 's/^/firmware missing   /'
 }
 
+# Reading a codec file talks to the controller. A card that is suspended, or stuck
+# part-way through a resume, blocks that read inside the kernel -- uninterruptibly, so
+# not even `timeout` gets its process back. Found on the dev seat, whose NVIDIA HDMI
+# function sits in `resuming` while the GPU is idle; it hung `hwmatch`, and so would
+# hang pacstrap at install time. A card with no runtime power management has no status
+# file at all and is safe to read.
+awake() {
+  local card=${1#"$PROC"/asound/}
+  local status="$SYS/class/sound/${card%%/*}/device/power/runtime_status"
+  [[ ! -r $status || $(<"$status") == active ]]
+}
+
 # An HDA codec whose every output pin is muted (Amp-Out bit 7) -- what a soft-mixer
 # rule or a lost alsa state leaves behind; nothing plays until something unmutes it.
 muted_codecs() {
   local file name outs muted
   for file in "$PROC"/asound/card*/codec#*; do
     [[ -r $file ]] || continue
+    awake "$file" || continue
     name=$(sed -n 's/^Codec: //p' "$file" | head -n1)
     outs=$(awk '/^Node .*Pin Complex/ { pin = 1; next } pin && /Amp-Out vals/ { print; pin = 0 }' "$file")
     [[ -n $outs ]] || continue

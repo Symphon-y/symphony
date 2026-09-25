@@ -39,7 +39,7 @@ cat <<'EOF'
         nmtui
   A connection you save there is carried over to the installed system.
 
-  (or see docs/runbooks/base-install.md in the baked-in repo at
-  /root/symphony for the manual step-by-step path)
+  The repo is baked in at /root/symphony; install/install-base-system and
+  install/configure-base-system are the two steps symphony-install runs.
 
 EOF

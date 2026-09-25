@@ -1,8 +1,9 @@
 # Alienware 14 (P39G) -- ground truth
 
-The machine symphony is installed on and driven from since 2026-09-20 (Phase 12's
-device, D-0063). Below the report is what the installer and the phases learned
-about it that a report cannot show. Regenerate the report with `scripts/system-report`.
+The machine symphony is installed on and driven from since 2026-09-20 (D-0063). Below
+the report is what the work learned about it that a report cannot show. Regenerate the
+report with `scripts/system-report`. Open work on this machine is tracked in GitHub
+issues; the reasoning behind each choice is in `DECISIONS.md`.
 
 ### System report (2026-09-21, installed system, linux-lts)
 
@@ -226,7 +227,8 @@ installed packages: 704
   `dell_rbtn` used to expose as an rfkill that is hard-blocked and cannot be cleared from
   software; the state is intermittent (three blocked boots, then an unblocked one after
   Fn+F2 plus an EC power-cycle). `module_blacklist=dell_rbtn` on the kernel command line
-  removes it, proven on all three boot entries (D-0076, `system/quirks.txt`). With the
+  removes it, proven on all three boot entries (D-0076; the entry now lives in
+  `system/hardware.txt`, which absorbed `quirks.txt` in D-0082). With the
   blacklist, Fn+F2 does nothing; use the bar or `nmcli radio wifi off`.
 - **Wi-Fi:** Broadcom BCM4352 (`14e4:43b1`, AzureWave `1a3b:2b23`, Dell DW1550). No open
   driver; `broadcom-wl-dkms` builds `wl` for `linux` and `linux-lts` at install
@@ -240,19 +242,41 @@ installed packages: 704
 - **Ethernet:** Qualcomm Atheros Killer E220x (`1969:e091`, `alx`), `enp8s0`, untested with a cable.
 - **GPU:** Intel HD 4600 (`i915`) drives the desktop; Hyprland renders fine on it and the
   installer needed `GSK_RENDERER=gl` (D-0066). The NVIDIA GT 750M binds `nouveau` and
-  provides a second DRM node; nothing uses it deliberately (Phase 12 bonus, untested).
+  provides a second DRM node; nothing uses it deliberately (bonus, untested — issue #2).
 - **Storage:** 500 GB 2.5" HDD (ST500LM000, rotational). LUKS2 root on Btrfs with the
   `@`/`@home`/`@log`/`@pkg`/`@snapshots` layout, 16 GB LUKS swap for hibernation
-  (`resume=` wired; hibernate/resume itself not yet verified -- Phase 12 task), 2 GB ESP
+  (`resume=` wired; hibernate/resume itself still unverified -- issue #1), 2 GB ESP
   at `/efi` with UKIs for `linux`, `linux-lts` and their fallbacks.
 - **Memory:** 8 GB, plus a 3.8 GB zram swap.
 - **Input:** Synaptics PS/2 touchpad; Dell WMI hotkeys; four "Quickstart" buttons.
-- **Audio:** three HDA controllers (Intel HDMI, Intel PCH, NVIDIA HDMI); PipeWire runs;
-  the PCH card is the one with the speakers/jack.
-- **Not on this machine:** TPM (Secure Boot deferred, Phase 12), a working `docker`
-  daemon (podman with docker emulation; ISO builds need `sudo podman`, `base-install.md`).
+- **Audio:** three HDA controllers (Intel HDMI, Intel PCH, NVIDIA HDMI). The PCH card
+  (`card1`) is the one with the speakers and jack; its codec is a **Realtek ALC3661**.
+  Nothing played until a *global* ALSA soft-mixer rule was dropped: it muted every output
+  pin in hardware on every card, which `symphony-hardware scan` now reports as
+  "every output pin muted" by reading `Amp-Out vals` bit 7 out of
+  `/proc/asound/card*/codec#*`. PipeWire manages the hardware mixer; `alsa-utils` and
+  `rtkit` ship (D-0083).
+- **AlienFX lighting:** a USB HID controller at `187c:0525`, four bits per colour channel.
+  Driven by our own `alienfx` package (D-0084) — upstream's AUR build is uninstallable and
+  its zone map is for a different model. `alienfx --zonescan` on this machine found seven
+  usable zones: keyboard `0x0001`/`0x0002`/`0x0004`/`0x0008` left to right, alien head
+  `0x0080`, logo `0x0100`, touchpad `0x0200`, status LEDs `0x0800`. `alienfx-theme` repaints
+  them from the palette's `PRIMARY` on every wallpaper change, after removing the colour's
+  white floor — Material You pastels otherwise read as washed-out pink through 4-bit
+  channels regardless of hue. Access is granted by a `uaccess` udev rule (ours, not
+  upstream's `MODE=666`), which only applies to an already-plugged device after
+  `udevadm control --reload` plus a re-trigger, so `symphony-hardware apply` does both.
+- **Power:** `power-profiles-daemon` enabled and active, `balanced` by default (D-0083;
+  folded in from Phase 12's task list).
+- **Not on this machine:** TPM (Secure Boot deferred), a working `docker` daemon (podman
+  with docker emulation, so local ISO builds need `SYMPHONY_CONTAINER_ENGINE="sudo podman"`
+  — rootless podman cannot mount the chroot).
+- **A trap worth remembering:** `/dev/bus/usb` is mode 755 from devtmpfs. A `chmod` aimed
+  at a device node but landing on the directory takes the execute bits away, and every
+  libusb tool then fails with `EACCES` no matter what udev grants on the nodes.
+  `symphony-hardware scan` reports it.
 - **Install history:** `2026.09.17-test14` (base, Phase 14), `2026.09.18-test2` (GUI,
   Phase 15), `2026.09.19-test1` (desktop round 1, Phase 16), `local-5c8bcf1` (2026-09-20,
-  the current install, Phase 17's D-0074 commit; later checkouts deployed over it with
-  `symphony-update apply --from`, Phase 18). It will not be reinstalled to test ISOs -- it is the dev
-  seat; fresh-install proofs need a second machine.
+  the current install, D-0074's commit; later checkouts deployed over it with
+  `symphony-update apply --from`, D-0079). It will not be reinstalled to test ISOs -- it is
+  the dev seat; fresh-install proofs need a second machine (issues #3 and #4).

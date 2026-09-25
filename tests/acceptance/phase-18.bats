@@ -97,16 +97,6 @@ setup() {
 
 # --- the record -----------------------------------------------------------------------
 
-@test "docs: update.md documents the four subcommands and --from; dev-deploy.md is gone" {
-  local doc="$REPO_ROOT/docs/runbooks/update.md"
-  local word
-  for word in 'symphony-update check' 'symphony-update apply' 'symphony-update rollback' 'symphony-update version' '--from'; do
-    run grep -F -e "$word" "$doc"
-    assert_success
-  done
-  assert [ ! -e "$REPO_ROOT/docs/runbooks/dev-deploy.md" ]
-}
-
 @test "docs: LICENSE exists (the repo is public)" {
   assert [ -f "$REPO_ROOT/LICENSE" ]
 }

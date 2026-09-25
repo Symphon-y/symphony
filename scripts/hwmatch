@@ -157,7 +157,12 @@ main() {
   PRESENT=$(
     present_pci
     present_usb
-    present_hda
+    # Only when the map asks about a codec. Reading a codec file talks to the
+    # controller, and on the dev seat /proc/asound/card2/codec#0 (the NVIDIA HDMI
+    # codec, GPU runtime-suspended) blocks in an uninterruptible read that even
+    # `timeout` cannot kill -- which hung `hwpkglist`, and so would hang pacstrap
+    # at install time. No shipped entry uses an hda: key.
+    if grep -q '^[[:space:]]*hda:' "$MAP"; then present_hda; fi
   )
   MODALIAS=$(dmi_modalias)
 

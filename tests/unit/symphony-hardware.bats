@@ -316,6 +316,24 @@ EOF
   assert_output --regexp "muted"
 }
 
+@test "scan: a sound card that is not fully powered up is never read" {
+  # Reading a codec file talks to the controller. On the dev seat the NVIDIA HDMI
+  # function sat in `resuming` and the read blocked in an uninterruptible kernel
+  # wait that `timeout` could not kill -- it hung hwmatch, and so pacstrap. Cards
+  # with no runtime PM have no status file and are still read (the tests either
+  # side of this one).
+  mkdir -p "$PROC/asound/card2" "$SYS/class/sound/card2/device/power"
+  echo resuming >"$SYS/class/sound/card2/device/power/runtime_status"
+  cat >"$PROC/asound/card2/codec#0" <<'EOF'
+Codec: Nvidia GPU 42 HDMI/DP
+Node 0x04 [Pin Complex] wcaps 0x400581: Stereo Amp-Out
+  Amp-Out vals:  [0x80 0x80]
+EOF
+  run "$SCRIPT" scan
+  assert_success
+  refute_output --partial "Nvidia"
+}
+
 @test "scan: an unmuted codec is not reported" {
   mkdir -p "$PROC/asound/card1"
   printf 'Codec: Realtek ALC3661\nVendor Id: 0x10ec0668\nSubsystem Id: 0x102805a9\nNode 0x14 [Pin Complex] wcaps 0x40058f: Stereo Amp-Out\n  Amp-Out vals:  [0x00 0x00]\n  Pin-ctls: 0x40: OUT\n' >"$PROC/asound/card1/codec#0"

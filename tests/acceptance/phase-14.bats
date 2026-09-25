@@ -88,14 +88,9 @@ setup() {
 
 @test "symphony-bootstrap is fully retired -- no trace outside historical records" {
   assert [ ! -e "$REPO_ROOT/iso/profile/airootfs/usr/local/bin/symphony-bootstrap" ]
-  # docs/phases/ is allowed to still mention the retired name: phase-10 and
-  # phase-12's tracking docs are accurate history of what was true when
-  # they ran (established precedent, see docs/roadmap.md's Phase 13 entry),
-  # and this phase's own tracking doc explains what it retired and why.
-  # docs/roadmap.md's per-phase summaries are the same kind of history (its
-  # Phase 14 paragraph says what was retired). Everything else -- scripts,
-  # other docs, other tests -- must be clean.
-  run bash -c "grep -rl 'symphony-bootstrap' '$REPO_ROOT' --exclude-dir=.git --exclude-dir=phases | grep -vE 'tests/acceptance/phase-14.bats|docs/roadmap.md'"
+  # This test is the only place the retired name may appear (D-0064 records what
+  # it was and why it went); everything else must be clean.
+  run bash -c "grep -rl 'symphony-bootstrap' '$REPO_ROOT' --exclude-dir=.git | grep -vF 'tests/acceptance/phase-14.bats'"
   assert_failure
   assert_output ""
 }

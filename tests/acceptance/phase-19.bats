@@ -80,11 +80,10 @@ setup() {
   assert_success
 }
 
-@test "docs: DECISIONS.md records D-0082 to D-0084; the hardware runbook exists" {
+@test "decisions: DECISIONS.md records D-0082 to D-0084" {
   local id
   for id in D-0082 D-0083 D-0084; do
     run grep -E "^## $id " "$REPO_ROOT/DECISIONS.md"
     assert_success
   done
-  assert [ -f "$REPO_ROOT/docs/runbooks/hardware.md" ]
 }

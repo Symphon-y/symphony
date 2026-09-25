@@ -13,7 +13,7 @@ setup() {
 # --- static: checkable from the VM -----------------------------------------
 
 @test "install-base-system: SWAP_SIZE is documented as optional in the vars example" {
-  run grep -q '^SWAP_SIZE' "$REPO_ROOT/docs/runbooks/base-install.vars.example"
+  run grep -q '^SWAP_SIZE' "$REPO_ROOT/install/base-install.vars.example"
   assert_success
 }
 
@@ -128,11 +128,6 @@ setup() {
 
 @test "iso: the live medium prints symphony-install as the one obvious thing to run" {
   run grep -q 'symphony-install' "$REPO_ROOT/iso/profile/airootfs/root/.bash_profile"
-  assert_success
-}
-
-@test "docs: base-install.md documents the guided symphony-install flow" {
-  run grep -q 'symphony-install' "$REPO_ROOT/docs/runbooks/base-install.md"
   assert_success
 }
 

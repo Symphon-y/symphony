@@ -96,14 +96,6 @@ setup() {
   assert_success
 }
 
-@test "docs: base-install.md documents reassembling a split ISO before writing to USB" {
-  local doc="$REPO_ROOT/docs/runbooks/base-install.md"
-  run grep -q 'cat symphony' "$doc"
-  assert_success
-  run grep -q 'sha256sum -c' "$doc"
-  assert_success
-}
-
 # The target_commitish and live-medium-boot regression tests that used to be
 # here now live in tests/acceptance/phase-12.bats -- Phase 12 and 13 were
 # never two separate stories (the offline ISO exists for the Alienware

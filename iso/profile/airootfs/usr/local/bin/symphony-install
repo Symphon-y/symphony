@@ -9,11 +9,10 @@
 # screen, then hands off to
 # install/run-guided-install, the shared runner both this script and the
 # future GUI use, so neither has to reimplement "run the install, then
-# offer to reboot." No install logic lives here -- see Phase 12's plan
-# (docs/phases/phase-12-alienware-migration.md) for why: a linear
-# sequential flow ending in one review screen, not a free-navigation
-# menu, researched against archinstall/Calamares/Windows Setup precedent
-# before being designed. The destructive-action confirmation stays
+# offer to reboot." No install logic lives here. The shape is deliberate:
+# a linear sequential flow ending in one review screen, not a
+# free-navigation menu, researched against archinstall/Calamares/Windows
+# Setup precedent before being designed (D-0063, D-0066). The destructive-action confirmation stays
 # entirely in install-base-system's own typed-disk-path gate -- this
 # script's review screen is a separate, lighter "did I answer these
 # right" checkpoint, not a replacement for it.
