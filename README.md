@@ -63,9 +63,18 @@ first needs them, not in advance.
 ## Installing and updating
 
 - **Install:** download `symphony-<tag>.iso` from the latest
-  [release](https://github.com/Symphon-y/symphony/releases) (reassemble the
-  `.part` files if it was split; check the `.sha256`), write it to a USB stick, boot
-  it. A graphical installer collects everything once and installs offline; the first
+  [release](https://github.com/Symphon-y/symphony/releases) and write it to a USB
+  stick. The ISO is over GitHub's 2 GiB per-file limit, so it arrives as numbered
+  parts — join them in order and check the digest before writing:
+
+  ```sh
+  cat symphony-<tag>.iso.*.part > symphony-<tag>.iso
+  sha256sum -c symphony-<tag>.iso.sha256
+  ```
+
+  On Windows, join them with `Get-Content -Raw`, then `iso/write-usb.ps1` checks the
+  digest, writes the stick and reads it back to compare. A graphical
+  installer collects everything once and installs offline; the first
   boot lands on the themed desktop with nothing left to type. Boot the ISO with
   `symphony.nogui` for a terminal instead, where `symphony-install` asks the same
   questions; Wi-Fi is optional either way (`nmtui` joins one, and the profile carries
