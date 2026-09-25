@@ -1,6 +1,6 @@
 // Target: ~/.config/waybar/config.jsonc (linked by install/link-home)
 //
-// A minimal, non-cluttered bar: workspaces, clock, volume, network, battery, tray.
+// A minimal, non-cluttered bar: workspaces, clock, updates, volume, network, battery, tray.
 // Colors come from ~/.config/waybar/colors.css (matugen-generated, imported by
 // style.css) -- this file only defines structure.
 {
@@ -11,7 +11,7 @@
 
   "modules-left": ["hyprland/workspaces"],
   "modules-center": ["clock"],
-  "modules-right": ["wireplumber", "network", "battery", "tray"],
+  "modules-right": ["custom/update", "wireplumber", "network", "battery", "tray"],
 
   "hyprland/workspaces": {
     "format": "{icon}",
@@ -65,6 +65,18 @@
     "format-plugged": "󰚥 {capacity}%",
     "format-icons": ["󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"],
     "tooltip-format": "{timeTo}"
+  },
+
+  // Present only when something is pending: update-status prints nothing otherwise, and
+  // waybar hides a custom module with no text. The state file it reads is written by
+  // update-check on a timer, so this poll costs nothing and never touches the network
+  // (Phase 20, D-0087). Click applies everything pending, right-click re-checks now.
+  "custom/update": {
+    "exec": "update-status",
+    "return-type": "json",
+    "interval": 300,
+    "on-click": "systemd-run --user --scope --collect --quiet xdg-terminal-exec -- update-now",
+    "on-click-right": "systemctl --user start update-notify.service"
   },
 
   "tray": {

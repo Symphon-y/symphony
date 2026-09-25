@@ -2463,3 +2463,49 @@ and `wallpaper-set` drives the config file instead.)_
   contents, not its name (verified). Two `home/hyprpaper` scripts now depend on being
   reachable from the payload root, which is how they are always installed and how the
   unit tests already invoke them.
+
+## D-0087 — An update is offered on the desktop and taken in a terminal (extends D-0059, D-0079)
+
+- **Status:** Accepted (2026-09-25, Phase 20)
+- **Decision:** Four scripts in `home/update/`, one job each. `update-check` is the only
+  one that asks anything -- `checkupdates` for packages, one GET to `releases/latest` for
+  the release -- and writes what it found to `~/.local/state/symphony/updates`;
+  `scripts/lib/updates.bash` is the one home of that file's shape. `update-notify` reads
+  it and raises a single toast carrying an **Update now** action, once per new thing.
+  `update-status` reads it and prints waybar JSON, or nothing, which is how waybar hides
+  a custom module. `update-now` is where both the action and the badge's click land: it
+  runs `sudo pacman -Syu` when packages are pending, then `symphony-update apply` when a
+  newer release exists, and stops if the first fails. A failing half of the check leaves
+  its own fields as they were, so a laptop opened away from its network does not read as
+  "nothing pending".
+- **Alternatives considered:** apply from the timer, unattended -- rejected, and it is
+  why this entry exists: `-Syu` without a person watching is the Arch partial-upgrade
+  anti-pattern, and an OS update is the user's call. A toast that never expires instead
+  of a bar badge -- `notify-send --action` implies `--wait`, so the timer's oneshot unit
+  would stay open until someone answered it; the badge is the durable surface and the
+  toast gets 30 s. One graphical polkit prompt via a privileged helper -- closer to
+  macOS, but `symphony-update apply` deliberately mixes root steps with user-level
+  appliers (`link-home`, `enable-user-services`, `yay`), so it cannot run wholesale under
+  `pkexec`; splitting out a root half that installs a downloaded payload is a real
+  security surface and is left for its own story. Keeping release updates and package
+  upgrades behind separate buttons -- recommended, and the user chose one button.
+- **Reasoning:** the mechanism to *notice* a release shipped in Phase 18 and worked --
+  the timer was enabled, active, and running daily -- but it only ever printed two
+  commands to retype, so it read as nothing at all. Two further things hid it: the
+  release half returns early unless the installed `VERSION` is a release tag, and the dev
+  seat runs `local-<sha>`, so it had never once executed; and mako's default left click
+  dismisses, so even an action-bearing toast needs an `[app-name=symphony]` rule to be
+  clickable. Bundling `-Syu` behind the same button is defensible because this path is
+  the opposite of unattended: asked for, watched in a terminal, ordered, and snapshotted
+  on both halves (`snap-pac` on the pacman transaction, `snapper` inside
+  `symphony-update`). The order is the substance -- the release's own `install-packages`
+  runs `yay -S --needed` without `-u`, and asking for a package against a stale database
+  is exactly how a partial upgrade happens, so packages go first.
+- **Consequences:** one `sudo` prompt covers the whole run (credential cache). The
+  terminal is launched with `systemd-run --user --scope --collect`, because a
+  `Type=oneshot` unit takes its cgroup down when `ExecStart` returns and would otherwise
+  kill the terminal mid-update. `update-check` replaces `checkupdates --change`, whose
+  only purpose was not re-notifying about the same set; the marker now holds the
+  announced release tag and package set, at the cost of one `checkupdates` sync instead
+  of two. The dev seat still sees only the package half until it runs a release, which is
+  correct and is also the one thing these tests cannot prove here.

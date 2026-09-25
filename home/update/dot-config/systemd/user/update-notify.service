@@ -1,7 +1,11 @@
 # Target: ~/.config/systemd/user/update-notify.service (linked by install/link-home)
+#
+# Two steps, in order: work out what is pending, then say so. Type=oneshot runs several
+# ExecStart lines sequentially and stops at the first failure.
 [Unit]
-Description=Notify when package updates or a new symphony release are pending
+Description=Check for pending package updates and symphony releases, and offer them
 
 [Service]
 Type=oneshot
+ExecStart=%h/.local/bin/update-check
 ExecStart=%h/.local/bin/update-notify

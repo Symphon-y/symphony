@@ -1,8 +1,10 @@
 #!/usr/bin/env bats
-# Unit tests for home/update/dot-local/bin/update-notify: the daily check that
-# informs about pending package updates (Phase 9, D-0059) and, since Phase 18, a
-# newer symphony release -- and never applies either. checkupdates, curl and
-# notify-send are stubs on PATH.
+# Unit tests for home/update/dot-local/bin/update-notify: the toast (Phase 9 D-0059 for
+# packages, Phase 18 for releases, made actionable in Phase 20).
+#
+# Since Phase 20 it only reads the state file update-check wrote -- it makes no network
+# call of its own -- and the toast carries an "Update now" action. notify-send,
+# systemd-run and xdg-terminal-exec are stubs on PATH.
 
 # Each @test runs in its own subshell, so per-test exports are intentionally local.
 # shellcheck disable=SC2030,SC2031
@@ -12,93 +14,183 @@ setup() {
   SCRIPT="$REPO_ROOT/home/update/dot-local/bin/update-notify"
   export STUB_LOG="$BATS_TEST_TMPDIR/calls.log"
   : >"$STUB_LOG"
-  export SYMPHONY_PAYLOAD_ROOT="$BATS_TEST_TMPDIR/payload"
   export SYMPHONY_STATE="$BATS_TEST_TMPDIR/state"
-  export SYMPHONY_RELEASE_REPO="example/symphony"
-  mkdir -p "$SYMPHONY_PAYLOAD_ROOT/current"
-  echo "2026.09.01" >"$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
-  export STUB_CHECKUPDATES_RC=2 STUB_CHECKUPDATES_OUT="" STUB_LATEST=2026.09.01
+  STATE="$SYMPHONY_STATE/updates"
+  mkdir -p "$SYMPHONY_STATE"
+  export STUB_ACTION=""
   make_stubs
 }
 
 # shellcheck disable=SC2016 # stub bodies expand when the stub runs
 make_stubs() {
-  local bin="$BATS_TEST_TMPDIR/bin"
+  local bin="$BATS_TEST_TMPDIR/bin" tool
   mkdir -p "$bin"
-  printf '#!/usr/bin/env bash\necho "checkupdates $*" >>"$STUB_LOG"\nprintf "%%s" "$STUB_CHECKUPDATES_OUT"\nexit "$STUB_CHECKUPDATES_RC"\n' >"$bin/checkupdates"
-  cat >"$bin/curl" <<'EOF'
+  # notify-send with --action prints the chosen action's name on stdout; nothing
+  # chosen (dismissed or expired) prints nothing.
+  cat >"$bin/notify-send" <<'EOF'
 #!/usr/bin/env bash
-echo "curl $*" >>"$STUB_LOG"
-[[ -n ${STUB_CURL_FAIL:-} ]] && exit 7
-printf '{"tag_name": "%s"}\n' "$STUB_LATEST"
+echo "notify-send $*" >>"$STUB_LOG"
+printf '%s' "${STUB_ACTION:-}"
 EOF
-  printf '#!/usr/bin/env bash\necho "notify-send $*" >>"$STUB_LOG"\n' >"$bin/notify-send"
+  for tool in systemd-run xdg-terminal-exec curl checkupdates; do
+    printf '#!/usr/bin/env bash\necho "%s $*" >>"$STUB_LOG"\n' "$tool" >"$bin/$tool"
+  done
   chmod +x "$bin"/*
   PATH="$bin:$PATH"
+}
+
+state() {
+  printf '%s\n' "$@" >"$STATE"
 }
 
 calls() {
   cat "$STUB_LOG"
 }
 
-@test "nothing pending and no new release: silent, exit 0" {
+@test "nothing pending: silent, exit 0" {
+  state "packages=0" "pkglist=" "release=" "installed=2026.09.24" "checked=1790000000"
   run "$SCRIPT"
   assert_success
   run calls
   refute_output --partial "notify-send"
 }
 
-@test "pending package updates: one toast naming the count (D-0059, unchanged)" {
-  STUB_CHECKUPDATES_RC=0 STUB_CHECKUPDATES_OUT=$'linux 1 -> 2\nvim 1 -> 2\n' run "$SCRIPT"
+@test "no state file at all: silent, and not a failure" {
+  run "$SCRIPT"
+  assert_success
+  run calls
+  refute_output --partial "notify-send"
+}
+
+@test "it never checks anything itself: that is update-check's job" {
+  state "packages=2" "pkglist=linux vim" "release=2026.09.25" "installed=2026.09.24" "checked=1790000000"
+  run "$SCRIPT"
+  assert_success
+  run calls
+  refute_output --partial "curl"
+  refute_output --partial "checkupdates"
+}
+
+@test "pending packages: one toast naming the count (D-0059, unchanged)" {
+  state "packages=2" "pkglist=linux vim" "release=" "installed=2026.09.24" "checked=1790000000"
+  run "$SCRIPT"
   assert_success
   run calls
   assert_output --partial "2 updates available"
-  refute_output --partial "pacman -Syu --noconfirm"
 }
 
-@test "a newer release: one toast naming the tag and the command to run" {
-  STUB_LATEST=2026.09.22 run "$SCRIPT"
-  assert_success
-  run calls
-  assert_output --partial "symphony 2026.09.22 available"
-  assert_output --partial "symphony-update apply"
-}
-
-@test "the same new release on the next day: no second toast" {
-  STUB_LATEST=2026.09.22 "$SCRIPT"
-  : >"$STUB_LOG"
-  STUB_LATEST=2026.09.22 run "$SCRIPT"
-  assert_success
-  run calls
-  refute_output --partial "notify-send"
-}
-
-@test "a release older than or equal to the installed one: nothing" {
-  STUB_LATEST=2026.08.01 run "$SCRIPT"
-  assert_success
-  run calls
-  refute_output --partial "notify-send"
-}
-
-@test "a local-* payload (the dev seat) is not nagged about releases" {
-  echo "local-abc1234" >"$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
-  STUB_LATEST=2026.09.22 run "$SCRIPT"
-  assert_success
-  run calls
-  refute_output --partial "notify-send"
-}
-
-@test "the release check failing (offline) is silent and does not block the package check" {
-  STUB_CURL_FAIL=1 STUB_CHECKUPDATES_RC=0 STUB_CHECKUPDATES_OUT=$'linux 1 -> 2\n' run "$SCRIPT"
-  assert_success
-  run calls
-  assert_output --partial "1 update available"
-  refute_output --partial "symphony 2"
-}
-
-@test "the release check has a timeout, so a hung network cannot hang the timer" {
+@test "a pending release: one toast naming the tag" {
+  state "packages=0" "pkglist=" "release=2026.09.25" "installed=2026.09.24" "checked=1790000000"
   run "$SCRIPT"
   assert_success
   run calls
-  assert_output --regexp "curl .*(--max-time|-m) [0-9]+"
+  assert_output --partial "symphony 2026.09.25 available"
+}
+
+@test "the toast offers an action to take the update, not a command to retype" {
+  state "packages=0" "pkglist=" "release=2026.09.25" "installed=2026.09.24" "checked=1790000000"
+  run "$SCRIPT"
+  assert_success
+  run calls
+  assert_output --regexp "notify-send .*(-A|--action)[= ]?update"
+}
+
+@test "choosing it opens a terminal running update-now" {
+  state "packages=0" "pkglist=" "release=2026.09.25" "installed=2026.09.24" "checked=1790000000"
+  STUB_ACTION=update run "$SCRIPT"
+  assert_success
+  run calls
+  assert_output --partial "update-now"
+}
+
+@test "the terminal is launched detached, or the oneshot service kills it on exit" {
+  # A Type=oneshot unit takes its whole cgroup down when ExecStart returns.
+  state "packages=0" "pkglist=" "release=2026.09.25" "installed=2026.09.24" "checked=1790000000"
+  STUB_ACTION=update run "$SCRIPT"
+  assert_success
+  run calls
+  assert_output --regexp "systemd-run .*--scope"
+}
+
+@test "dismissing it launches nothing" {
+  state "packages=0" "pkglist=" "release=2026.09.25" "installed=2026.09.24" "checked=1790000000"
+  STUB_ACTION="" run "$SCRIPT"
+  assert_success
+  run calls
+  refute_output --partial "update-now"
+}
+
+@test "choosing Later launches nothing" {
+  state "packages=0" "pkglist=" "release=2026.09.25" "installed=2026.09.24" "checked=1790000000"
+  STUB_ACTION=later run "$SCRIPT"
+  assert_success
+  run calls
+  refute_output --partial "update-now"
+}
+
+@test "the same release tomorrow: no second toast" {
+  state "packages=0" "pkglist=" "release=2026.09.25" "installed=2026.09.24" "checked=1790000000"
+  "$SCRIPT"
+  : >"$STUB_LOG"
+  run "$SCRIPT"
+  assert_success
+  run calls
+  refute_output --partial "notify-send"
+}
+
+@test "the same pending packages tomorrow: no second toast" {
+  state "packages=2" "pkglist=linux vim" "release=" "installed=2026.09.24" "checked=1790000000"
+  "$SCRIPT"
+  : >"$STUB_LOG"
+  run "$SCRIPT"
+  assert_success
+  run calls
+  refute_output --partial "notify-send"
+}
+
+@test "a different set of pending packages is worth saying again" {
+  state "packages=2" "pkglist=linux vim" "release=" "installed=2026.09.24" "checked=1790000000"
+  "$SCRIPT"
+  : >"$STUB_LOG"
+  state "packages=3" "pkglist=linux vim git" "release=" "installed=2026.09.24" "checked=1790000001"
+  run "$SCRIPT"
+  assert_success
+  run calls
+  assert_output --partial "3 updates available"
+}
+
+@test "a newer release than the one already announced is worth saying again" {
+  state "packages=0" "pkglist=" "release=2026.09.25" "installed=2026.09.24" "checked=1790000000"
+  "$SCRIPT"
+  : >"$STUB_LOG"
+  state "packages=0" "pkglist=" "release=2026.09.26" "installed=2026.09.24" "checked=1790000001"
+  run "$SCRIPT"
+  assert_success
+  run calls
+  assert_output --partial "2026.09.26"
+}
+
+@test "a long package list is cut short in the toast, not dumped into it" {
+  state "packages=37" "pkglist=$(printf 'pkg%02d ' $(seq 1 37))" "release=" "installed=2026.09.24" "checked=1790000000"
+  run "$SCRIPT"
+  assert_success
+  run calls
+  assert_output --partial "more"
+  refute_output --partial "pkg37"
+}
+
+@test "both pending: one toast, not two" {
+  state "packages=2" "pkglist=linux vim" "release=2026.09.25" "installed=2026.09.24" "checked=1790000000"
+  run "$SCRIPT"
+  assert_success
+  run bash -c "grep -c '^notify-send' '$STUB_LOG'"
+  assert_output "1"
+}
+
+@test "the toast is given a lifetime, so --wait cannot hold the unit open forever" {
+  state "packages=0" "pkglist=" "release=2026.09.25" "installed=2026.09.24" "checked=1790000000"
+  run "$SCRIPT"
+  assert_success
+  run calls
+  assert_output --regexp "notify-send .*(-t|--expire-time)[= ][0-9]+"
 }

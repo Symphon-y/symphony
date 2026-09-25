@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/update-check (linked by install/link-home)
+#
+# update-check: work out what is pending and write it down (Phase 20, D-0087). The one
+# place that knows -- the toast, the waybar badge and update-now all read its answer
+# rather than each asking again.
+#
+# Run from update-notify.service's timer, and by hand. It is the only script in this set
+# that touches the network, and it never notifies and never upgrades.
+#
+# A half that cannot answer leaves its own fields as they were: a laptop that opens the
+# lid away from its network must not read as "nothing pending" and quietly drop the
+# release it already knew about.
+#
+# `set -e` is deliberately off -- a failing half is an expected outcome here, not a
+# reason to abandon the other one.
+set -uo pipefail
+
+ROOT=$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../../../.." && pwd)
+readonly ROOT
+# shellcheck source-path=SCRIPTDIR source=../../../../scripts/lib/updates.bash
+source "$ROOT/scripts/lib/updates.bash"
+
+readonly PAYLOAD_ROOT="${SYMPHONY_PAYLOAD_ROOT:-/usr/local/share/symphony}"
+readonly RELEASE_REPO="${SYMPHONY_RELEASE_REPO:-Symphon-y/symphony}"
+readonly API="https://api.github.com/repos/$RELEASE_REPO/releases/latest"
+
+# A release tag is a date; anything else (local-<sha>, unreleased) is a build that no
+# published release supersedes -- the dev seat is never nagged about one.
+is_release() {
+  [[ $1 =~ ^20[0-9]{2}\.[0-9]{2}\.[0-9]{2} ]]
+}
+
+newer() {
+  [[ $(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n1) == "$2" && $1 != "$2" ]]
+}
+
+# checkupdates exits 2 with no output when nothing is pending, and non-zero for a real
+# failure (no network to sync its temporary database, most often).
+check_packages() {
+  local output rc
+  output=$(checkupdates 2>/dev/null)
+  rc=$?
+  case $rc in
+    0) ;;
+    2) UPDATE_PACKAGES=0 UPDATE_PKGLIST="" && return 0 ;;
+    *) return 0 ;; # keep what the last successful check found
+  esac
+  UPDATE_PKGLIST=$(awk '{ print $1 }' <<<"$output" | paste -sd' ' -)
+  UPDATE_PACKAGES=$(wc -w <<<"$UPDATE_PKGLIST")
+}
+
+check_release() {
+  [[ -r $PAYLOAD_ROOT/current/VERSION ]] || return 0
+  UPDATE_INSTALLED=$(tr -d '[:space:]' <"$PAYLOAD_ROOT/current/VERSION")
+
+  if ! is_release "$UPDATE_INSTALLED"; then
+    UPDATE_RELEASE=""
+    return 0
+  fi
+
+  local json latest
+  json=$(curl --proto '=https' --tlsv1.2 -fsSL --max-time 10 \
+    -H 'Accept: application/vnd.github+json' "$API" 2>/dev/null) || return 0
+  latest=$(sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' <<<"$json" | head -n1)
+
+  # Answered, but named no tag we understand: there is nothing to offer. Distinct from
+  # not reaching the API at all, which returned above with the old answer intact.
+  if [[ -z $latest ]] || ! newer "$UPDATE_INSTALLED" "$latest"; then
+    UPDATE_RELEASE=""
+    return 0
+  fi
+  UPDATE_RELEASE=$latest
+}
+
+updates_load
+check_packages
+check_release
+updates_save
