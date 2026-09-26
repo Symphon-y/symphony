@@ -189,6 +189,29 @@ apply_payload() {
   "$CURRENT/home/hardware/dot-local/bin/symphony-hardware" apply --no-packages
 }
 
+# Hyprland reads its config out of the payload, which the swap replaces underneath it:
+# between the two renames its `source`d files briefly do not exist, and it puts up a
+# config-error overlay that stays until something reloads it. The runbook used to tell
+# the user to do this by hand (#8).
+#
+# The env var is the cheap answer; `hyprctl -j version` is the honest one, because a
+# session started outside this shell has no var to read. Checking that hyprctl merely
+# exists would be no check at all -- it is installed on every symphony machine.
+session_present() {
+  [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] && return 0
+  hyprctl -j version >/dev/null 2>&1
+}
+
+# Never fatal: by the time this runs the payload is in place and the update has
+# succeeded. A machine that could not be reloaded is one `hyprctl reload` away, not one
+# rollback away, so say so and leave the exit code alone.
+reload_hyprland() {
+  session_present || return 0
+  log "reloading Hyprland"
+  hyprctl reload >/dev/null ||
+    echo "symphony-update: hyprctl reload failed -- run it by hand to clear the config error" >&2
+}
+
 snapshot() {
   log "taking a Btrfs snapshot"
   sudo snapper -c root create -d "$1"
@@ -280,6 +303,7 @@ apply() {
   apply_payload
   log "running pending migrations"
   "$CURRENT/scripts/migrate" apply
+  reload_hyprland
   echo "symphony-update: now at $target"
 }
 
@@ -297,6 +321,7 @@ rollback() {
   sudo mv "$CURRENT" "$PREVIOUS"
   sudo mv "$staging" "$CURRENT"
   apply_payload
+  reload_hyprland
   echo "symphony-update: now at $previous"
   echo "note: migrations that $current ran are not undone -- see snapper for the pre-update snapshot"
 }

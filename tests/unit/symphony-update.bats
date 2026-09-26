@@ -131,6 +131,21 @@ EOF
   # cannot do and only needs to have been asked for (the payload dir is ours).
   printf '#!/usr/bin/env bash\necho "sudo $*" >>"$STUB_LOG"\n[[ $1 == chown ]] && exit 0\nexec "$@"\n' >"$bin/sudo"
   printf '#!/usr/bin/env bash\necho "snapper $*" >>"$STUB_LOG"\n' >"$bin/snapper"
+  # hyprctl: `-j version` is how a session is detected, so it answers according to
+  # STUB_HYPRCTL_NO_SESSION; the reload can be made to fail on its own.
+  cat >"$bin/hyprctl" <<'EOF'
+#!/usr/bin/env bash
+echo "hyprctl $*" >>"$STUB_LOG"
+if [[ $* == *version* ]]; then
+  [[ -n ${STUB_HYPRCTL_NO_SESSION:-} ]] && exit 1
+  exit 0
+fi
+if [[ $* == *reload* && -n ${STUB_HYPRCTL_RELOAD_FAIL:-} ]]; then
+  echo "Couldn't connect to the Hyprland socket" >&2
+  exit 1
+fi
+exit 0
+EOF
   printf '#!/usr/bin/env bash\necho "notify-send $*" >>"$STUB_LOG"\n' >"$bin/notify-send"
   chmod +x "$bin"/*
   PATH="$bin:$PATH"
@@ -353,6 +368,61 @@ installed_version() {
   sync=$(grep -n '^sync-system' "$STUB_LOG" | cut -d: -f1 | head -1)
   assert [ -n "$chown" ]
   assert [ "$chown" -lt "$sync" ]
+}
+
+# --- reloading Hyprland after the swap (#8) -----------------------------------------
+
+@test "apply: reloads Hyprland at the end, so the swap's config-error overlay clears" {
+  export HYPRLAND_INSTANCE_SIGNATURE=abc123
+  run "$SCRIPT" apply --yes
+  assert_success
+  run calls
+  assert_line "hyprctl reload"
+}
+
+@test "apply: the reload comes after the appliers and the migrations, never before" {
+  export HYPRLAND_INSTANCE_SIGNATURE=abc123
+  run "$SCRIPT" apply --yes
+  assert_success
+  local migrate reload
+  migrate=$(grep -n '^migrate apply' "$STUB_LOG" | cut -d: -f1 | head -1)
+  reload=$(grep -n '^hyprctl reload' "$STUB_LOG" | cut -d: -f1 | head -1)
+  assert [ -n "$migrate" ]
+  assert [ "$migrate" -lt "$reload" ]
+}
+
+@test "apply: a session detected only by hyprctl, with no env var, still reloads" {
+  unset HYPRLAND_INSTANCE_SIGNATURE
+  run "$SCRIPT" apply --yes
+  assert_success
+  run calls
+  assert_line "hyprctl reload"
+}
+
+@test "apply: no session (a TTY or over SSH) means no reload, and no failure" {
+  unset HYPRLAND_INSTANCE_SIGNATURE
+  STUB_HYPRCTL_NO_SESSION=1 run "$SCRIPT" apply --yes
+  assert_success
+  run calls
+  refute_output --partial "hyprctl reload"
+}
+
+@test "apply: a failed reload is reported, but the update already succeeded and stands" {
+  export HYPRLAND_INSTANCE_SIGNATURE=abc123
+  STUB_HYPRCTL_RELOAD_FAIL=1 run "$SCRIPT" apply --yes
+  assert_success
+  assert_output --partial "reload"
+  assert_equal "$(installed_version)" "2026.09.22"
+}
+
+@test "rollback: reloads too -- it swaps the payload the same way" {
+  export HYPRLAND_INSTANCE_SIGNATURE=abc123
+  "$SCRIPT" apply --yes >/dev/null
+  : >"$STUB_LOG"
+  run "$SCRIPT" rollback
+  assert_success
+  run calls
+  assert_line "hyprctl reload"
 }
 
 # --- apply --from DIR: the dev seat ------------------------------------------------
