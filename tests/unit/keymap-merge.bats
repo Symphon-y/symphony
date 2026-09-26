@@ -52,6 +52,21 @@ merge() {
   assert_output "global|SUPER + W|web"
 }
 
+@test "true keeps the shipped binding: the counterpart to false" {
+  # Writing `true` is how you say "I know about this key and I want it as shipped".
+  # Without it, `true` fell through to "no command for it" -- an error for something
+  # that reads as the obvious opposite of `false`.
+  run merge '{ always = { ["XF86AudioMute"] = "volume.mute" } }' \
+    '{ always = { ["XF86AudioMute"] = true } }'
+  assert_output "always|XF86AudioMute|volume.mute"
+}
+
+@test "true for a key with no default binds nothing, and is not an error" {
+  run merge '{ always = {} }' '{ always = { ["XF86AudioMute"] = true } }'
+  assert_success
+  assert_output ""
+}
+
 @test "a key the user adds is kept alongside the defaults" {
   run merge '{ global = { ["SUPER + Q"] = "window.close" } }' \
     '{ global = { ["SUPER + T"] = "terminal" } }'

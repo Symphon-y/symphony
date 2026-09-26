@@ -6,6 +6,8 @@
 --   * whole-value replace, never a field-by-field merge -- otherwise a `desc` the
 --     user once set would outlive the action it described, and the cheatsheet lies
 --   * `false` unbinds a key; a scope set to `false` is dropped whole
+--   * `true` keeps the shipped binding -- the readable counterpart to `false`, and
+--     a way to say "I know about this key and I want it as it comes"
 --   * a key or scope the user adds is created
 --   * the result is emitted in a fixed order, so `hyprctl binds -j` is stable enough
 --     for a test to assert against
@@ -45,6 +47,10 @@ function M.merge(defaults, user)
         local key = notation.canonical(chord)
         if action == false then
           merged[name][key] = nil
+        elseif action == true then
+          -- Keep whatever the defaults said. A key with no default stays unbound,
+          -- which is what "as shipped" means for a key that ships unbound.
+          merged[name][key] = merged[name][key] or nil
         else
           -- Overriding an existing key keeps the default's spelling of the chord and
           -- changes only the action: for letters `Q` and `q` are distinct keysyms, and

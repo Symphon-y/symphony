@@ -1,7 +1,7 @@
 -- Target: ~/.config/hypr/keymap/defaults.lua (linked by install/link-home)
 --
 -- The keymap this system ships with. Copy a line into ~/.config/symphony/keymap.lua
--- to change it; that file wins, per key. `false` unbinds. This file is a read-only
+-- to change it; that file wins, per key. `false` unbinds, `true` keeps it as shipped. This file is a read-only
 -- symlink into the payload and is replaced by every symphony-update, so it is always
 -- the current reference -- `symphony-keys defaults` opens it.
 --

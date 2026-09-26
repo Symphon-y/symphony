@@ -5,6 +5,7 @@
 --
 --   * name an action to rebind a key
 --   * `false` unbinds a key entirely
+--   * `true` keeps the shipped binding -- useful for saying so out loud
 --   * a key that is not in the defaults is simply added
 --
 -- The full list of shipped keys and the actions they can be given is in
@@ -21,6 +22,7 @@
 --       ["XF86AudioRaiseVolume"] = "volume.down",
 --       ["XF86AudioLowerVolume"] = "volume.up",
 --       ["XF86AudioMute"] = false,
+--       ["XF86MonBrightnessUp"] = true,   -- as shipped; the same as leaving it out
 --     },
 --   }
 

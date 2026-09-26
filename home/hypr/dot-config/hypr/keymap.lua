@@ -60,6 +60,11 @@ for _, entry in ipairs(merge.entries(merge.merge(defaults, user or {}))) do
       repeating = action.repeating,
     })
   elseif action ~= nil then
-    notify(("cannot bind %s: no command for it"):format(entry.chord))
+    -- Say what was written and what is valid. The old wording, "no command for it",
+    -- named neither and left you guessing at your own config.
+    local written = type(entry.action) == "string" and ("%q"):format(entry.action)
+      or type(entry.action)
+    notify(("cannot bind %s: %s is not an action -- name one from actions.lua, or use "):format(
+      entry.chord, written) .. "false to unbind, true to keep the shipped binding.")
   end
 end
