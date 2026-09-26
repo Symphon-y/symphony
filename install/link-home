@@ -53,6 +53,25 @@ seed_wallpaper() {
   fi
 }
 
+# ~/.config/symphony/ is the user's: their keymap sits there beside matugen's
+# generated theme.env, in a directory stow also links things into. Seeded file by
+# file and never at directory level -- stow --no-folding is what keeps that safe, and
+# a folded symlink would put the user's own keymap inside the root-owned payload.
+# Never overwritten, so an edit survives every update (Phase 21, #21).
+seed_config() {
+  local src="$REPO_ROOT/install/seed/symphony"
+  local dest="$HOME/.config/symphony"
+  [[ -d $src ]] || return 0
+
+  mkdir -p "$dest"
+  local file target
+  for file in "$src"/*; do
+    [[ -f $file ]] || continue
+    target="$dest/${file##*/}"
+    [[ -e $target ]] || cp "$file" "$target"
+  done
+}
+
 apply() {
   local dir names=()
   for dir in "$PACKAGES_DIR"/*/; do
@@ -63,6 +82,7 @@ apply() {
     "${names[@]}"
 
   seed_wallpaper
+  seed_config
 
   echo "linked: ${names[*]}"
 }
