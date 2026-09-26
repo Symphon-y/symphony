@@ -69,6 +69,12 @@ local media = {
   { "XF86AudioMute", "volume mute", "Mute", false },
   { "XF86MonBrightnessUp", "brightness up", "Brightness up", true },
   { "XF86MonBrightnessDown", "brightness down", "Brightness down", true },
+  -- Keyboard lighting (#26), provisionally on SUPER + the same keys. The shipped
+  -- default belongs in the keymap as a hardware-independent chord -- not every
+  -- keyboard emits XF86MonBrightness at all -- with this machine's keys moving to
+  -- ~/.config/symphony/keymap.lua when Task E migrates the lot.
+  { mainMod .. " + XF86MonBrightnessUp", "keyboard-backlight up", "Keyboard light up", true },
+  { mainMod .. " + XF86MonBrightnessDown", "keyboard-backlight down", "Keyboard light down", true },
   -- Not on this chassis, but standard elsewhere and harmless where the key never fires.
   { "XF86AudioPlay", "player play-pause", "Play/pause", false },
   { "XF86AudioNext", "player next", "Next track", false },

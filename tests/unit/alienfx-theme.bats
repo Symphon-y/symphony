@@ -102,6 +102,51 @@ print(sorted(k for k in t if k!='speed'))
   assert_output "[0, 0, 0]"
 }
 
+# --- the keyboard backlight level (#26) ----------------------------------------------
+
+@test "with no level set the colour is full: a machine that never dimmed stays lit" {
+  run "$SCRIPT"
+  assert_success
+  local full
+  full=$(colour)
+  mkdir -p "$HOME/.local/state/symphony"
+  echo 100 >"$HOME/.local/state/symphony/led-brightness"
+  run "$SCRIPT"
+  assert_success
+  assert_equal "$(colour)" "$full"
+}
+
+@test "the level scales the colour before it is quantised, so rounding happens once" {
+  mkdir -p "$HOME/.local/state/symphony"
+  echo 50 >"$HOME/.local/state/symphony/led-brightness"
+  run "$SCRIPT"
+  assert_success
+  # #3fa7d6 with its floor removed is [0, 147, 214], which at full quantises to
+  # [0, 9, 13]. Halved in 8-bit space it is [0, 73, 107] -> [0, 4, 6]; halving the
+  # quantised value instead would give [0, 4, 6] here but drifts elsewhere, and
+  # rounding twice is how a dim colour loses its hue.
+  run colour
+  assert_output "[0, 4, 6]"
+}
+
+@test "level 0 is off: every channel dark" {
+  mkdir -p "$HOME/.local/state/symphony"
+  echo 0 >"$HOME/.local/state/symphony/led-brightness"
+  run "$SCRIPT"
+  assert_success
+  run colour
+  assert_output "[0, 0, 0]"
+}
+
+@test "a corrupted level is treated as full rather than leaving the keys dark" {
+  mkdir -p "$HOME/.local/state/symphony"
+  echo "banana" >"$HOME/.local/state/symphony/led-brightness"
+  run "$SCRIPT"
+  assert_success
+  run colour
+  refute_output "[0, 0, 0]"
+}
+
 @test "no theme colour yet (first login before a render): silent, exit 0, nothing applied" {
   rm "$HOME/.config/symphony/theme.env"
   run "$SCRIPT"

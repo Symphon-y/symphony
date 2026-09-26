@@ -14,6 +14,7 @@
 set -euo pipefail
 
 readonly THEME_ENV="$HOME/.config/symphony/theme.env"
+readonly LEVEL_FILE="${SYMPHONY_STATE:-$HOME/.local/state/symphony}/led-brightness"
 readonly THEME_DIR="$HOME/.config/alienfx"
 readonly THEME="$THEME_DIR/symphony.json"
 
@@ -62,6 +63,24 @@ if ((high > low)); then
   r=$(((r - low) * high / (high - low)))
   g=$(((g - low) * high / (high - low)))
   b=$(((b - low) * high / (high - low)))
+fi
+
+# The keyboard backlight level (#26). The controller has no brightness of its own --
+# 4 bits per channel is the whole dynamic range -- so dimming is a scale on the colour.
+# Applied here, in 8-bit space, so the quantise below rounds once rather than twice:
+# rounding a second time is how a dim colour loses its hue. Read on every repaint,
+# because a wallpaper change re-renders the palette and would otherwise silently
+# restore full brightness. Anything unreadable means full: dark keys with no obvious
+# cause are worse than ignoring a corrupt file.
+level=100
+if [[ -r $LEVEL_FILE ]]; then
+  level=$(<"$LEVEL_FILE")
+  [[ $level =~ ^[0-9]+$ ]] && ((level <= 100)) || level=100
+fi
+if ((level < 100)); then
+  r=$((r * level / 100))
+  g=$((g * level / 100))
+  b=$((b * level / 100))
 fi
 
 # The controller takes 4 bits per channel (0-15); the palette gives 8. Rounded,

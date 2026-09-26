@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/keyboard-backlight (linked by install/link-home)
+#
+# keyboard-backlight: the keyboard lighting role (#26).
+#
+# There is no kernel LED device for the AlienFX -- /sys/class/leds holds only the lock
+# lights and the card reader -- so there is no brightness attribute to set. The level
+# is a scale that alienfx-theme applies to the palette colour before quantising it to
+# the controller's 4 bits per channel. This script moves the level and asks for a
+# repaint; the painting stays in alienfx-theme, which is the one place that knows how
+# a colour reaches the hardware.
+#
+# Because the range is 16 steps per channel, consecutive presses can look identical
+# and then jump: the level only shows when it crosses a quantisation boundary.
+#
+# Usage: keyboard-backlight up|down|off [STEP]
+set -euo pipefail
+
+ROOT=$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../../../.." && pwd)
+readonly ROOT
+# shellcheck source-path=SCRIPTDIR source=../../../../scripts/lib/osd.bash
+source "$ROOT/scripts/lib/osd.bash"
+
+readonly LEVEL_FILE="${SYMPHONY_STATE:-$HOME/.local/state/symphony}/led-brightness"
+
+usage() {
+  echo "usage: keyboard-backlight up|down|off [STEP]" >&2
+  exit 2
+}
+
+step=${2:-5}
+
+# Anything unreadable means full: keys left dark with no obvious cause are worse than
+# ignoring a corrupt file. alienfx-theme reads the same file the same way.
+level=100
+if [[ -r $LEVEL_FILE ]]; then
+  level=$(<"$LEVEL_FILE")
+  if [[ ! $level =~ ^[0-9]+$ ]] || ((level > 100)); then
+    level=100
+  fi
+fi
+
+case ${1:-} in
+  up) level=$((level + step)) ;;
+  down) level=$((level - step)) ;;
+  off) level=0 ;;
+  *) usage ;;
+esac
+
+if ((level > 100)); then
+  level=100
+elif ((level < 0)); then
+  level=0
+fi
+
+mkdir -p "$(dirname "$LEVEL_FILE")"
+printf '%s' "$level" >"$LEVEL_FILE"
+
+# Repaint now, or the new level would not show until something else re-rendered the
+# palette. Never fatal: lighting must not fail a keypress.
+command -v alienfx-theme >/dev/null && alienfx-theme || true
+
+osd_show "Keyboard light" "$level%" "$level"
