@@ -106,15 +106,17 @@ setup() {
   assert_output --partial "#custom-update.release"
 }
 
-@test "mako invokes the action on a click, or the button does nothing" {
+@test "mako gives the update toast a lifetime long enough to answer" {
+  # Nothing else is needed: invoke-default-action is already mako's left-click
+  # default, and it draws no buttons for actions -- the toast is text you click.
   run cat "$REPO_ROOT/home/matugen/dot-config/matugen/templates/mako.ini"
   assert_success
   assert_output --partial "[app-name=symphony]"
-  assert_output --partial "on-button-left=invoke-default-action"
+  assert_output --partial "default-timeout=30000"
 }
 
-@test "the toast offers an action rather than a command to retype" {
-  run grep -E '\-A update=' "$REPO_ROOT/home/update/dot-local/bin/update-notify"
+@test "the toast's action is named 'default', the only one a click can invoke" {
+  run grep -E '\-A default=' "$REPO_ROOT/home/update/dot-local/bin/update-notify"
   assert_success
 }
 
@@ -151,6 +153,6 @@ setup() {
 }
 
 @test "live-session: mako has the generated app-name rule (matugen rendered it)" {
-  run grep -q "on-button-left=invoke-default-action" "$HOME/.config/mako/config"
+  run grep -q "app-name=symphony" "$HOME/.config/mako/config"
   assert_success
 }

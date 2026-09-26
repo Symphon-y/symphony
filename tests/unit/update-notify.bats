@@ -87,17 +87,21 @@ calls() {
   assert_output --partial "symphony 2026.09.25 available"
 }
 
-@test "the toast offers an action to take the update, not a command to retype" {
+@test "the action is named 'default', the only one a mako click can invoke" {
+  # mako draws no buttons for actions at all. Its left click runs
+  # invoke-default-action, which invokes the action literally named `default`;
+  # any other name is unreachable by clicking. Naming it `update` shipped a toast
+  # that looked right and did nothing.
   state "packages=0" "pkglist=" "release=2026.09.25" "installed=2026.09.24" "checked=1790000000"
   run "$SCRIPT"
   assert_success
   run calls
-  assert_output --regexp "notify-send .*(-A|--action)[= ]?update"
+  assert_output --regexp "notify-send .*(-A|--action)[= ]?default="
 }
 
 @test "choosing it opens a terminal running update-now" {
   state "packages=0" "pkglist=" "release=2026.09.25" "installed=2026.09.24" "checked=1790000000"
-  STUB_ACTION=update run "$SCRIPT"
+  STUB_ACTION=default run "$SCRIPT"
   assert_success
   run calls
   assert_output --partial "update-now"
@@ -106,7 +110,7 @@ calls() {
 @test "the terminal is launched detached, or the oneshot service kills it on exit" {
   # A Type=oneshot unit takes its whole cgroup down when ExecStart returns.
   state "packages=0" "pkglist=" "release=2026.09.25" "installed=2026.09.24" "checked=1790000000"
-  STUB_ACTION=update run "$SCRIPT"
+  STUB_ACTION=default run "$SCRIPT"
   assert_success
   run calls
   assert_output --regexp "systemd-run .*--scope"
@@ -120,12 +124,14 @@ calls() {
   refute_output --partial "update-now"
 }
 
-@test "choosing Later launches nothing" {
+@test "no second action is offered: mako cannot reach one" {
+  # A "Later" action would never be invocable, so it would be a lie on screen.
+  # Dismissing is Later, and mako's right click already dismisses.
   state "packages=0" "pkglist=" "release=2026.09.25" "installed=2026.09.24" "checked=1790000000"
-  STUB_ACTION=later run "$SCRIPT"
+  run "$SCRIPT"
   assert_success
   run calls
-  refute_output --partial "update-now"
+  refute_output --partial "later"
 }
 
 @test "the same release tomorrow: no second toast" {

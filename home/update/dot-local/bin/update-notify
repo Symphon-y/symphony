@@ -51,13 +51,18 @@ fi
 mkdir -p "$STATE_DIR"
 echo "$announcement" >"$MARKER"
 
+# The action must be named `default`: mako draws no buttons for actions at all, and
+# the only one a click can reach is the one invoke-default-action looks for, which is
+# literally the action named `default`. A second action would be unreachable, so
+# "Later" is just dismissing -- which mako's right click already does.
+#
 # --action implies --wait: notify-send blocks until the toast is answered or expires,
 # and prints the chosen action's name.
 action=$(notify-send --app-name=symphony -t "$TOAST_MS" \
-  -A update="Update now" -A later="Later" \
+  -A default="Update now" \
   "$summary" "$body")
 
-[[ $action == update ]] || exit 0
+[[ $action == default ]] || exit 0
 
 # Detached on purpose: this runs from a Type=oneshot unit, which takes its whole cgroup
 # down when ExecStart returns -- the terminal would die with it, mid-update.

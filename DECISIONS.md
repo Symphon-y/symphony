@@ -2494,8 +2494,12 @@ and `wallpaper-set` drives the config file instead.)_
   commands to retype, so it read as nothing at all. Two further things hid it: the
   release half returns early unless the installed `VERSION` is a release tag, and the dev
   seat runs `local-<sha>`, so it had never once executed; and mako's default left click
-  dismisses, so even an action-bearing toast needs an `[app-name=symphony]` rule to be
-  clickable. Bundling `-Syu` behind the same button is defensible because this path is
+  dismisses *by default only in the sense that it has no button UI at all*: mako draws
+  no action buttons, and the one action a click can reach is the one named literally
+  `default`, which `invoke-default-action` (already its left-click default) looks for.
+  Shipping actions named `update` and `later` produced a toast that appeared correctly
+  and did nothing -- found on the dev seat after the merge, fixed by naming the single
+  action `default` and dropping the unreachable second one. Bundling `-Syu` behind the same button is defensible because this path is
   the opposite of unattended: asked for, watched in a terminal, ordered, and snapshotted
   on both halves (`snap-pac` on the pacman transaction, `snapper` inside
   `symphony-update`). The order is the substance -- the release's own `install-packages`
