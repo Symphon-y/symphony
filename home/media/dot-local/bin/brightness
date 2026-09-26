@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/brightness (linked by install/link-home)
+#
+# brightness: the backlight role (Phase 21), called by XF86MonBrightnessUp/Down.
+#
+# Arch's brightnessctl ships only the binary, its licence and its man page -- no udev
+# rule -- and depends on systemd-libs, so it writes through the logind API rather than
+# needing the `video` group that upstream's default build assumes.
+#
+# Usage: brightness up|down [STEP]
+set -euo pipefail
+
+ROOT=$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../../../.." && pwd)
+readonly ROOT
+# shellcheck source-path=SCRIPTDIR source=../../../../scripts/lib/osd.bash
+source "$ROOT/scripts/lib/osd.bash"
+
+# A floor, because `set 5%-` from 3% lands on zero and a black panel offers no visible
+# way back to a usable screen.
+readonly FLOOR=5
+
+usage() {
+  echo "usage: brightness up|down [STEP]" >&2
+  exit 2
+}
+
+command -v brightnessctl >/dev/null || {
+  echo "brightness: brightnessctl not found" >&2
+  exit 1
+}
+
+step=${2:-5}
+
+case ${1:-} in
+  up) brightnessctl -q set "${step}%+" ;;
+  down) brightnessctl -q -n "$FLOOR" set "${step}%-" ;;
+  *) usage ;;
+esac
+
+# -m prints device,class,current,percent,max on one line.
+out=$(brightnessctl -m) || exit 0
+percent=$(cut -d, -f4 <<<"$out" | tr -d '%')
+osd_show "Brightness" "$percent%" "$percent"

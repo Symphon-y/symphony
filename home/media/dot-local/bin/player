@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/player (linked by install/link-home)
+#
+# player: the media-player role (Phase 21), for the XF86Audio transport keys.
+#
+# Usage: player play-pause|next|previous|stop
+set -euo pipefail
+
+ROOT=$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../../../.." && pwd)
+readonly ROOT
+# shellcheck source-path=SCRIPTDIR source=../../../../scripts/lib/osd.bash
+source "$ROOT/scripts/lib/osd.bash"
+
+usage() {
+  echo "usage: player play-pause|next|previous|stop" >&2
+  exit 2
+}
+
+command -v playerctl >/dev/null || {
+  echo "player: playerctl not found" >&2
+  exit 1
+}
+
+case ${1:-} in
+  play-pause | next | previous | stop) ;;
+  *) usage ;;
+esac
+
+# Pressing a transport key with nothing playing is an everyday event, not an error:
+# say so on screen and let the keypress succeed.
+if ! playerctl "$1" 2>/dev/null; then
+  osd_show "Player" "No player running"
+  exit 0
+fi
+
+status=$(playerctl status 2>/dev/null || true)
+track=$(playerctl metadata --format '{{artist}} - {{title}}' 2>/dev/null || true)
+osd_show "${status:-Player}" "$track"
