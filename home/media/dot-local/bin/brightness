@@ -17,6 +17,11 @@ source "$ROOT/scripts/lib/osd.bash"
 
 # A floor, because `set 5%-` from 3% lands on zero and a black panel offers no visible
 # way back to a usable screen.
+#
+# Written as --min-value=N on purpose: the short -n takes an *optional* argument, so
+# `-n 5` leaves the 5 to be read as the operation, brightnessctl falls back to `info`,
+# prints the unchanged state and exits 0. It fails silently and successfully. Verified
+# on the machine -- `-n 5 set 5%-` moved nothing, `--min-value=5 set 5%-` moved 5%.
 readonly FLOOR=5
 
 usage() {
@@ -33,7 +38,7 @@ step=${2:-5}
 
 case ${1:-} in
   up) brightnessctl -q set "${step}%+" ;;
-  down) brightnessctl -q -n "$FLOOR" set "${step}%-" ;;
+  down) brightnessctl -q "--min-value=$FLOOR" set "${step}%-" ;;
   *) usage ;;
 esac
 

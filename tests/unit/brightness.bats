@@ -57,11 +57,17 @@ path_without_tools() {
 @test "down lowers it, with a floor so the screen never goes black" {
   # `set 5%-` at 3% lands on 0 and the panel is unusable with no way to see the way
   # back. A minimum keeps the screen readable.
+  #
+  # The floor must be passed attached (--min-value=N or -nN), never as `-n N`: the
+  # short option's argument is optional, so a separated value is read as the
+  # operation, brightnessctl falls back to `info` and exits 0 having changed nothing.
+  # An earlier version shipped `-n 5` and silently did not work.
   run "$SCRIPT" down
   assert_success
   run calls
   assert_output --regexp "brightnessctl .*set [0-9]+%-"
-  assert_output --partial "-n"
+  assert_output --regexp "(--min-value=[0-9]+|-n[0-9]+)"
+  refute_output --regexp "\-n [0-9]"
 }
 
 @test "the OSD shows the level, read back from brightnessctl -m" {
