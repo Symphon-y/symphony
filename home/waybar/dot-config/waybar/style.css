@@ -28,11 +28,23 @@ window#waybar {
 }
 
 #clock,
+#custom-update,
 #wireplumber,
 #network,
 #battery,
 #tray {
   padding: 0 10px;
+}
+
+/* Updates (Phase 20): the module is absent unless something is pending, so its mere
+ * presence is the signal -- it only needs to say which kind. A release is the bigger
+ * change and takes the accent; packages alone are routine. */
+#custom-update {
+  color: @on_background;
+}
+
+#custom-update.release {
+  color: @primary;
 }
 
 #wireplumber.muted {

@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/update-now (linked by install/link-home)
+#
+# update-now: apply everything that is pending (Phase 20, D-0087). The one place the
+# toast's "Update now" action and the waybar badge's click both land, run in a terminal
+# so sudo can ask for a password once and a long operation is visible while it happens.
+#
+# Order, and it is the substance of this script:
+#   1. sudo pacman -Syu, when packages are pending. First, because the release's own
+#      install-packages runs `yay -S --needed` without -u, and asking for a package
+#      against a stale database is how a partial upgrade happens. snap-pac snapshots
+#      this half by itself, on the pacman transaction.
+#   2. symphony-update apply, when a newer release exists -- its own snapper snapshot,
+#      the minisign check against /etc/symphony/release.pub, the payload swap, migrations.
+#
+# A failed upgrade stops the run: a release must never be applied on top of a system
+# left half-upgraded. Unattended `-Syu` is the Arch anti-pattern and stays rejected;
+# this is the opposite of unattended -- asked for, watched, ordered, and snapshotted on
+# both halves.
+set -uo pipefail
+
+ROOT=$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../../../.." && pwd)
+readonly ROOT
+# shellcheck source-path=SCRIPTDIR source=../../../../scripts/lib/updates.bash
+source "$ROOT/scripts/lib/updates.bash"
+
+die() {
+  printf 'update-now: %s\n' "$*" >&2
+  exit 1
+}
+
+log() {
+  printf '==> %s\n' "$*"
+}
+
+# Whatever update-check last found; ask now if it has never run, so a click straight
+# after login does not answer "up to date" from an empty file.
+[[ -r $(updates_state_file) ]] || update-check
+updates_load
+
+if ! updates_pending; then
+  echo "update-now: up to date ($UPDATE_INSTALLED)"
+  exit 0
+fi
+
+echo "About to update this machine:"
+((UPDATE_PACKAGES > 0)) && echo "  $UPDATE_PACKAGES package(s): $UPDATE_PKGLIST"
+[[ -n $UPDATE_RELEASE ]] && echo "  symphony $UPDATE_INSTALLED -> $UPDATE_RELEASE"
+echo
+
+if ((UPDATE_PACKAGES > 0)); then
+  log "upgrading packages"
+  sudo pacman -Syu || die "pacman -Syu failed; nothing else was applied"
+fi
+
+if [[ -n $UPDATE_RELEASE ]]; then
+  log "applying symphony $UPDATE_RELEASE"
+  symphony-update apply || die "symphony-update apply failed"
+fi
+
+# So the badge clears and the next toast is about something new.
+log "rechecking"
+update-check

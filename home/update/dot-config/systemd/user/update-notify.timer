@@ -4,6 +4,9 @@ Description=Check for pending package updates and symphony releases daily
 
 [Timer]
 OnCalendar=daily
+# Not exactly midnight: a fleet of these hitting the same API at the same second is
+# rude, and the answer is no fresher for it.
+RandomizedDelaySec=30m
 Persistent=true
 
 [Install]

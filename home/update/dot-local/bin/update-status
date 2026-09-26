@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/update-status (linked by install/link-home)
+#
+# update-status: the waybar badge (Phase 20, D-0087). Prints one line of waybar JSON
+# describing what update-check found, and nothing at all when nothing is pending --
+# which is how waybar hides a custom module.
+#
+# Reads the state file only. No network, no pacman, no GitHub: waybar can poll this as
+# often as it likes, and a machine with no route out still draws its bar.
+set -euo pipefail
+
+ROOT=$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../../../.." && pwd)
+readonly ROOT
+# shellcheck source-path=SCRIPTDIR source=../../../../scripts/lib/updates.bash
+source "$ROOT/scripts/lib/updates.bash"
+
+# Package names cannot contain any of these, but a corrupted state file can -- and a
+# waybar module that emits invalid JSON silently disappears instead of saying why. The
+# newline is not paranoia: the tooltip joins its two halves with one.
+json_escape() {
+  local s=${1//\\/\\\\}
+  s=${s//\"/\\\"}
+  printf '%s' "${s//$'\n'/\\n}"
+}
+
+updates_load
+updates_pending || exit 0
+
+text=""
+tooltip=""
+class=packages
+
+if [[ -n $UPDATE_RELEASE ]]; then
+  class=release
+  text="↑ $UPDATE_RELEASE"
+  tooltip="symphony $UPDATE_RELEASE available (installed $UPDATE_INSTALLED)"
+fi
+
+if ((UPDATE_PACKAGES > 0)); then
+  plural=$([[ $UPDATE_PACKAGES -eq 1 ]] && echo package || echo packages)
+  if [[ -n $text ]]; then
+    text+=" +$UPDATE_PACKAGES"
+    tooltip+=$'\n'
+  else
+    text="↑ $UPDATE_PACKAGES"
+  fi
+  tooltip+="$UPDATE_PACKAGES $plural to upgrade: $(updates_pkglist_summary "$UPDATE_PKGLIST" 12)"
+fi
+
+printf '{"text": "%s", "tooltip": "%s", "class": "%s"}\n' \
+  "$(json_escape "$text")" "$(json_escape "$tooltip")" "$class"
