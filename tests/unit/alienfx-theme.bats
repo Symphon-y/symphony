@@ -39,7 +39,7 @@ colour() {
   run "$SCRIPT"
   assert_success
   run calls
-  assert_line "alienfx --theme symphony"
+  assert_line --regexp "^alienfx --theme symphony --dim (on|off)$"
   run python3 -c "
 import json,sys
 t=json.load(open('$HOME/.config/alienfx/symphony.json'))
@@ -103,39 +103,68 @@ print(sorted(k for k in t if k!='speed'))
 }
 
 # --- the keyboard backlight level (#26) ----------------------------------------------
+#
+# Brightness is a hardware state now (alienfx 0x1C, patched in), not a scale on the
+# colour. Scaling could not work: with 16 levels per channel a colour whose smallest lit
+# channel is a small fraction of its largest loses that channel first, so #cabeff's
+# violet flipped to pure blue as it dimmed.
 
-@test "with no level set the colour is full: a machine that never dimmed stays lit" {
-  run "$SCRIPT"
-  assert_success
-  local full
-  full=$(colour)
+@test "full and dim paint the same colour: only the dim state differs" {
   mkdir -p "$HOME/.local/state/symphony"
-  echo 100 >"$HOME/.local/state/symphony/led-brightness"
+  echo full >"$HOME/.local/state/symphony/led-brightness"
   run "$SCRIPT"
   assert_success
-  assert_equal "$(colour)" "$full"
+  local at_full
+  at_full=$(colour)
+  echo dim >"$HOME/.local/state/symphony/led-brightness"
+  run "$SCRIPT"
+  assert_success
+  assert_equal "$(colour)" "$at_full"
 }
 
-@test "the level scales the colour before it is quantised, so rounding happens once" {
+@test "dim asks the hardware to dim" {
   mkdir -p "$HOME/.local/state/symphony"
-  echo 50 >"$HOME/.local/state/symphony/led-brightness"
+  echo dim >"$HOME/.local/state/symphony/led-brightness"
   run "$SCRIPT"
   assert_success
-  # #3fa7d6 with its floor removed is [0, 147, 214], which at full quantises to
-  # [0, 9, 13]. Halved in 8-bit space it is [0, 73, 107] -> [0, 4, 6]; halving the
-  # quantised value instead would give [0, 4, 6] here but drifts elsewhere, and
-  # rounding twice is how a dim colour loses its hue.
-  run colour
-  assert_output "[0, 4, 6]"
+  run calls
+  assert_output --regexp "alienfx .*--dim on"
 }
 
-@test "level 0 is off: every channel dark" {
+@test "full asks the hardware not to dim" {
   mkdir -p "$HOME/.local/state/symphony"
-  echo 0 >"$HOME/.local/state/symphony/led-brightness"
+  echo full >"$HOME/.local/state/symphony/led-brightness"
+  run "$SCRIPT"
+  assert_success
+  run calls
+  assert_output --regexp "alienfx .*--dim off"
+}
+
+@test "off goes dark, since the controller has no third brightness state" {
+  mkdir -p "$HOME/.local/state/symphony"
+  echo off >"$HOME/.local/state/symphony/led-brightness"
   run "$SCRIPT"
   assert_success
   run colour
   assert_output "[0, 0, 0]"
+}
+
+@test "no level set yet is full brightness, not dark" {
+  run "$SCRIPT"
+  assert_success
+  run calls
+  assert_output --regexp "alienfx .*--dim off"
+}
+
+@test "a legacy numeric level still means something sensible" {
+  # The level used to be 0-100. A machine updating across this change must not end up
+  # dark or unreadable because its state file predates the state names.
+  mkdir -p "$HOME/.local/state/symphony"
+  echo 100 >"$HOME/.local/state/symphony/led-brightness"
+  run "$SCRIPT"
+  assert_success
+  run calls
+  assert_output --regexp "alienfx .*--dim off"
 }
 
 @test "a corrupted level is treated as full rather than leaving the keys dark" {
@@ -145,6 +174,20 @@ print(sorted(k for k in t if k!='speed'))
   assert_success
   run colour
   refute_output "[0, 0, 0]"
+}
+
+@test "the colour is never scaled: no arithmetic on the channels" {
+  # The property the old code violated. #3fa7d6 with its floor removed is [0, 147, 214],
+  # which quantises to [0, 9, 13] -- and must, at every brightness.
+  mkdir -p "$HOME/.local/state/symphony"
+  local level
+  for level in full dim; do
+    echo "$level" >"$HOME/.local/state/symphony/led-brightness"
+    run "$SCRIPT"
+    assert_success
+    run colour
+    assert_output "[0, 9, 13]"
+  done
 }
 
 @test "no theme colour yet (first login before a render): silent, exit 0, nothing applied" {
@@ -161,7 +204,11 @@ print(sorted(k for k in t if k!='speed'))
   # seat): give the script a PATH with only what it needs and no alienfx.
   rm "$BATS_TEST_TMPDIR/bin/alienfx"
   local tool
-  for tool in bash sed head mkdir; do ln -s "$(command -v "$tool")" "$BATS_TEST_TMPDIR/bin/$tool"; done
+  # realpath and dirname too: the script resolves its own payload root to find
+  # scripts/lib, so a PATH without them kills it before the alienfx check.
+  for tool in bash sed head mkdir realpath dirname; do
+    ln -s "$(command -v "$tool")" "$BATS_TEST_TMPDIR/bin/$tool"
+  done
   run env PATH="$BATS_TEST_TMPDIR/bin" "$SCRIPT"
   assert_success
   run calls

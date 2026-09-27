@@ -59,6 +59,22 @@ lua_eval() {
   assert_output --partial "TimeoutStartSec="
 }
 
+@test "brightness never scales the colour" {
+  # The bug this pins: dimming used to multiply the RGB channels, and with 16 levels
+  # per channel the smallest lit channel rounds away first -- #cabeff's violet became
+  # pure blue as it dimmed. Brightness is a hardware state (alienfx 0x1C) instead.
+  run grep -nE '\$\(\(.*(r|g|b) \* |\* level|level / 100' \
+    "$REPO_ROOT/home/hardware/dot-local/bin/alienfx-theme"
+  assert_failure
+}
+
+@test "the installed alienfx understands --dim" {
+  # Our patch adds the hardware dim command the library documents but never
+  # implemented. A machine whose package predates it fails here.
+  run bash -c "alienfx --help 2>&1 | grep -q -- '--dim'"
+  assert_success
+}
+
 @test "the installed alienfx cannot spin forever waiting for the controller" {
   # Upstream counts failures only inside `except TypeError`, which `bool(resp) and`
   # made unreachable -- so a contended controller loops without end. Our patch counts

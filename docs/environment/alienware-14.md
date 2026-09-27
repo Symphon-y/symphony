@@ -283,7 +283,9 @@ installed packages: 704
   "every output pin muted" by reading `Amp-Out vals` bit 7 out of
   `/proc/asound/card*/codec#*`. PipeWire manages the hardware mixer; `alsa-utils` and
   `rtkit` ship (D-0083).
-- **AlienFX lighting:** a USB HID controller at `187c:0525`, four bits per colour channel.
+- **AlienFX lighting:** a USB HID controller at `187c:0525`, four bits per colour channel
+  (`controller_m14xr3`; upstream's `Devicelist.md` and its `PACKET_LENGTH = 9` agree, and
+  only the 17R4/15R3 generation gets eight bits).
   Driven by our own `alienfx` package (D-0084) — upstream's AUR build is uninstallable and
   its zone map is for a different model. `alienfx --zonescan` on this machine found seven
   usable zones: keyboard `0x0001`/`0x0002`/`0x0004`/`0x0008` left to right, alien head
@@ -298,6 +300,26 @@ installed packages: 704
 - **Not on this machine:** TPM (Secure Boot deferred), a working `docker` daemon (podman
   with docker emulation, so local ISO builds need `SYMPHONY_CONTAINER_ENGINE="sudo podman"`
   — rootless podman cannot mount the chroot).
+- **AlienFX brightness is a hardware state, not a level.** The protocol has a dim command
+  the Python `alienfx` library documents but never implemented -- its command table stops
+  at `CMD_SET_SPEED = 0xe`:
+
+  ```
+  02:1C:oo:bb     o: 32 Enable / 64 Disable      b: 01 always / 00 battery only
+  ```
+
+  Confirmed on this machine: with the controller reset and settled, `02:1C:32:01` answers
+  `STATUS_READY`, and on a keyboard painted pure white, toggling Enable and Disable
+  visibly dims and restores it. `0x1d` (`03` apply, `81` go-dark) is accepted too. So the
+  brightness range is **off, dim, full** -- and nothing needs to scale the colour, which
+  is what matters: with 16 levels per channel a colour whose smallest lit channel is a
+  small fraction of its largest loses that channel first, so `#cabeff`'s violet turned
+  pure blue as it dimmed.
+- **`STATUS_UNKNOWN_COMMAND` latches until a reset.** Probing a few deliberately bogus
+  commands and then the interesting one reports `UNKNOWN_COMMAND` for everything after the
+  first bogus one -- which produced a confident, wrong "this controller has no dim
+  command". Reset and wait for ready between probes, put the candidate first, and
+  re-check the calibration at the *end* of the run.
 - **A trap worth remembering:** `/dev/bus/usb` is mode 755 from devtmpfs. A `chmod` aimed
   at a device node but landing on the directory takes the execute bits away, and every
   libusb tool then fails with `EACCES` no matter what udev grants on the nodes.

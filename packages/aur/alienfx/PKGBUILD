@@ -5,11 +5,13 @@
 # commit with the dependency corrected and the zone map from a real `alienfx --zonescan`
 # (patch beside this file), until upstream takes both. A second patch bounds
 # _wait_controller_ready, whose failure counter sits in an unreachable branch -- a
-# contended controller otherwise spins forever and flashes the keyboard.
+# contended controller otherwise spins forever and flashes the keyboard. A third adds
+# the hardware dim command (0x1C), which this library documents but never implemented --
+# without it, dimming means scaling the colour, which shifts the hue on a 4-bit controller.
 pkgname=alienfx
 pkgver=2.5.0
 _commit=bc573d99bb4beec84e8e5fd9f8763db952945caf
-pkgrel=3
+pkgrel=4
 pkgdesc="CLI and GUI utility to control the lighting of Alienware computers (symphony build: fixed deps, Alienware 14 zone map)"
 arch=('any')
 url="https://github.com/trackmastersteve/alienfx"
@@ -23,8 +25,10 @@ optdepends=(
 makedepends=('python-setuptools' 'git')
 source=("git+$url.git#commit=$_commit"
         '0001-m14xr3-zone-map-from-zonescan.patch'
-        '0002-bound-controller-ready-wait.patch')
+        '0002-bound-controller-ready-wait.patch'
+        '0003-add-dim-command.patch')
 sha256sums=('SKIP'
+            'SKIP'
             'SKIP'
             'SKIP')
 
@@ -32,6 +36,7 @@ prepare() {
   cd "$srcdir/$pkgname"
   patch -Np1 -i "$srcdir/0001-m14xr3-zone-map-from-zonescan.patch"
   patch -Np1 -i "$srcdir/0002-bound-controller-ready-wait.patch"
+  patch -Np1 -i "$srcdir/0003-add-dim-command.patch"
 }
 
 package() {

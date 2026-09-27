@@ -13,8 +13,13 @@
 # (wallpaper-set, the login unit) must never fail because of lighting.
 set -euo pipefail
 
+ROOT=$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../../../.." && pwd)
+readonly ROOT
+# Only the state helpers from this lib: lighting_repaint is what runs *this* script.
+# shellcheck source-path=SCRIPTDIR source=../../../../scripts/lib/lighting.bash
+source "$ROOT/scripts/lib/lighting.bash"
+
 readonly THEME_ENV="$HOME/.config/symphony/theme.env"
-readonly LEVEL_FILE="${SYMPHONY_STATE:-$HOME/.local/state/symphony}/led-brightness"
 readonly THEME_DIR="$HOME/.config/alienfx"
 readonly THEME="$THEME_DIR/symphony.json"
 
@@ -65,22 +70,15 @@ if ((high > low)); then
   b=$(((b - low) * high / (high - low)))
 fi
 
-# The keyboard backlight level (#26). The controller has no brightness of its own --
-# 4 bits per channel is the whole dynamic range -- so dimming is a scale on the colour.
-# Applied here, in 8-bit space, so the quantise below rounds once rather than twice:
-# rounding a second time is how a dim colour loses its hue. Read on every repaint,
-# because a wallpaper change re-renders the palette and would otherwise silently
-# restore full brightness. Anything unreadable means full: dark keys with no obvious
-# cause are worse than ignoring a corrupt file.
-level=100
-if [[ -r $LEVEL_FILE ]]; then
-  level=$(<"$LEVEL_FILE")
-  [[ $level =~ ^[0-9]+$ ]] && ((level <= 100)) || level=100
-fi
-if ((level < 100)); then
-  r=$((r * level / 100))
-  g=$((g * level / 100))
-  b=$((b * level / 100))
+# The keyboard backlight level (#26) is a hardware state, never a scale on the colour.
+# Scaling is the only way to fake a percentage here, and with 16 levels per channel it
+# loses the smallest lit channel first: #cabeff's violet turned pure blue as it dimmed.
+# So the colour below is whatever the palette says, at every brightness, and `dim` is a
+# separate command (alienfx 0x1C, added by our patch). `off` is a dark colour, the
+# controller having no third state.
+state=$(lighting_state)
+if [[ $state == off ]]; then
+  r=0 g=0 b=0
 fi
 
 # The controller takes 4 bits per channel (0-15); the palette gives 8. Rounded,
@@ -110,6 +108,9 @@ mkdir -p "$THEME_DIR"
 # through lighting_repaint -- see scripts/lib/lighting.bash. The ready-wait inside
 # alienfx is bounded by our own patch (packages/aur/alienfx), so a run that cannot claim
 # the controller fails instead of spinning.
-alienfx --theme symphony ||
+dim=off
+[[ $state == dim ]] && dim=on
+
+alienfx --theme symphony --dim "$dim" ||
   echo "alienfx-theme: alienfx failed (no device, no access, or busy?)" >&2
 exit 0

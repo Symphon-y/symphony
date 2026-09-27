@@ -16,7 +16,8 @@ setup() {
   load '../helpers/common'
   export HOME="$BATS_TEST_TMPDIR/home"
   export STUB_LOG="$BATS_TEST_TMPDIR/calls.log"
-  mkdir -p "$HOME" "$BATS_TEST_TMPDIR/bin"
+  export SYMPHONY_STATE="$HOME/.local/state/symphony"
+  mkdir -p "$HOME" "$SYMPHONY_STATE" "$BATS_TEST_TMPDIR/bin"
   : >"$STUB_LOG"
   cat >"$BATS_TEST_TMPDIR/bin/systemctl" <<'EOF'
 #!/usr/bin/env bash
@@ -35,6 +36,47 @@ EOF
 calls() {
   cat "$STUB_LOG"
 }
+
+# --- the brightness state ------------------------------------------------------------
+
+@test "a machine that never set a brightness reads as full, not dark" {
+  run lighting_state
+  assert_output "full"
+}
+
+@test "a state round-trips" {
+  lighting_set_state dim
+  run lighting_state
+  assert_output "dim"
+}
+
+@test "the states are ordered dark to bright, so up and down are just moves" {
+  # Same shell: the lib was sourced in setup, and an array does not cross `bash -c`.
+  run printf '%s\n' "${LIGHTING_STATES[@]}"
+  assert_output "off
+dim
+full"
+}
+
+@test "a legacy percentage is read as the nearest state" {
+  # The level was 0-100 before the hardware dim was found; 0 is the only one that
+  # meant off.
+  local -A cases=([0]=off [1]=dim [50]=dim [51]=full [100]=full)
+  local value
+  for value in "${!cases[@]}"; do
+    printf '%s' "$value" >"$(lighting_state_file)"
+    run lighting_state
+    assert_output "${cases[$value]}"
+  done
+}
+
+@test "a corrupted state reads as full: dark keys with no cause are worse" {
+  printf 'banana' >"$(lighting_state_file)"
+  run lighting_state
+  assert_output "full"
+}
+
+# --- asking for a repaint -------------------------------------------------------------
 
 @test "it asks systemd to restart the unit that owns the painter" {
   run lighting_repaint
