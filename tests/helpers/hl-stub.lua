@@ -24,6 +24,26 @@ local function record(line)
   log[#log + 1] = line
 end
 
+-- Arguments as a stable, readable string: sorted, so a test can assert on it.
+local function render(args)
+  if args == nil then
+    return ""
+  end
+  if type(args) ~= "table" then
+    return " " .. tostring(args)
+  end
+  local keys = {}
+  for key in pairs(args) do
+    keys[#keys + 1] = tostring(key)
+  end
+  table.sort(keys)
+  local pairs_out = {}
+  for _, key in ipairs(keys) do
+    pairs_out[#pairs_out + 1] = ("%s=%s"):format(key, tostring(args[key]))
+  end
+  return " {" .. table.concat(pairs_out, ",") .. "}"
+end
+
 -- What a dispatcher table says it will do, for the log.
 local function describe(dispatcher)
   if type(dispatcher) == "function" then
@@ -35,18 +55,62 @@ local function describe(dispatcher)
   if type(dispatcher) == "table" and dispatcher.kind == "submap" then
     return "submap " .. tostring(dispatcher.name)
   end
+  if type(dispatcher) == "table" and dispatcher.kind == "dispatch" then
+    return ("dispatch %s%s (argc %d)"):format(dispatcher.dsp, render(dispatcher.args), dispatcher.argc)
+  end
   return "dispatch " .. type(dispatcher)
 end
 
+-- Every other dispatcher, by the name the registry gave it. hl.dsp is a tree of
+-- namespaces ending in factories; the ones this repo names are listed here, and anything
+-- else resolves to nil exactly as it would against the real API, so a typo in the
+-- registry fails a test rather than only the session.
+--
+-- `argc` is recorded because "called with no argument" and "called with nil" are not the
+-- same thing to the real API: hl.dsp.focus(nil) raises "expected a table".
+local DISPATCHERS = {
+  ["exit"] = true,
+  ["focus"] = true,
+  ["no_op"] = true,
+  ["window.close"] = true,
+  ["window.kill"] = true,
+  ["window.move"] = true,
+}
+local NAMESPACES = { cursor = true, group = true, window = true, workspace = true }
+
+local function dsp_node(path)
+  return setmetatable({}, {
+    __index = function(_, key)
+      local child = path .. "." .. key
+      if DISPATCHERS[child] or NAMESPACES[child] then
+        return dsp_node(child)
+      end
+      return nil
+    end,
+    __call = function(_, ...)
+      return { kind = "dispatch", dsp = path, args = ..., argc = select("#", ...) }
+    end,
+  })
+end
+
 hl = {
-  dsp = {
+  -- The two the keymap treats specially are explicit; everything else resolves through
+  -- the node proxy above, so a registry entry can name any dispatcher Hyprland has.
+  dsp = setmetatable({
     exec_cmd = function(cmd)
       return { kind = "exec_cmd", cmd = cmd }
     end,
     submap = function(name)
       return { kind = "submap", name = name }
     end,
-  },
+  }, {
+    __index = function(_, key)
+      if DISPATCHERS[key] or NAMESPACES[key] then
+        return dsp_node(key)
+      end
+      return nil
+    end,
+  }),
 
   bind = function(keys, dispatcher, opts)
     binds[#binds + 1] = {

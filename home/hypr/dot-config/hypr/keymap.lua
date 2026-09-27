@@ -114,6 +114,31 @@ local function resolve(action, chord)
   if type(spec) == "table" and spec.kind == "exec" and spec.cmd then
     return { run = hl.dsp.exec_cmd(spec.cmd), desc = spec.desc, repeating = spec.repeating }
   end
+  if type(spec) == "table" and spec.kind == "dispatch" and spec.dsp then
+    -- The registry names a dispatcher as a dotted path, so adding one is a line in
+    -- actions.lua rather than another branch here.
+    local factory = hl.dsp
+    for part in spec.dsp:gmatch("[^.]+") do
+      factory = type(factory) == "table" and factory[part] or nil
+    end
+    if factory == nil then
+      return nil, ("%s wants the dispatcher %q, which this Hyprland does not have"):format(chord, spec.dsp)
+    end
+    -- With no args, called with no argument at all: hl.dsp.focus(nil) raises "expected a
+    -- table" while hl.dsp.no_op(nil) is fine, so the two are not interchangeable. And
+    -- pcall, because a registry entry with the wrong shape for its dispatcher must cost
+    -- its own key and not the session.
+    local ok, dispatcher = pcall(function()
+      if spec.args == nil then
+        return factory()
+      end
+      return factory(spec.args)
+    end)
+    if not ok then
+      return nil, ("%s cannot use %s: %s"):format(chord, spec.dsp, tostring(dispatcher))
+    end
+    return { run = dispatcher, desc = spec.desc, repeating = spec.repeating }
+  end
   if type(spec) == "table" and spec.kind == "leave" then
     -- Leaving is what `exits` does below; this action exists so the cheatsheet lists
     -- Escape like any other key.

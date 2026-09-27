@@ -15,7 +15,8 @@
 -- A mistake in here cannot cost you a session: the file is loaded on its own, and if
 -- it fails symphony keeps the shipped keymap and tells you what went wrong.
 --
--- Example -- swap the volume keys and stop the mute key muting:
+-- Example -- swap the volume keys, stop the mute key muting, take the terminal
+-- somewhere else, and add a chord this machine has that the defaults cannot assume:
 --
 --   return {
 --     always = {
@@ -23,6 +24,11 @@
 --       ["XF86AudioLowerVolume"] = "volume.up",
 --       ["XF86AudioMute"] = false,
 --       ["XF86MonBrightnessUp"] = true,   -- as shipped; the same as leaving it out
+--       ["SUPER + Prior"] = "keyboard.brighter",
+--     },
+--     global = {
+--       ["SUPER + Return"] = false,
+--       ["SUPER + T"] = "app.terminal",
 --     },
 --   }
 

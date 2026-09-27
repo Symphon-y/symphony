@@ -167,7 +167,12 @@ bar_json() {
 }
 
 @test "menu: SUPER+CTRL+N opens network-menu" {
-  run grep -E 'CTRL \+ N".*exec_cmd\("network-menu"\)' "$REPO_ROOT/home/hypr/dot-config/hypr/bindings.lua"
+  # Two halves since #23: the keymap names an action for the chord, and the action
+  # registry is the one place that knows which command that is.
+  local keymap="$REPO_ROOT/home/hypr/dot-config/hypr/keymap"
+  run grep -E '\["SUPER \+ CTRL \+ N"\][[:space:]]*=[[:space:]]*"menu\.network"' "$keymap/defaults.lua"
+  assert_success
+  run grep -E '\["menu\.network"\].*cmd = "network-menu"' "$keymap/actions.lua"
   assert_success
 }
 

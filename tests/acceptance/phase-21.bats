@@ -182,6 +182,95 @@ print('dim' in inspect.signature(AlienFXController.set_theme).parameters)"
   assert_failure
 }
 
+# --- every chord is the user's now (#23) ----------------------------------------------
+
+@test "every chord that used to be hardcoded is a keymap entry" {
+  # These were raw hl.bind calls in bindings.lua, which is a read-only symlink into the
+  # payload -- so none of them could be changed by the person using them. Spelling is
+  # asserted exactly as it must reach hl.bind: for a letter, Q and q are distinct
+  # keysyms, and the shipped spelling is the one known to work.
+  local pair expected=(
+    "SUPER + Return|app.terminal"
+    "SUPER + Q|window.close"
+    "SUPER + L|session.lock"
+    "SUPER + SHIFT + Q|session.exit"
+    "SUPER + SPACE|app.launcher"
+    "SUPER + ESCAPE|session.power-menu"
+    "SUPER + CTRL + V|menu.clipboard"
+    "SUPER + CTRL + N|menu.network"
+    "SUPER + CTRL + W|wallpaper.random"
+    "PRINT|capture.screenshot"
+    "SUPER + PRINT|capture.colour"
+    "ALT + PRINT|capture.record"
+    "SUPER + CTRL + PRINT|capture.qr"
+    "SUPER + left|focus.left"
+    "SUPER + right|focus.right"
+    "SUPER + up|focus.up"
+    "SUPER + down|focus.down"
+    "SUPER + 1|workspace.1"
+    "SUPER + 9|workspace.9"
+    "SUPER + 0|workspace.10"
+    "SUPER + SHIFT + 1|workspace.move.1"
+    "SUPER + SHIFT + 0|workspace.move.10"
+  )
+  run lua_eval "
+    local merge = require('keymap.merge')
+    local defaults = require('keymap.defaults')
+    for _, entry in ipairs(merge.entries(merge.merge(defaults, {}))) do
+      print(entry.chord .. '|' .. tostring(entry.action))
+    end"
+  assert_success
+  for pair in "${expected[@]}"; do
+    assert_line "$pair"
+  done
+}
+
+@test "all twenty workspace chords are there, switching and moving" {
+  run lua_eval "
+    local merge = require('keymap.merge')
+    local defaults = require('keymap.defaults')
+    local seen = 0
+    for _, entry in ipairs(merge.entries(merge.merge(defaults, {}))) do
+      if tostring(entry.action):match('^workspace%.') then
+        seen = seen + 1
+      end
+    end
+    print(seen)"
+  assert_output "20"
+}
+
+@test "nothing hardcodes a binding any more: bindings.lua is gone" {
+  assert [ ! -e "$REPO_ROOT/home/hypr/dot-config/hypr/bindings.lua" ]
+  run grep -rn 'require("bindings")' "$REPO_ROOT/home/hypr"
+  assert_failure
+}
+
+@test "an installed machine has its stale bindings.lua link removed" {
+  # stow --restow unlinks what is *in* the package, so a file deleted from the payload
+  # leaves its symlink behind pointing at nothing. Only a migration can clear that.
+  run bash -c "grep -rl 'hypr/bindings.lua' '$REPO_ROOT/migrations/'"
+  assert_success
+}
+
+@test "live-session: no binding is nameless" {
+  # The whole point of #23. Every Lua bind reports dispatcher \"__lua\", so a bind with
+  # no description cannot be identified at all -- not by a test, not by the cheatsheet,
+  # not by a person. Before the migration this listed all 37 hardcoded chords.
+  run bash -c "hyprctl binds -j | jq -r '.[]|select(.description==\"\")|\"\(.modmask) \(.key)\"'"
+  assert_success
+  assert_output ""
+}
+
+@test "live-session: the migrated chords are bound where they always were" {
+  local spec
+  for spec in "64 Return" "64 Q" "64 L" "65 Q" "64 SPACE" "64 ESCAPE" "68 V" "68 N" \
+    "68 W" "0 PRINT" "64 PRINT" "8 PRINT" "68 PRINT" "64 left" "64 1" "64 0" "65 0"; do
+    run bash -c "hyprctl binds -j | jq -e --argjson m ${spec% *} --arg k '${spec#* }' \
+      '.[]|select(.modmask==\$m and .key==\$k)'"
+    assert_success
+  done
+}
+
 # --- transient prefix groups (#22) ----------------------------------------------------
 
 @test "every group the defaults ship plans without complaint" {
