@@ -249,6 +249,33 @@ installed packages: 704
   at `/efi` with UKIs for `linux`, `linux-lts` and their fallbacks.
 - **Memory:** 8 GB, plus a 3.8 GB zram swap.
 - **Input:** Synaptics PS/2 touchpad; Dell WMI hotkeys; four "Quickstart" buttons.
+- **Keyboard keysyms (Phase 21, probed with `xkbcli interactive-wayland`).** F6/F7 emit
+  plain `F6`/`F7` -- they are not media keys. The Fn layer is resolved **in firmware**
+  and arrives as real media keycodes from the *AT Translated Set 2 keyboard* itself, not
+  from a WMI shim (`KEY_MUTE`, `KEY_VOLUMEDOWN`, `KEY_VOLUMEUP` are in that device's
+  `B: KEY=` bitmask; `Video Bus` and `Dell WMI hotkeys` carry the brightness ones). What
+  reaches the compositor:
+  - volume: `XF86AudioMute`, `XF86AudioLowerVolume`, `XF86AudioRaiseVolume`
+  - brightness: `XF86MonBrightnessDown` (Fn+PageDown), `XF86MonBrightnessUp` (Fn+PageUp)
+  - also present and unbound: `XF86TouchpadToggle`, `XF86Launch9`
+  So the keys did nothing before Phase 21 only because nothing was bound -- no quirk,
+  no udev rule, no `hda:` map entry.
+- **A modified Fn-layer keysym never arrives.** `SUPER + Fn + PageUp` fires *nothing*:
+  not the chord bound to it, and not the unmodified brightness bind either. The firmware
+  stops emitting `XF86MonBrightness*` once SUPER is held. Measured with both binds live
+  and confirmed by neither level moving. Consequence: a default binding must not put a
+  modifier on an `XF86*` key -- the keyboard lighting uses `SUPER + PageUp/PageDown`
+  (keysyms `Prior`/`Next`, the same physical keys without Fn) instead, and an acceptance
+  test pins that.
+- **`brightnessctl` works for a `wheel` user with no `video` group.** Arch's package
+  ships only the binary, licence and man page -- no udev rule -- and the binary carries
+  `org.freedesktop.login1.Session.SetBrightness`, so it writes through logind. Confirmed
+  by `brightnessctl set 50%` taking effect while
+  `/sys/class/backlight/intel_backlight/brightness` stays `root:root 0644` and
+  unwritable. Upstream's default build installs a rule and *does* need the group.
+- **`brightnessctl`'s `-n` takes an optional argument**, so `-n 5` is read as `-n` plus
+  an operation `5`, and the tool falls back to `info`: it prints the unchanged state and
+  **exits 0**. Use `--min-value=N`. It fails silently and successfully otherwise.
 - **Audio:** three HDA controllers (Intel HDMI, Intel PCH, NVIDIA HDMI). The PCH card
   (`card1`) is the one with the speakers and jack; its codec is a **Realtek ALC3661**.
   Nothing played until a *global* ALSA soft-mixer rule was dropped: it muted every output

@@ -24,11 +24,16 @@ return {
     ["XF86MonBrightnessUp"] = "screen.brighter",
     ["XF86MonBrightnessDown"] = "screen.dimmer",
 
-    -- Provisional on this chassis's keys (#26): the shipped default should be a
-    -- hardware-independent chord, since not every keyboard emits XF86MonBrightness
-    -- at all. Moves when the prefix groups land.
-    ["SUPER + XF86MonBrightnessUp"] = "keyboard.brighter",
-    ["SUPER + XF86MonBrightnessDown"] = "keyboard.dimmer",
+    -- The keyboard lighting (#26), on PageUp/PageDown -- the same two physical keys
+    -- as the screen brightness above, without the Fn layer.
+    --
+    -- It was SUPER + XF86MonBrightnessUp/Down, which never fired: measured on the
+    -- Alienware, the firmware's Fn layer does not emit those keysyms while SUPER is
+    -- held, so nothing arrived at all -- not the keyboard light, not the screen.
+    -- Prior/Next are the keysyms PageUp/PageDown send unmodified, they exist on every
+    -- keyboard, and no Fn layer is involved.
+    ["SUPER + Prior"] = "keyboard.brighter",
+    ["SUPER + Next"] = "keyboard.dimmer",
 
     -- Not on this chassis, but standard elsewhere and harmless where they never fire.
     ["XF86AudioPlay"] = "player.play-pause",

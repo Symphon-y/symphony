@@ -99,6 +99,27 @@ lua_eval() {
   done
 }
 
+@test "the keyboard-light default does not sit on an Fn-layer keysym" {
+  # Measured on the Alienware: XF86MonBrightnessUp/Down are emitted by the firmware's
+  # Fn layer and do NOT arrive when SUPER is also held -- SUPER+Fn+PgUp fired nothing
+  # at all, neither the keyboard light nor the screen. So a modified XF86* chord is
+  # not a binding a default can rely on.
+  run lua_eval "
+    local defaults = require('keymap.defaults')
+    local bad = {}
+    for scope, keys in pairs(defaults) do
+      for chord, action in pairs(keys) do
+        if type(action) == 'string' and action:match('^keyboard%.')
+          and chord:match('XF86') and chord:match('%+') then
+          bad[#bad + 1] = chord
+        end
+      end
+    end
+    print(table.concat(bad, ', '))"
+  assert_success
+  assert_output ""
+}
+
 # --- the config surface (#21) ---------------------------------------------------------
 
 @test "a keymap is seeded for the user to edit, from install/seed" {
@@ -139,6 +160,14 @@ lua_eval() {
   # Toggling mute on key-repeat is nobody's intent.
   run bash -c "hyprctl binds -j | jq -e '.[]|select(.key==\"XF86AudioMute\" and .repeat)'"
   assert_failure
+}
+
+@test "live-session: the keyboard light is on a chord that actually fires" {
+  local key
+  for key in Prior Next; do
+    run bash -c "hyprctl binds -j | jq -e --arg k '$key' '.[]|select(.key==\$k and .modmask==64)'"
+    assert_success
+  done
 }
 
 @test "live-session: every bind the keymap generated carries its description" {
