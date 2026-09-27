@@ -1,0 +1,29 @@
+-- ~/.config/symphony/keymap.lua -- your keybindings. This file is yours: symphony
+-- seeds it once and never touches it again.
+--
+-- What you write here is laid over the shipped keymap, one key at a time:
+--
+--   * name an action to rebind a key
+--   * `false` unbinds a key entirely
+--   * `true` keeps the shipped binding -- useful for saying so out loud
+--   * a key that is not in the defaults is simply added
+--
+-- The full list of shipped keys and the actions they can be given is in
+--   ~/.config/hypr/keymap/defaults.lua   (read-only; `symphony-keys defaults` opens it)
+--   ~/.config/hypr/keymap/actions.lua    (every action, and what it does)
+--
+-- A mistake in here cannot cost you a session: the file is loaded on its own, and if
+-- it fails symphony keeps the shipped keymap and tells you what went wrong.
+--
+-- Example -- swap the volume keys and stop the mute key muting:
+--
+--   return {
+--     always = {
+--       ["XF86AudioRaiseVolume"] = "volume.down",
+--       ["XF86AudioLowerVolume"] = "volume.up",
+--       ["XF86AudioMute"] = false,
+--       ["XF86MonBrightnessUp"] = true,   -- as shipped; the same as leaving it out
+--     },
+--   }
+
+return {}

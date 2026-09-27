@@ -13,6 +13,7 @@ setup() {
   mkdir -p "$REPO_COPY/install" "$REPO_COPY/scripts" "$REPO_COPY/home/shell" "$REPO_COPY/home/app/dot-config/app"
   cp "$REPO_ROOT/install/link-home" "$REPO_COPY/install/"
   cp -R "$REPO_ROOT/scripts/lib" "$REPO_COPY/scripts/"
+  cp -R "$REPO_ROOT/install/seed" "$REPO_COPY/install/"
   echo "# fixture" >"$REPO_COPY/home/shell/dot-profile"
   echo "# fixture" >"$REPO_COPY/home/app/dot-config/app/config.toml"
   SCRIPT="$REPO_COPY/install/link-home"
@@ -94,6 +95,65 @@ seed_default() {
   run "$SCRIPT" apply
   assert_success
   assert [ ! -e "$HOME/.local/share/backgrounds" ]
+}
+
+# --- seeding ~/.config/symphony (Task C, #21) ---------------------------------------
+
+@test "apply seeds the keymap, so there is something to edit" {
+  seed_default
+  run "$SCRIPT" apply
+  assert_success
+  assert [ -f "$HOME/.config/symphony/keymap.lua" ]
+}
+
+@test "only files something actually reads are seeded" {
+  # #16 planned init.lua and options.lua alongside keymap.lua. Nothing loads them
+  # yet, and a seeded file that does nothing when edited is worse than no file: it
+  # invites a change and silently ignores it. They arrive when a loader does.
+  seed_default
+  run "$SCRIPT" apply
+  assert_success
+  assert [ ! -e "$HOME/.config/symphony/options.lua" ]
+  assert [ ! -e "$HOME/.config/symphony/init.lua" ]
+}
+
+@test "the seeded keymap points at the reference rather than being empty" {
+  seed_default
+  run "$SCRIPT" apply
+  assert_success
+  run cat "$HOME/.config/symphony/keymap.lua"
+  assert_output --partial "keymap/defaults.lua"
+}
+
+@test "a config file the user has written is never overwritten" {
+  seed_default
+  mkdir -p "$HOME/.config/symphony"
+  echo "-- mine" >"$HOME/.config/symphony/keymap.lua"
+  run "$SCRIPT" apply
+  assert_success
+  run cat "$HOME/.config/symphony/keymap.lua"
+  assert_output "-- mine"
+}
+
+@test "~/.config/symphony is a real directory, never a symlink" {
+  # Three owners share it: matugen writes theme.env, stow links things nearby, and
+  # these seeded files are the user's. A folded symlink would put the user's keymap
+  # inside the root-owned payload.
+  seed_default
+  run "$SCRIPT" apply
+  assert_success
+  assert [ -d "$HOME/.config/symphony" ]
+  assert [ ! -L "$HOME/.config/symphony" ]
+}
+
+@test "matugen's theme.env survives seeding" {
+  seed_default
+  mkdir -p "$HOME/.config/symphony"
+  echo "PRIMARY=#abcdef" >"$HOME/.config/symphony/theme.env"
+  run "$SCRIPT" apply
+  assert_success
+  run cat "$HOME/.config/symphony/theme.env"
+  assert_output "PRIMARY=#abcdef"
 }
 
 @test "fails with usage when no command is given" {

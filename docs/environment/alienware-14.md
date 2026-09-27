@@ -249,6 +249,33 @@ installed packages: 704
   at `/efi` with UKIs for `linux`, `linux-lts` and their fallbacks.
 - **Memory:** 8 GB, plus a 3.8 GB zram swap.
 - **Input:** Synaptics PS/2 touchpad; Dell WMI hotkeys; four "Quickstart" buttons.
+- **Keyboard keysyms (Phase 21, probed with `xkbcli interactive-wayland`).** F6/F7 emit
+  plain `F6`/`F7` -- they are not media keys. The Fn layer is resolved **in firmware**
+  and arrives as real media keycodes from the *AT Translated Set 2 keyboard* itself, not
+  from a WMI shim (`KEY_MUTE`, `KEY_VOLUMEDOWN`, `KEY_VOLUMEUP` are in that device's
+  `B: KEY=` bitmask; `Video Bus` and `Dell WMI hotkeys` carry the brightness ones). What
+  reaches the compositor:
+  - volume: `XF86AudioMute`, `XF86AudioLowerVolume`, `XF86AudioRaiseVolume`
+  - brightness: `XF86MonBrightnessDown` (Fn+PageDown), `XF86MonBrightnessUp` (Fn+PageUp)
+  - also present and unbound: `XF86TouchpadToggle`, `XF86Launch9`
+  So the keys did nothing before Phase 21 only because nothing was bound -- no quirk,
+  no udev rule, no `hda:` map entry.
+- **A modified Fn-layer keysym never arrives.** `SUPER + Fn + PageUp` fires *nothing*:
+  not the chord bound to it, and not the unmodified brightness bind either. The firmware
+  stops emitting `XF86MonBrightness*` once SUPER is held. Measured with both binds live
+  and confirmed by neither level moving. Consequence: a default binding must not put a
+  modifier on an `XF86*` key -- the keyboard lighting uses `SUPER + PageUp/PageDown`
+  (keysyms `Prior`/`Next`, the same physical keys without Fn) instead, and an acceptance
+  test pins that.
+- **`brightnessctl` works for a `wheel` user with no `video` group.** Arch's package
+  ships only the binary, licence and man page -- no udev rule -- and the binary carries
+  `org.freedesktop.login1.Session.SetBrightness`, so it writes through logind. Confirmed
+  by `brightnessctl set 50%` taking effect while
+  `/sys/class/backlight/intel_backlight/brightness` stays `root:root 0644` and
+  unwritable. Upstream's default build installs a rule and *does* need the group.
+- **`brightnessctl`'s `-n` takes an optional argument**, so `-n 5` is read as `-n` plus
+  an operation `5`, and the tool falls back to `info`: it prints the unchanged state and
+  **exits 0**. Use `--min-value=N`. It fails silently and successfully otherwise.
 - **Audio:** three HDA controllers (Intel HDMI, Intel PCH, NVIDIA HDMI). The PCH card
   (`card1`) is the one with the speakers and jack; its codec is a **Realtek ALC3661**.
   Nothing played until a *global* ALSA soft-mixer rule was dropped: it muted every output
@@ -256,7 +283,9 @@ installed packages: 704
   "every output pin muted" by reading `Amp-Out vals` bit 7 out of
   `/proc/asound/card*/codec#*`. PipeWire manages the hardware mixer; `alsa-utils` and
   `rtkit` ship (D-0083).
-- **AlienFX lighting:** a USB HID controller at `187c:0525`, four bits per colour channel.
+- **AlienFX lighting:** a USB HID controller at `187c:0525`, four bits per colour channel
+  (`controller_m14xr3`; upstream's `Devicelist.md` and its `PACKET_LENGTH = 9` agree, and
+  only the 17R4/15R3 generation gets eight bits).
   Driven by our own `alienfx` package (D-0084) — upstream's AUR build is uninstallable and
   its zone map is for a different model. `alienfx --zonescan` on this machine found seven
   usable zones: keyboard `0x0001`/`0x0002`/`0x0004`/`0x0008` left to right, alien head
@@ -271,6 +300,37 @@ installed packages: 704
 - **Not on this machine:** TPM (Secure Boot deferred), a working `docker` daemon (podman
   with docker emulation, so local ISO builds need `SYMPHONY_CONTAINER_ENGINE="sudo podman"`
   — rootless podman cannot mount the chroot).
+- **AlienFX brightness is a hardware state, not a level.** The protocol has a dim command
+  the Python `alienfx` library documents but never implemented -- its command table stops
+  at `CMD_SET_SPEED = 0xe`:
+
+  ```
+  02:1C:oo:bb     o: 32 Enable / 64 Disable      b: 01 always / 00 battery only
+  ```
+
+  Confirmed on this machine: with the controller reset and settled, `02:1C:32:01` answers
+  `STATUS_READY`, and on a keyboard painted pure white, toggling Enable and Disable
+  visibly dims and restores it. `0x1d` (`03` apply, `81` go-dark) is accepted too. So the
+  brightness range is **off, dim, full** -- and nothing needs to scale the colour, which
+  is what matters: with 16 levels per channel a colour whose smallest lit channel is a
+  small fraction of its largest loses that channel first, so `#cabeff`'s violet turned
+  pure blue as it dimmed.
+- **The dim only lands inside a programming transaction.** This controller answers
+  `STATUS_READY` only just after a reset, so a dim sent on its own -- acquire, wait, send --
+  spends `_wait_controller_ready`'s fifty tries and returns having sent nothing
+  (`ERROR:root:Controller status could not be retrieved`). It belongs after `_ping` +
+  `_reset("all-lights-on")` + `_wait_controller_ready`, in the same transaction as the theme.
+- **The dim is multiplicative in the 4 bits**, so how far the colour is stretched decides
+  whether the hue survives it. Measured at the keyboard with `#cabeff`: `(3, 0, 15)` (the
+  full saturation stretch) dims to pure blue; `(12, 11, 15)` (unstretched) dims with its hue
+  intact; `(7, 5, 15)` -- the most stretch that leaves four of fifteen in the dimmest lit
+  channel -- keeps the hue *and* most of the saturation. Four is where a halving stops
+  having two levels to land on.
+- **`STATUS_UNKNOWN_COMMAND` latches until a reset.** Probing a few deliberately bogus
+  commands and then the interesting one reports `UNKNOWN_COMMAND` for everything after the
+  first bogus one -- which produced a confident, wrong "this controller has no dim
+  command". Reset and wait for ready between probes, put the candidate first, and
+  re-check the calibration at the *end* of the run.
 - **A trap worth remembering:** `/dev/bus/usb` is mode 755 from devtmpfs. A `chmod` aimed
   at a device node but landing on the directory takes the execute bits away, and every
   libusb tool then fails with `EACCES` no matter what udev grants on the nodes.

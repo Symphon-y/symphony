@@ -72,3 +72,5 @@ make                           # runs yay's and xdg-terminal-exec's Makefiles
 scdoc                          # renders xdg-terminal-exec's man page (a makepkg makedepend of that AUR package)
 debugedit                      # makepkg needs it to build debug packages (Arch's current default)
 gcc                            # C compiler; yay's build uses cgo (Go's C interop) despite being a Go program
+playerctl                      # MPRIS transport control; the `player` role script wraps it (Phase 21)
+brightnessctl                  # backlight control through logind -- no udev rule, no `video` group (Phase 21)

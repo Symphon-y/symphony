@@ -1,0 +1,43 @@
+-- Target: ~/.config/hypr/keymap/actions.lua (linked by install/link-home)
+--
+-- Every verb the keymap can bind, once. A keymap entry names one of these, so the
+-- same verb reached from a hardware key, a chord or (later) a prefix group is the
+-- same thing -- and the cheatsheet is a view of this table rather than a second list
+-- to keep in sync.
+--
+-- `kind` is a declarative spec, not a live hl.dsp.* object. That is the one choice
+-- that lets this file be read by /usr/bin/lua in a unit test with no compositor.
+--
+--   desc       what the cheatsheet shows; every generated bind carries one, because
+--              `hyprctl binds -j` reports dispatcher "__lua" for every Lua bind and
+--              `description` is the only field a test can asserted against
+--   kind/cmd   "exec" plus a command line
+--   repeating  holding the key repeats the action (volume, yes; mute, no)
+--   exits      leaves a prefix group after acting (Phase 21 Task D)
+--
+-- Pure: no `hl`.
+
+return {
+  ["volume.up"] = { desc = "Volume up", kind = "exec", cmd = "volume up", repeating = true },
+  ["volume.down"] = { desc = "Volume down", kind = "exec", cmd = "volume down", repeating = true },
+  ["volume.mute"] = { desc = "Mute", kind = "exec", cmd = "volume mute", exits = true },
+
+  ["screen.brighter"] = { desc = "Brightness up", kind = "exec", cmd = "brightness up", repeating = true },
+  ["screen.dimmer"] = { desc = "Brightness down", kind = "exec", cmd = "brightness down", repeating = true },
+
+  -- Not `repeating`: each press is a USB transaction, and holding the key made several
+  -- alienfx processes fight over the controller. Three presses cover the whole range --
+  -- off, dim, full is everything the hardware has.
+  ["keyboard.brighter"] = { desc = "Keyboard light up", kind = "exec", cmd = "keyboard-backlight up" },
+  ["keyboard.dimmer"] = { desc = "Keyboard light down", kind = "exec", cmd = "keyboard-backlight down" },
+  ["keyboard.off"] = { desc = "Keyboard light off", kind = "exec", cmd = "keyboard-backlight off", exits = true },
+
+  -- Leaving a prefix group. The exit itself comes from `exits`, the same field every
+  -- other action uses; this entry exists so Escape is listed on the cheatsheet rather
+  -- than being invisible machinery.
+  ["group.leave"] = { desc = "Close this group", kind = "leave", exits = true },
+
+  ["player.play-pause"] = { desc = "Play/pause", kind = "exec", cmd = "player play-pause" },
+  ["player.next"] = { desc = "Next track", kind = "exec", cmd = "player next" },
+  ["player.previous"] = { desc = "Previous track", kind = "exec", cmd = "player previous" },
+}

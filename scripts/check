@@ -16,7 +16,9 @@ while IFS= read -r file; do
     shell_files+=("$file")
   fi
 done < <(
-  find scripts install -type f | sort
+  # install/seed holds config templates in the user's language, not scripts -- they
+  # are syntax-checked by the luac step below, not by shellcheck.
+  find scripts install -type f -not -path 'install/seed/*' | sort
   find home -path '*/dot-local/bin/*' -type f -not -path '*/__pycache__/*' | sort
   find migrations -name '*.sh' -type f 2>/dev/null | sort
   find iso/profile/airootfs -type f -path '*/bin/*' 2>/dev/null | sort
@@ -53,6 +55,12 @@ python3 -c 'import ast, sys
 for path in sys.argv[1:]:
     with open(path, encoding="utf-8") as f:
         ast.parse(f.read(), path)' "${python_files[@]}"
+
+echo "==> lua syntax"
+# Hyprland's config is Lua, and a syntax error there costs a session -- the compositor
+# comes up with no binds at all. luac -p parses without executing; -o /dev/null because
+# luac writes luac.out otherwise. Same idea as the ast.parse step above.
+find home install/seed -name '*.lua' -print0 | xargs -0 luac -p -o /dev/null
 
 echo "==> gui: unit tests"
 python3 -m unittest discover -s gui/tests -t gui

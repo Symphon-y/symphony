@@ -1,0 +1,173 @@
+Add the hardware dim command (0x1C), which this library never implemented.
+
+The controller dims in hardware. docs/Knowledgebase/old_afxcontroller-protocoll-
+documentaion.txt in this very repository documents it:
+
+    ### 0x1C: Dim
+        02:1C:oo:bb:  :  :  :  :
+        o: 32 (Enable)
+           64 (Disable)
+        b: 01 (Always)
+           00 (in Battery Mode Only)
+
+but cmdpacket.py's command table stops at CMD_SET_SPEED = 0xe, so nothing could
+send it. Confirmed on an Alienware 14 (0x187c:0x0525, controller_m14xr3, 4 bits
+per colour): 02:1C:32:01 answers STATUS_READY -- while a deliberately bogus
+command in the same run answers STATUS_UNKNOWN_COMMAND -- and on a keyboard
+painted pure white, toggling Enable and Disable visibly dims and restores it.
+
+It matters because dimming by scaling the RGB values cannot work here: with 16
+levels per channel, a colour whose smallest lit channel is a small fraction of
+its largest loses that channel first, so the hue shifts as the lights dim. A
+state-based hardware dim leaves the colours exactly as sent.
+
+Dimming is a parameter of set_theme rather than a command of its own, because the
+packet only lands inside a programming transaction: this controller answers
+STATUS_READY only just after a reset, so a bare set_dim -- acquire, wait, send --
+spends its 50 tries in _wait_controller_ready and exits without ever sending the
+packet. set_dim is kept for a dim with no theme to apply and does its own reset
+prologue, at the cost of lighting every zone; `--theme X --dim on` is the useful
+form and is one transaction and one device claim.
+diff -ru a/alienfx/core/cmdpacket.py b/alienfx/core/cmdpacket.py
+--- a/alienfx/core/cmdpacket.py	2026-09-27 03:51:38.899187387 -0500
++++ b/alienfx/core/cmdpacket.py	2026-09-27 03:52:07.209051836 -0500
+@@ -57,6 +57,13 @@
+     CMD_SAVE_NEXT = 0x8
+     CMD_SAVE = 0x9
+     CMD_SET_SPEED = 0xe
++    CMD_SET_DIM = 0x1c
++
++    # 0x1C takes a state, not a level: the controller dims by a fixed amount or not
++    # at all. Values from docs/Knowledgebase/old_afxcontroller-protocoll-documentaion.txt
++    # and confirmed on an Alienware 14 (0x187c:0x0525).
++    DIM_ENABLE = 0x32
++    DIM_DISABLE = 0x64
+ 
+     # Status codes
+     STATUS_BUSY = 0x11
+@@ -92,7 +99,8 @@
+             self.CMD_RESET: self._parse_cmd_reset,
+             self.CMD_SAVE_NEXT: self._parse_cmd_save_next,
+             self.CMD_SAVE: self._parse_cmd_save,
+-            self.CMD_SET_SPEED: self._parse_cmd_set_speed
++            self.CMD_SET_SPEED: self._parse_cmd_set_speed,
++            self.CMD_SET_DIM: self._parse_cmd_set_dim
+         }
+ 
+     # @staticmethod
+@@ -277,6 +285,15 @@
+         pkt = args["pkt"]
+         return "SET_SPEED: {}".format(hex((pkt[2] << 8) + pkt[3]))
+ 
++    def _parse_cmd_set_dim(self, args):
++        """ Parse a packet containing the "dim" command and return it as a
++        human readable string.
++        """
++        pkt = args["pkt"]
++        state = "ENABLE" if pkt[2] == self.DIM_ENABLE else "DISABLE"
++        return "SET_DIM: {} ({})".format(
++            state, "always" if pkt[3] else "battery-only")
++
+     # @classmethod
+     def _parse_cmd_unknown(self, args):
+         """ Return a string reporting an unknown command packet.
+@@ -388,3 +405,15 @@
+         pkt = [0x02, self.CMD_SET_SPEED, 0, 0, 0, 0, 0, 0, 0]
+         pkt[2:4] = [(speed&0xff00) >> 8, speed & 0xff]
+         return pkt
++
++    def make_cmd_set_dim(self, enable, always=True):
++        """ Return a command packet for the "dim" command.
++
++        Dimming is a state and not a level, so the colour is never scaled to
++        make the lights darker -- which on a 4-bit-per-channel controller
++        cannot be done without shifting the hue.
++        """
++        pkt = [0x02, self.CMD_SET_DIM, 0, 0, 0, 0, 0, 0, 0]
++        pkt[2] = self.DIM_ENABLE if enable else self.DIM_DISABLE
++        pkt[3] = 0x01 if always else 0x00
++        return pkt
+diff -ru a/alienfx/core/controller.py b/alienfx/core/controller.py
+--- a/alienfx/core/controller.py	2026-09-27 03:51:38.903801151 -0500
++++ b/alienfx/core/controller.py	2026-09-27 03:52:07.209220904 -0500
+@@ -268,9 +268,33 @@
+             logging.debug("SENDING: {}".format(self.pkt_to_string(cmd)))
+             self._driver.write_packet(cmd)
+ 
+-    def set_theme(self, themefile):
++    def set_dim(self, enable):
++        """ Enable or disable the controller's hardware dimming.
++
++        Dimming is a controller state, so the colours already programmed keep
++        their exact values: this changes brightness without touching hue. Needs
++        the same reset prologue as set_theme, because the controller answers
++        STATUS_READY only after a reset -- without it _wait_controller_ready
++        never succeeds and the packet is never sent. The reset lights every
++        zone, so prefer set_theme(themefile, dim=...), which does both in one
++        transaction.
++        """
++        try:
++            self._driver.acquire()
++            self._ping()
++            self._reset("all-lights-on")
++            self._wait_controller_ready()
++            self._send_cmds([self.cmd_packet.make_cmd_set_dim(enable)])
++        finally:
++            self._driver.release()
++
++    def set_theme(self, themefile, dim=None):
+         """ Send the given theme settings to the controller. This should result
+         in the lights changing to the theme settings immediately.
++
++        dim, when not None, sets the controller's hardware dimming in the same
++        transaction -- it has to be sent while the controller is ready, which it
++        is only just after the reset below.
+         """
+         try:
+             self._driver.acquire()
+@@ -282,6 +306,9 @@
+             self._reset("all-lights-on")
+             self._wait_controller_ready()
+             
++            if dim is not None:
++                self._send_cmds([pkt.make_cmd_set_dim(dim)])
++            
+             for state_name in self.state_map:
+                 cmds = []
+                 cmds = self._make_zone_cmds(themefile, state_name)
+diff -ru a/alienfx/ui/console/main.py b/alienfx/ui/console/main.py
+--- a/alienfx/ui/console/main.py	2026-09-27 03:51:38.900079533 -0500
++++ b/alienfx/ui/console/main.py	2026-09-27 03:52:07.209358674 -0500
+@@ -122,6 +122,12 @@
+         argparser.add_argument(
+             "-j", "--json", action="store_true", help="output JSON for machine readability"
+         )
++        argparser.add_argument(
++            "-d", "--dim", choices=["on", "off"],
++            help="turn hardware dimming on or off; with --theme, in the same "
++                 "transaction (on its own it resets the controller, lighting "
++                 "every zone)"
++        )
+         args = argparser.parse_args()
+         if args.zonescan is not None:
+             if args.zonescan:
+@@ -186,6 +192,7 @@
+ 
+         if args.log is not None:
+             alienfx_logger.set_logfile(args.log)
++        dim = None if args.dim is None else args.dim == "on"
+         if args.list is not None:
+             print("Available themes:")
+             themes = themefile.get_themes()
+@@ -193,8 +200,10 @@
+                 print(("\t{}").format(t))
+         elif args.theme is not None:
+             themefile.load(args.theme)
+-            controller.set_theme(themefile)
++            controller.set_theme(themefile, dim=dim)
+             themefile.applied()
++        elif dim is not None:
++            controller.set_dim(dim)
+             
+     except Exception as e:
+         logging.error(str(e) + "\n Python-Version: "+sys.version) 

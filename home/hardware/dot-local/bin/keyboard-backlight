@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/keyboard-backlight (linked by install/link-home)
+#
+# keyboard-backlight: the keyboard lighting role (#26). Moves between the brightness
+# states the controller has and asks for a repaint; the painting itself stays in
+# alienfx-theme, the one place that knows how a colour reaches the hardware.
+#
+# Three states, not a percentage, because that is what the hardware offers: alienfx's
+# 0x1C command takes Enable or Disable. The percentages this used to keep were a fiction
+# over scaling the RGB values, which on a 4-bit-per-channel controller loses the smallest
+# lit channel first -- #cabeff's violet turned pure blue as it dimmed.
+#
+# Usage: keyboard-backlight up|down|off
+set -euo pipefail
+
+ROOT=$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../../../.." && pwd)
+readonly ROOT
+# shellcheck source-path=SCRIPTDIR source=../../../../scripts/lib/osd.bash
+source "$ROOT/scripts/lib/osd.bash"
+# shellcheck source-path=SCRIPTDIR source=../../../../scripts/lib/lighting.bash
+source "$ROOT/scripts/lib/lighting.bash"
+
+usage() {
+  echo "usage: keyboard-backlight up|down|off" >&2
+  exit 2
+}
+
+# Where the current state sits in the ordered list, so up and down are just moves.
+state_index() {
+  local i
+  for i in "${!LIGHTING_STATES[@]}"; do
+    [[ ${LIGHTING_STATES[$i]} == "$1" ]] && printf '%s' "$i" && return 0
+  done
+  printf '%s' "$((${#LIGHTING_STATES[@]} - 1))"
+}
+
+index=$(state_index "$(lighting_state)")
+last=$((${#LIGHTING_STATES[@]} - 1))
+
+case ${1:-} in
+  up) ((index < last)) && index=$((index + 1)) ;;
+  down) ((index > 0)) && index=$((index - 1)) ;;
+  off) index=0 ;;
+  *) usage ;;
+esac
+
+state=${LIGHTING_STATES[$index]}
+lighting_set_state "$state"
+lighting_repaint
+
+# A bar position as well as the name, so this reads like the volume OSD even though the
+# underlying control has three positions rather than a hundred.
+osd_show "Keyboard light" "${state^}" "$((index * 100 / last))"

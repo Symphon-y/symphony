@@ -107,8 +107,9 @@ calls() {
   assert_success
   run cat "$CONF"
   assert_output --partial "path = $IMAGE"
+  # Only hyprpaper: the lighting repaint is a separate restart and is expected.
   run calls
-  refute_output --partial "restart"
+  refute_output --partial "restart hyprpaper"
 }
 
 @test "never uses hyprpaper's runtime IPC: 0.8.4 accepts the request and ignores it (D-0085)" {
@@ -123,11 +124,22 @@ calls() {
   assert_success
   run calls
   assert_output --partial "matugen --config $HOME/.config/matugen/config.toml image $IMAGE --source-color-index 0"
-  assert_output --partial "alienfx-theme"
+  assert_output --partial "restart alienfx-theme.service"
   local restart matugen
   restart=$(grep -n 'restart hyprpaper' "$STUB_LOG" | cut -d: -f1 | head -1)
   matugen=$(grep -n '^matugen' "$STUB_LOG" | cut -d: -f1 | head -1)
   assert [ "$restart" -lt "$matugen" ]
+}
+
+@test "it asks for the repaint rather than running the painter itself" {
+  # Two painters at once wedge the USB controller, and a wallpaper change can land at
+  # the same moment as a brightness keypress.
+  run "$SCRIPT" "$IMAGE"
+  assert_success
+  # Per line, not against the whole blob: `^` in refute_output --regexp anchors to the
+  # start of the entire output, which any earlier line would satisfy away.
+  run bash -c "grep -c '^alienfx-theme' '$STUB_LOG' || true"
+  assert_output "0"
 }
 
 @test "a path with spaces (an SMB share of photos) round-trips into the config and the symlink" {

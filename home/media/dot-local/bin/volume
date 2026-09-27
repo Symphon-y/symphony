@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/volume (linked by install/link-home)
+#
+# volume: the volume role (Phase 21). XF86AudioRaiseVolume/LowerVolume/Mute call it,
+# and so will the SUPER+v group once prefix groups land. Hardware differences live
+# here and never in a binding -- which is what lets the same verb serve a keyboard
+# with no volume keys at all.
+#
+# Usage: volume up|down|mute [STEP]
+set -euo pipefail
+
+ROOT=$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../../../.." && pwd)
+readonly ROOT
+# shellcheck source-path=SCRIPTDIR source=../../../../scripts/lib/osd.bash
+source "$ROOT/scripts/lib/osd.bash"
+
+readonly SINK="@DEFAULT_AUDIO_SINK@"
+
+usage() {
+  echo "usage: volume up|down|mute [STEP]" >&2
+  exit 2
+}
+
+command -v wpctl >/dev/null || {
+  echo "volume: wpctl not found -- it comes with wireplumber" >&2
+  exit 1
+}
+
+step=${2:-5}
+
+case ${1:-} in
+  # -l 1.0 is a ceiling, not a formality: wpctl raises past 100% happily, and the
+  # speakers distort long before the number stops going up.
+  up) wpctl set-volume -l 1.0 "$SINK" "${step}%+" ;;
+  down) wpctl set-volume "$SINK" "${step}%-" ;;
+  mute) wpctl set-mute "$SINK" toggle ;;
+  *) usage ;;
+esac
+
+# Read back rather than track: something else may have moved the volume, and the OSD
+# should say what is true now. A sink that cannot be read is not worth failing over.
+out=$(wpctl get-volume "$SINK") || exit 0
+if [[ $out == *MUTED* ]]; then
+  osd_show "Volume" "Muted"
+else
+  percent=$(awk '{ printf "%d", $2 * 100 }' <<<"$out")
+  osd_show "Volume" "$percent%" "$percent"
+fi
