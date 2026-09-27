@@ -189,62 +189,19 @@ apply_payload() {
   "$CURRENT/home/hardware/dot-local/bin/symphony-hardware" apply --no-packages
 }
 
-# Hyprland reads its config out of the payload, which the swap replaces underneath it:
-# between the two renames its `source`d files briefly do not exist, and it puts up a
-# config-error overlay that stays until something reloads it. The runbook used to tell
-# the user to do this by hand (#8).
+# The desktop, made to match the payload that just landed. It lives in the payload as
+# install/reload-desktop, not here, for a reason this fix proved on itself: symphony-update
+# runs from the copy installed *before* the swap, so a change to its post-swap behaviour
+# would only take effect one deploy later. An applier runs from the new payload.
 #
-# The env var is the cheap answer; `hyprctl -j version` is the honest one, because a
-# session started outside this shell has no var to read. Checking that hyprctl merely
-# exists would be no check at all -- it is installed on every symphony machine.
-session_present() {
-  [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] && return 0
-  hyprctl -j version >/dev/null 2>&1
-}
-
-# The palette is matugen output -- mako's config, waybar's colours, ghostty, fuzzel, the
-# GTK sheets, theme.env -- generated from templates that live in the payload. matugen runs
-# on a wallpaper change, and a deploy is not one, so a release that changes a template
-# otherwise changes nothing on screen (#25). The one step here with a real cost, so the
-# only one that asks first.
-rerender_palette() {
-  local pointer image
-  diff -rq "$PREVIOUS/home/matugen" "$CURRENT/home/matugen" >/dev/null 2>&1 && return 0
-
-  # shellcheck source=/dev/null # the payload's copy, which is the one that just landed
-  source "$CURRENT/scripts/lib/wallpaper.bash"
-  pointer=$(wallpaper_pointer)
-  # No wallpaper yet: a machine before first-login, which renders it itself.
-  [[ -e $pointer ]] || return 0
-
-  image=$(realpath "$pointer")
-  log "re-rendering the palette: a template changed"
-  palette_render "$image" >/dev/null ||
-    echo "symphony-update: matugen failed -- run 'wallpaper-set $image' to re-theme" >&2
-}
-
-# Make the running desktop match the payload that just landed. Every step is never fatal:
-# by the time this runs the payload is in place and the update has succeeded, so a desktop
-# that could not be reloaded is one command away, not one rollback away.
-#
-# Hyprland reads its config out of the payload, which the swap replaces underneath it:
-# between the two renames its `source`d files briefly do not exist, and it puts up a
-# config-error overlay that stays until something reloads it (#8). Everything else on the
-# desktop has the quieter version of the same problem -- `enable --now` is a no-op on a
-# unit that is already running, so waybar kept the config it started with and Phase 20's
-# update badge shipped without ever appearing (#25).
+# Never fatal: by now the update has succeeded, so a desktop that could not be reloaded is
+# one command away, not one rollback away.
 reload_desktop() {
-  session_present || return 0
-
-  log "reloading Hyprland"
-  hyprctl reload >/dev/null ||
-    echo "symphony-update: hyprctl reload failed -- run it by hand to clear the config error" >&2
-
-  rerender_palette
-
-  log "restarting user services"
-  "$CURRENT/install/enable-user-services" restart ||
-    echo "symphony-update: a user service did not restart -- see the names above" >&2
+  log "reloading the desktop"
+  "$CURRENT/install/reload-desktop" --since "$PREVIOUS" ||
+    echo "symphony-update: the desktop was not fully reloaded -- see above" >&2
+  # Not session-gated and not the applier's job: a changed unit file matters on a TTY too,
+  # and this is the one call here that needs root.
   sudo "$CURRENT/install/enable-root-services" reload ||
     echo "symphony-update: systemctl daemon-reload failed -- a changed unit file is still stale" >&2
 }

@@ -163,10 +163,16 @@ setup() {
 # and it passed for two days while the running bar did not have it. `enable --now` is a
 # no-op on a unit that is already enabled and running, so nothing picked the change up.
 
-@test "the deploy restarts the user services, not just Hyprland" {
+@test "the deploy reloads the desktop through an applier in the payload" {
+  # An applier, not a function in symphony-update: the updater runs from the copy
+  # installed *before* the swap, so post-swap logic kept in there takes effect one deploy
+  # late -- which is how the first version of this fix appeared not to work.
+  assert [ -x "$REPO_ROOT/install/reload-desktop" ]
   # shellcheck disable=SC2016 # a grep pattern, not a string to expand
-  run grep -qE '^\s*"\$CURRENT/install/enable-user-services" restart' \
+  run grep -qE '"\$CURRENT/install/reload-desktop" --since' \
     "$REPO_ROOT/home/update/dot-local/bin/symphony-update"
+  assert_success
+  run grep -qE 'enable-user-services" restart' "$REPO_ROOT/install/reload-desktop"
   assert_success
 }
 
@@ -190,7 +196,7 @@ setup() {
 @test "a deploy that changes a matugen template re-renders the palette" {
   # Every generated config -- mako, waybar's colours, ghostty, fuzzel, GTK, theme.env --
   # is stale until matugen runs, and a deploy is not a wallpaper change.
-  run grep -q 'rerender_palette' "$REPO_ROOT/home/update/dot-local/bin/symphony-update"
+  run grep -q 'rerender_palette' "$REPO_ROOT/install/reload-desktop"
   assert_success
   run grep -q 'palette_render' "$REPO_ROOT/scripts/lib/wallpaper.bash"
   assert_success

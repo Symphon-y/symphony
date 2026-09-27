@@ -2771,14 +2771,21 @@ and `wallpaper-set` drives the config file instead.)_
 ## D-0094 — A deploy makes the running desktop match the payload
 
 - **Status:** Accepted (2026-09-27, #25)
-- **Decision:** `symphony-update`'s post-swap step reloads the whole desktop, not just the
-  compositor. `reload_desktop()` reloads Hyprland (D-0079's #8 behaviour, unchanged),
-  re-renders the palette when the payload's matugen templates changed, then runs
-  `install/enable-user-services restart` and `install/enable-root-services reload`. The
+- **Decision:** A deploy reloads the whole desktop, not just the compositor, and it does so
+  from **`install/reload-desktop` in the payload** rather than from a function in
+  `symphony-update`. The applier reloads Hyprland (D-0079's #8 behaviour, unchanged),
+  re-renders the palette when the payload's matugen templates changed, and runs
+  `install/enable-user-services restart`; the updater calls it with `--since "$PREVIOUS"`
+  and adds `sudo install/enable-root-services reload`, the one part needing root. The
   restart is `systemctl --user daemon-reload` followed by `try-restart` of **every** unit in
   `system/services-user.txt`; the root side is a `daemon-reload` and nothing more. Every step
   is session-gated and never fatal.
-- **Alternatives considered:** restart only the units whose config actually changed — quieter,
+- **Alternatives considered:** keep the reload in `symphony-update`, which is where it was
+  written first — the updater runs from the copy of itself installed *before* the swap, so
+  the fix deployed cleanly and then did nothing, and only the *next* deploy would have
+  restarted anything. Any future improvement to the reload would have the same lag, looking
+  broken each time. An applier runs from the payload that just landed. Restart only the units
+  whose config actually changed — quieter,
   but it needs a mapping from each unit to the payload paths it reads, which is knowledge that
   rots silently and would have to be right for a bug whose whole nature is silence. Restart
   only waybar and mako, the two named in the issue — leaves the same trap set for the next
@@ -2810,4 +2817,6 @@ and `wallpaper-set` drives the config file instead.)_
   `--source-color-index 0` (which stops matugen prompting for a source colour with no TTY) can
   no longer be forgotten in one copy. An acceptance test asserts the running bar is newer than
   the payload it reads, which is the exact thing that was false when this was filed and which
-  no file-contents test could have caught.
+  no file-contents test could have caught. The general rule this leaves: **anything a deploy
+  must do belongs in the payload, not in the updater** — the updater can only orchestrate with
+  the code it was started with.

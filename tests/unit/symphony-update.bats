@@ -37,11 +37,11 @@ make_installed_payload() {
   mkdir -p "$dir/install" "$dir/scripts" "$dir/packages" "$dir/migrations" "$dir/home" "$dir/system"
   echo "$version" >"$dir/VERSION"
   local tool
-  for tool in install/sync-system install/link-home install/enable-user-services install/enable-root-services install/install-packages scripts/migrate scripts/hwpkglist home/hardware/dot-local/bin/symphony-hardware; do
+  for tool in install/sync-system install/link-home install/enable-user-services install/enable-root-services install/install-packages install/reload-desktop scripts/migrate scripts/hwpkglist home/hardware/dot-local/bin/symphony-hardware; do
     # shellcheck disable=SC2016 # stub body expands when the stub runs
     mkdir -p "$dir/$(dirname "$tool")"
     # shellcheck disable=SC2016 # stub body expands when the stub runs
-    printf '#!/usr/bin/env bash\nd=$(dirname "$0"); while [[ ! -e $d/VERSION ]]; do d=$(dirname "$d"); done\necho "%s${*:+ $*} from $(cat "$d/VERSION")" >>"$STUB_LOG"\n[[ $1 == restart && -n ${STUB_RESTART_FAIL:-} ]] && exit 1\nexit 0\n' "${tool##*/}" >"$dir/$tool"
+    printf '#!/usr/bin/env bash\nd=$(dirname "$0"); while [[ ! -e $d/VERSION ]]; do d=$(dirname "$d"); done\necho "%s${*:+ $*} from $(cat "$d/VERSION")" >>"$STUB_LOG"\n[[ $0 == *reload-desktop && -n ${STUB_RELOAD_FAIL:-} ]] && exit 1\nexit 0\n' "${tool##*/}" >"$dir/$tool"
     chmod +x "$dir/$tool"
   done
   echo "old-package" >"$dir/packages/base.txt"
@@ -65,13 +65,13 @@ make_release() {
   local repo="$BATS_TEST_TMPDIR/repo-$tag"
   mkdir -p "$repo/install" "$repo/scripts" "$repo/packages" "$repo/migrations" "$repo/home" "$repo/system"
   local tool
-  for tool in install/sync-system install/link-home install/enable-user-services install/enable-root-services install/install-packages scripts/migrate scripts/hwpkglist home/hardware/dot-local/bin/symphony-hardware; do
+  for tool in install/sync-system install/link-home install/enable-user-services install/enable-root-services install/install-packages install/reload-desktop scripts/migrate scripts/hwpkglist home/hardware/dot-local/bin/symphony-hardware; do
     # shellcheck disable=SC2016 # stub body expands when the stub runs
     mkdir -p "$repo/$(dirname "$tool")"
     # The release's stubs must find VERSION wherever the payload lands (current/ after
     # the swap, or previous/ after a rollback): walk up from $0 to the dir holding it.
     # shellcheck disable=SC2016 # stub body expands when the stub runs
-    printf '#!/usr/bin/env bash\nd=$(dirname "$0"); while [[ ! -e $d/VERSION ]]; do d=$(dirname "$d"); done\necho "%s${*:+ $*} from $(cat "$d/VERSION")" >>"$STUB_LOG"\n[[ $1 == restart && -n ${STUB_RESTART_FAIL:-} ]] && exit 1\nexit 0\n' "${tool##*/}" >"$repo/$tool"
+    printf '#!/usr/bin/env bash\nd=$(dirname "$0"); while [[ ! -e $d/VERSION ]]; do d=$(dirname "$d"); done\necho "%s${*:+ $*} from $(cat "$d/VERSION")" >>"$STUB_LOG"\n[[ $0 == *reload-desktop && -n ${STUB_RELOAD_FAIL:-} ]] && exit 1\nexit 0\n' "${tool##*/}" >"$repo/$tool"
     chmod +x "$repo/$tool"
   done
   echo "$package" >"$repo/packages/base.txt"
@@ -382,151 +382,61 @@ installed_version() {
   assert [ "$chown" -lt "$sync" ]
 }
 
-# --- reloading Hyprland after the swap (#8) -----------------------------------------
+# --- reloading the desktop after the swap (#8, #25) ---------------------------------
+#
+# The work itself lives in the payload's install/reload-desktop and is tested there. What
+# matters here is that the updater hands off to it, from the payload that just landed and
+# after everything else -- and that a desktop which could not be reloaded never turns a
+# successful update into a failed one.
 
-@test "apply: reloads Hyprland at the end, so the swap's config-error overlay clears" {
-  export HYPRLAND_INSTANCE_SIGNATURE=abc123
+@test "apply: hands the desktop to the payload's own applier, naming the payload it replaced" {
   run "$SCRIPT" apply --yes
   assert_success
   run calls
-  assert_line "hyprctl reload"
+  assert_line "reload-desktop --since $SYMPHONY_PAYLOAD_ROOT/previous from 2026.09.22"
 }
 
 @test "apply: the reload comes after the appliers and the migrations, never before" {
-  export HYPRLAND_INSTANCE_SIGNATURE=abc123
   run "$SCRIPT" apply --yes
   assert_success
   local migrate reload
   migrate=$(grep -n '^migrate apply' "$STUB_LOG" | cut -d: -f1 | head -1)
-  reload=$(grep -n '^hyprctl reload' "$STUB_LOG" | cut -d: -f1 | head -1)
+  reload=$(grep -n '^reload-desktop' "$STUB_LOG" | cut -d: -f1 | head -1)
   assert [ -n "$migrate" ]
   assert [ "$migrate" -lt "$reload" ]
 }
 
-@test "apply: a session detected only by hyprctl, with no env var, still reloads" {
-  unset HYPRLAND_INSTANCE_SIGNATURE
-  run "$SCRIPT" apply --yes
-  assert_success
-  run calls
-  assert_line "hyprctl reload"
-}
-
-@test "apply: no session (a TTY or over SSH) means no reload, and no failure" {
-  unset HYPRLAND_INSTANCE_SIGNATURE
-  STUB_HYPRCTL_NO_SESSION=1 run "$SCRIPT" apply --yes
-  assert_success
-  run calls
-  refute_output --partial "hyprctl reload"
-}
-
-@test "apply: a failed reload is reported, but the update already succeeded and stands" {
-  export HYPRLAND_INSTANCE_SIGNATURE=abc123
-  STUB_HYPRCTL_RELOAD_FAIL=1 run "$SCRIPT" apply --yes
-  assert_success
-  assert_output --partial "reload"
-  assert_equal "$(installed_version)" "2026.09.22"
-}
-
-# --- the rest of the desktop, not just the compositor (#25) --------------------------
-#
-# The bug: `enable --now` is a no-op on a unit that is already enabled and running, so a
-# deploy that changed waybar's config left the old bar on screen -- which is how Phase
-# 20's update badge shipped and never appeared. A deploy now makes the running desktop
-# match the payload.
-
-@test "apply: restarts the user services, so a changed config reaches the screen" {
-  export HYPRLAND_INSTANCE_SIGNATURE=abc123
-  run "$SCRIPT" apply --yes
-  assert_success
-  run calls
-  assert_line "enable-user-services restart from 2026.09.22"
-}
-
-@test "apply: reloads the system manager, so a changed unit file is re-read" {
-  export HYPRLAND_INSTANCE_SIGNATURE=abc123
+@test "apply: reloads the system manager too, so a changed unit file is re-read" {
+  # Not the applier's job and not session-gated: a changed unit file matters on a TTY as
+  # much as on a desktop, and this is the one reload that needs root.
   run "$SCRIPT" apply --yes
   assert_success
   run calls
   assert_line "enable-root-services reload from 2026.09.22"
 }
 
-@test "apply: the restart runs from the new payload, after its own appliers" {
-  export HYPRLAND_INSTANCE_SIGNATURE=abc123
-  run "$SCRIPT" apply --yes
-  assert_success
-  local applied restarted
-  applied=$(grep -n '^enable-user-services apply' "$STUB_LOG" | cut -d: -f1 | head -1)
-  restarted=$(grep -n '^enable-user-services restart' "$STUB_LOG" | cut -d: -f1 | head -1)
-  assert [ -n "$applied" ]
-  assert [ "$applied" -lt "$restarted" ]
+@test "apply: the reload is a payload applier, not logic in the updater (#25)" {
+  # The reason it moved: the updater runs from the copy installed *before* the swap, so a
+  # change to this behaviour in here would only take effect one deploy later -- which is
+  # how the first version of this fix appeared not to work at all.
+  run grep -nE 'hyprctl|matugen|try-restart' "$SCRIPT"
+  assert_failure
 }
 
-@test "apply: re-renders the palette when a matugen template changed" {
-  # mako's config, waybar's colours, ghostty, fuzzel and the GTK sheets are all matugen
-  # output. A deploy that changes a template changes nothing on screen otherwise: matugen
-  # runs on a wallpaper change, and a deploy is not one.
-  export HYPRLAND_INSTANCE_SIGNATURE=abc123
-  export HOME="$BATS_TEST_TMPDIR/home"
-  mkdir -p "$HOME/.local/state/symphony" "$HOME/Pictures"
-  : >"$HOME/Pictures/wall.png"
-  ln -sfn "$HOME/Pictures/wall.png" "$HOME/.local/state/symphony/wallpaper"
-  # The installed payload's template differs from the release's.
-  echo "# changed" >>"$SYMPHONY_PAYLOAD_ROOT/current/home/matugen/dot-config/matugen/templates/mako.ini"
-  run "$SCRIPT" apply --yes
+@test "apply: a desktop that will not reload is reported, and the update still stands" {
+  STUB_RELOAD_FAIL=1 run "$SCRIPT" apply --yes
   assert_success
-  run calls
-  assert_output --partial "matugen"
-}
-
-@test "apply: does not re-render when the templates are untouched" {
-  # The one step with a real cost, so it is the one step that asks first.
-  export HYPRLAND_INSTANCE_SIGNATURE=abc123
-  export HOME="$BATS_TEST_TMPDIR/home"
-  mkdir -p "$HOME/.local/state/symphony" "$HOME/Pictures"
-  : >"$HOME/Pictures/wall.png"
-  ln -sfn "$HOME/Pictures/wall.png" "$HOME/.local/state/symphony/wallpaper"
-  run "$SCRIPT" apply --yes
-  assert_success
-  run calls
-  refute_output --partial "matugen"
-}
-
-@test "apply: no wallpaper yet (a machine before first-login) skips the re-render" {
-  export HYPRLAND_INSTANCE_SIGNATURE=abc123
-  export HOME="$BATS_TEST_TMPDIR/home"
-  mkdir -p "$HOME"
-  echo "# changed" >>"$SYMPHONY_PAYLOAD_ROOT/current/home/matugen/dot-config/matugen/templates/mako.ini"
-  run "$SCRIPT" apply --yes
-  assert_success
-  run calls
-  refute_output --partial "matugen"
-}
-
-@test "apply: no session means the desktop is left alone entirely" {
-  unset HYPRLAND_INSTANCE_SIGNATURE
-  STUB_HYPRCTL_NO_SESSION=1 run "$SCRIPT" apply --yes
-  assert_success
-  run calls
-  refute_output --partial "enable-user-services restart"
-  refute_output --partial "matugen"
-}
-
-@test "apply: a service that will not restart is reported, and the update still stands" {
-  export HYPRLAND_INSTANCE_SIGNATURE=abc123
-  STUB_RESTART_FAIL=1 run "$SCRIPT" apply --yes
-  assert_success
-  assert_output --partial "restart"
+  assert_output --partial "reload"
   assert_equal "$(installed_version)" "2026.09.22"
 }
 
-@test "rollback: reloads too -- it swaps the payload the same way" {
-  export HYPRLAND_INSTANCE_SIGNATURE=abc123
+@test "rollback: reloads the desktop too -- it swaps the payload the same way" {
   "$SCRIPT" apply --yes >/dev/null
   : >"$STUB_LOG"
   run "$SCRIPT" rollback
   assert_success
   run calls
-  assert_line "hyprctl reload"
+  assert_output --partial "reload-desktop"
 }
 
 # --- apply --from DIR: the dev seat ------------------------------------------------

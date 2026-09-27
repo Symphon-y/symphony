@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# reload-desktop: make the running desktop match this payload (#25).
+#
+# Usage: install/reload-desktop [--since DIR]
+#   --since DIR   the payload this one replaced, to see whether the matugen templates
+#                 changed. Without it the palette is re-rendered unconditionally.
+#
+# Why this is an applier and not a function in symphony-update: the updater runs from
+# the copy of itself that was installed *before* the swap, so a change to its post-swap
+# behaviour only takes effect one deploy later -- which is exactly how the first version
+# of this fix appeared not to work. An applier runs from the payload that just landed, so
+# an improvement here works on the deploy that introduces it.
+#
+# What it answers: every applier can run and leave the screen unchanged. `enable --now` is
+# a no-op on a unit that is already enabled and running, and matugen -- which generates
+# mako's config, waybar's colours, ghostty, fuzzel, the GTK sheets and theme.env -- runs
+# on a wallpaper change, which a deploy is not.
+#
+# Never fatal: by the time this runs the payload is in place and the update has succeeded,
+# so a desktop that could not be reloaded is one command away, not one rollback away. Each
+# problem is a line on stderr naming what to run by hand.
+set -euo pipefail
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+readonly REPO_ROOT
+# shellcheck source-path=SCRIPTDIR source=../scripts/lib/wallpaper.bash
+source "$REPO_ROOT/scripts/lib/wallpaper.bash"
+
+usage() {
+  echo "usage: reload-desktop [--since DIR]" >&2
+  exit 2
+}
+
+# The env var is the cheap answer; `hyprctl -j version` is the honest one, because a
+# session started outside this shell has no var to read. Checking that hyprctl merely
+# exists would be no check at all -- it is installed on every symphony machine.
+session_present() {
+  [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] && return 0
+  hyprctl -j version >/dev/null 2>&1
+}
+
+# Hyprland reads its config out of the payload, which the swap replaces underneath it:
+# between the two renames its `source`d files briefly do not exist, and it puts up a
+# config-error overlay that stays until something reloads it (#8).
+reload_hyprland() {
+  echo "==> reloading Hyprland"
+  hyprctl reload >/dev/null ||
+    echo "reload-desktop: hyprctl reload failed -- run it by hand to clear the config error" >&2
+}
+
+# The generated half of the desktop. The one step here with a real cost, so the only one
+# that asks first: with a previous payload to compare against, the templates decide.
+rerender_palette() {
+  local since=$1 pointer image
+  if [[ -n $since ]] && diff -rq "$since/home/matugen" "$REPO_ROOT/home/matugen" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  pointer=$(wallpaper_pointer)
+  # No wallpaper yet: a machine before first-login, which renders the palette itself.
+  [[ -e $pointer ]] || return 0
+
+  image=$(realpath "$pointer")
+  echo "==> re-rendering the palette: a template changed"
+  palette_render "$image" >/dev/null ||
+    echo "reload-desktop: matugen failed -- run 'wallpaper-set $image' to re-theme" >&2
+}
+
+# Everything with shipped configuration, through the one list that declares it
+# (system/services-user.txt), so a unit added there is covered without anyone remembering.
+restart_services() {
+  echo "==> restarting user services"
+  "$REPO_ROOT/install/enable-user-services" restart ||
+    echo "reload-desktop: a user service did not restart -- see the names above" >&2
+}
+
+main() {
+  local since=""
+  case ${1:-} in
+    "") ;;
+    --since)
+      since=${2:-}
+      [[ -n $since ]] || usage
+      ;;
+    *) usage ;;
+  esac
+
+  if ! session_present; then
+    echo "no session: nothing to reload"
+    return 0
+  fi
+
+  reload_hyprland
+  rerender_palette "$since"
+  restart_services
+}
+
+main "$@"
