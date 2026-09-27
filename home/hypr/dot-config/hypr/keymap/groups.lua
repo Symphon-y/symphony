@@ -24,9 +24,16 @@ local notation = require("keymap.notation")
 
 local M = {}
 
--- How long a group waits before closing itself. The backstop that makes an open group
--- harmless: Escape is also bound, but this is what saves a group left open by accident.
+-- How long a group waits, with nothing pressed, before closing itself. The backstop that
+-- makes an open group harmless: Escape is also bound, but this is what saves a group left
+-- open by accident -- and it matters, because an open group holds j, k, m and Escape,
+-- and Escape belongs to whatever is on screen.
 M.TIMEOUT = 1500
+
+-- The idle clock's resolution. Hyprland's oneshot timers cannot be re-armed (measured),
+-- so the wait is counted in ticks of a repeating one: the group closes after TIMEOUT of
+-- silence, give or take one tick.
+M.TICK = 500
 
 -- The action every group falls back to for Escape. Named rather than inlined so the
 -- cheatsheet lists leaving like any other binding.

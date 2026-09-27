@@ -18,6 +18,7 @@ local notices = {}
 local timer = nil
 local timers_created = 0
 local current_submap = nil
+local in_timer = false
 
 local function record(line)
   log[#log + 1] = line
@@ -70,8 +71,13 @@ hl = {
     current_submap = nil
   end,
 
+  -- Measured on 0.56.2: a submap dispatched from inside a timer callback is silently
+  -- ignored -- the call returns ok, no submap event is emitted, the submap does not
+  -- change. The stub drops it the same way, so a keymap that leaves a group from a timer
+  -- fails here rather than only on the machine.
   dispatch = function(dispatcher)
-    record(describe(dispatcher))
+    local ignored = in_timer and type(dispatcher) == "table" and dispatcher.kind == "submap"
+    record(describe(dispatcher) .. (ignored and " (ignored: dispatched from a timer)" or ""))
   end,
 
   timer = function(callback, opts)
@@ -79,20 +85,20 @@ hl = {
     timer = {
       callback = callback,
       timeout = opts and opts.timeout,
+      kind = opts and opts.type,
       enabled = true,
       set_timeout = function(self, timeout)
         self.timeout = timeout
       end,
       set_enabled = function(self, enabled)
         self.enabled = enabled
-        record(enabled and ("timer armed " .. tostring(self.timeout)) or "timer disabled")
+        record(enabled and ("timer enabled " .. tostring(self.timeout)) or "timer disabled")
       end,
       is_enabled = function(self)
         return self.enabled
       end,
     }
-    record("timer created " .. tostring(timer.timeout))
-    record("timer armed " .. tostring(timer.timeout))
+    record(("timer created %s %s"):format(tostring(timer.kind), tostring(timer.timeout)))
     return timer
   end,
 
@@ -163,10 +169,37 @@ function stub.press(chord)
   end
 end
 
+-- One tick of the timer, in the timer's own context -- where a submap dispatch does not
+-- work. A "oneshot" cannot be made to fire twice, as on the machine.
 function stub.fire_timer()
-  if timer then
-    timer.callback()
+  if not timer or not timer.enabled then
+    record("timer not running")
+    return
   end
+  if timer.kind == "oneshot" and timer.fired then
+    record("oneshot timer cannot fire twice")
+    return
+  end
+  timer.fired = true
+  in_timer = true
+  timer.callback()
+  in_timer = false
+end
+
+-- Enough ticks to cover an idle wait of `ms`.
+function stub.idle_for(ms)
+  local groups = require("keymap.groups")
+  for _ = 1, math.ceil(ms / groups.TICK) do
+    stub.fire_timer()
+  end
+end
+
+function stub.timer_kind()
+  return timer and tostring(timer.kind) or ""
+end
+
+function stub.timer_running()
+  return timer and tostring(timer.enabled) or ""
 end
 
 function stub.timers_created()

@@ -33,25 +33,56 @@ end
 
 -- --- an open prefix group ---------------------------------------------------------
 --
--- One timer for every group, because only one group can be open at a time: it is
--- re-armed on each keystroke that keeps the group open, never created per keystroke.
+-- One timer for the session, because only one group can be open at a time. Two things
+-- about it were measured on 0.56.2 rather than read off the API's types:
+--
+--   * a "oneshot" timer cannot be re-armed. It fires once and set_timeout/set_enabled
+--     do nothing after that, so an idle timeout built on one works for the first group
+--     and never again. This is a "repeat" timer instead -- enabled only while a group
+--     is open, and counting ticks of idleness, so the wait still measures from the last
+--     keystroke rather than from when the group opened.
+--   * a submap dispatched from inside a timer callback is *silently* ignored: the
+--     dispatch returns ok, no submap event is emitted, the submap does not change. Only
+--     the keybind and IPC paths are honoured. So a key that leaves dispatches directly,
+--     and the timeout goes round through hyprctl, which is IPC.
+
+local LEAVE_OVER_IPC = [[hyprctl dispatch 'hl.dsp.submap("reset")']]
 
 local idle
+local idle_ticks = 0
 
-local function close_group()
-  hl.dispatch(hl.dsp.submap("reset"))
+local function stop_idling()
+  idle_ticks = 0
   if idle then
     idle:set_enabled(false)
   end
 end
 
-local function hold_group_open()
-  if idle then
-    idle:set_timeout(groups.TIMEOUT)
-    idle:set_enabled(true)
-  else
-    idle = hl.timer(close_group, { timeout = groups.TIMEOUT, type = "oneshot" })
+-- From a keybind: the submap can be dispatched directly, which is immediate.
+local function close_group()
+  hl.dispatch(hl.dsp.submap("reset"))
+  stop_idling()
+end
+
+-- From the timer: the same thing, the long way round.
+local function close_group_over_ipc()
+  stop_idling()
+  hl.dispatch(hl.dsp.exec_cmd(LEAVE_OVER_IPC))
+end
+
+local function on_tick()
+  idle_ticks = idle_ticks + 1
+  if idle_ticks * groups.TICK >= groups.TIMEOUT then
+    close_group_over_ipc()
   end
+end
+
+local function hold_group_open()
+  idle_ticks = 0
+  if not idle then
+    idle = hl.timer(on_tick, { timeout = groups.TICK, type = "repeat" })
+  end
+  idle:set_enabled(true)
 end
 
 -- A reload clears every bind and all of this Lua state but does *not* leave the current

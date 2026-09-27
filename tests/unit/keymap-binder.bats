@@ -51,14 +51,19 @@ binder() {
   assert_output "volume"
 }
 
-@test "a member that does not exit keeps the group open and re-arms the timer" {
+@test "a member that does not exit keeps the group open and restarts the idle wait" {
   run binder "
+    stub.press('SUPER + v')
+    stub.idle_for(1000)
     stub.reset()
     stub.press('k')
+    stub.idle_for(1000)
     print(stub.log())"
   assert_output --partial "exec_cmd volume up"
+  # 1 s of idling, a keystroke, 1 s more: the wait measures from the keystroke, so the
+  # group is still open. A timer that only counted from when the group opened would have
+  # closed it here.
   refute_output --partial "submap reset"
-  assert_output --partial "timer armed 1500"
 }
 
 @test "a member that exits closes the group and stops the timer" {
@@ -81,13 +86,14 @@ binder() {
   refute_output --partial "exec_cmd"
 }
 
-@test "the prefix arms the timer, so a group opened and forgotten closes itself" {
+@test "the prefix starts the idle clock, so a group opened and forgotten closes itself" {
   run binder "
     stub.reset()
     stub.press('SUPER + v')
-    print(stub.log())"
+    print(stub.log())
+    print(stub.timer_kind(), stub.timer_running())"
   assert_output --partial "submap volume"
-  assert_output --partial "timer armed 1500"
+  assert_line --index 3 "repeat	true"
 }
 
 @test "there is one timer however many keys are pressed" {
@@ -102,13 +108,38 @@ binder() {
   assert_output "1"
 }
 
-@test "the timer firing closes the group" {
+@test "idling out closes the group, and over IPC because a timer cannot do it directly" {
+  # Measured on 0.56.2: a submap dispatched from a timer callback returns ok and is
+  # silently ignored. Only the keybind and IPC paths change the submap, so the timeout
+  # goes round through hyprctl.
   run binder "
     stub.press('SUPER + v')
     stub.reset()
-    stub.fire_timer()
+    stub.idle_for(1500)
     print(stub.log())"
-  assert_output --partial "submap reset"
+  assert_output --partial "hyprctl dispatch"
+  refute_output --partial "(ignored: dispatched from a timer)"
+}
+
+@test "the clock keeps running, so a second group also closes itself" {
+  # The bug this forbids: a oneshot timer, which cannot be re-armed once it has fired --
+  # the first group would time out and every one after it would stay open for ever.
+  run binder "
+    stub.press('SUPER + v')
+    stub.idle_for(1500)
+    stub.press('SUPER + v')
+    stub.reset()
+    stub.idle_for(1500)
+    print(stub.log())"
+  assert_output --partial "hyprctl dispatch"
+}
+
+@test "the clock stops once the group is closed, rather than ticking all session" {
+  run binder "
+    stub.press('SUPER + v')
+    stub.press('m')
+    print(stub.timer_running())"
+  assert_output "false"
 }
 
 # --- not costing a session -------------------------------------------------------------
