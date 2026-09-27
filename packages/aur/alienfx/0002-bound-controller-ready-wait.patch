@@ -1,0 +1,33 @@
+Bound the controller-ready wait so a contended device cannot spin forever.
+
+_wait_controller_ready() loops until the controller answers STATUS_READY and counts
+failures only inside `except TypeError`. That branch is unreachable: read_packet()
+swallows USBError and returns None, and the `bool(resp) and` guard -- added so resp[0]
+would not raise TypeError on None -- means nothing raises at all. So errcount never
+increments, the `if errcount > 50: quit(-99)` escape never fires, and the loop runs
+without end.
+
+Measured on an Alienware 14: 25 concurrent invocations each spun here for over ten
+minutes in R state, hammering get_status after having issued _reset("all-lights-on") --
+which made the keyboard flash and meant no colour ever landed.
+
+This counts every attempt that did not come back ready, which is what the existing
+bound of 50 was always meant to do.
+
+--- a/alienfx/core/controller.py
++++ b/alienfx/core/controller.py
+@@ -153,10 +153,13 @@
+             pkt = self.cmd_packet.make_cmd_get_status()
+             logging.debug("SENDING: {}".format(self.pkt_to_string(pkt)))
+             self._driver.write_packet(pkt)
++            resp = None
+             try:
+                 resp = self._driver.read_packet()
+-                ready = bool(resp) and (resp[0] == self.cmd_packet.STATUS_READY)
+             except TypeError:
++                pass
++            ready = bool(resp) and (resp[0] == self.cmd_packet.STATUS_READY)
++            if not ready:
+                 errcount += 1
+                 logging.debug("No Status received yet... Failed tries=" + str(errcount))
+             if errcount > 50:

@@ -102,22 +102,6 @@ print(sorted(k for k in t if k!='speed'))
   assert_output "[0, 0, 0]"
 }
 
-@test "the paint is serialised, so two callers cannot fight over the USB device" {
-  # A repeating key, a wallpaper change and the login unit can all ask at once. libusb
-  # gives the loser "Resource busy" and alienfx then retries forever, one error line
-  # per packet -- so the second caller waits rather than racing.
-  run grep -qE "flock" "$SCRIPT"
-  assert_success
-}
-
-@test "alienfx is bounded, so a stuck one cannot flood" {
-  # Measured: an alienfx that cannot claim the device wrote 512KB of errors before it
-  # was killed. The writability check catches an inaccessible node; a *busy* one gets
-  # past it, which is what a timeout is for.
-  run grep -qE "timeout [0-9]+ alienfx" "$SCRIPT"
-  assert_success
-}
-
 # --- the keyboard backlight level (#26) ----------------------------------------------
 
 @test "with no level set the colour is full: a machine that never dimmed stays lit" {

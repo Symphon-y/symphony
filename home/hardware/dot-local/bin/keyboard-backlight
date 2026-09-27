@@ -20,6 +20,8 @@ ROOT=$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../../../.." && pwd)
 readonly ROOT
 # shellcheck source-path=SCRIPTDIR source=../../../../scripts/lib/osd.bash
 source "$ROOT/scripts/lib/osd.bash"
+# shellcheck source-path=SCRIPTDIR source=../../../../scripts/lib/lighting.bash
+source "$ROOT/scripts/lib/lighting.bash"
 
 readonly LEVEL_FILE="${SYMPHONY_STATE:-$HOME/.local/state/symphony}/led-brightness"
 
@@ -56,8 +58,9 @@ fi
 mkdir -p "$(dirname "$LEVEL_FILE")"
 printf '%s' "$level" >"$LEVEL_FILE"
 
-# Repaint now, or the new level would not show until something else re-rendered the
-# palette. Never fatal: lighting must not fail a keypress.
-command -v alienfx-theme >/dev/null && alienfx-theme || true
+# Ask for a repaint, or the new level would not show until something else re-rendered
+# the palette. Asking rather than painting is what keeps a held key from starting a
+# painter per press; the OSD below is raised immediately either way.
+lighting_repaint
 
 osd_show "Keyboard light" "$level%" "$level"

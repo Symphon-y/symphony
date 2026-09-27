@@ -4,6 +4,10 @@
 # D-0084). Enabled only on machines with the controller, by symphony-hardware
 # from system/hardware.txt -- never by services-user.txt. Later repaints come
 # from wallpaper-set, which calls alienfx-theme after every render.
+#
+# This unit is the only thing that should run the painter. Callers ask for a repaint
+# with `systemctl --user --no-block restart` (scripts/lib/lighting.bash): systemd kills
+# the previous instance's cgroup first, so two painters can never fight over the device.
 [Unit]
 Description=AlienFX lighting in the theme colour
 PartOf=graphical-session.target
@@ -12,6 +16,9 @@ After=graphical-session.target
 [Service]
 Type=oneshot
 ExecStart=%h/.local/bin/alienfx-theme
+# A painter that cannot claim the USB controller must not live forever: our alienfx
+# patch bounds its ready-wait, and this reaps one on a machine whose package predates it.
+TimeoutStartSec=30
 
 [Install]
 WantedBy=graphical-session.target

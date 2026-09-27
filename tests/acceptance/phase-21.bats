@@ -38,6 +38,38 @@ lua_eval() {
   assert_line "lua"
 }
 
+@test "nothing but the unit runs the AlienFX painter" {
+  # The bug this pins: wallpaper-set and keyboard-backlight each ran alienfx-theme
+  # directly, in the caller's cgroup. Nothing owned the process lifetime, a repeating
+  # key spawned one per press, and 25 of them wedged the controller -- the keys flashed
+  # and no colour landed. Callers ask systemd; systemd owns exactly one painter.
+  run bash -c "grep -rn --include='*' -E '(^|[^-])\\balienfx-theme\\b' \
+    '$REPO_ROOT/home' '$REPO_ROOT/install' '$REPO_ROOT/scripts' \
+    | grep -v 'dot-local/bin/alienfx-theme:' \
+    | grep -v 'systemd/user/alienfx-theme.service' \
+    | grep -v 'alienfx-theme.service' \
+    | grep -v 'scripts/lib/lighting.bash' \
+    | grep -v '^[^:]*:[0-9]*: *#'"
+  assert_failure
+}
+
+@test "the painter's unit is bounded, so a wedged run is reaped" {
+  run cat "$REPO_ROOT/home/hardware/dot-config/systemd/user/alienfx-theme.service"
+  assert_success
+  assert_output --partial "TimeoutStartSec="
+}
+
+@test "the installed alienfx cannot spin forever waiting for the controller" {
+  # Upstream counts failures only inside `except TypeError`, which `bool(resp) and`
+  # made unreachable -- so a contended controller loops without end. Our patch counts
+  # every failed read. A machine whose package predates it fails here.
+  # Asserting the patched *shape*: the count sits under `if not ready`, outside the
+  # try/except. Grepping for `errcount += 1` near the read matches the unpatched form
+  # too, since that is exactly where upstream's unreachable increment lives.
+  run bash -c "grep -A1 'if not ready:' /usr/lib/python3*/site-packages/alienfx/core/controller.py | grep -q 'errcount += 1'"
+  assert_success
+}
+
 # --- the keymap's own invariants (#21) ------------------------------------------------
 
 @test "every action the defaults name actually exists in the registry" {

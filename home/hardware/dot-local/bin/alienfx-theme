@@ -106,22 +106,10 @@ mkdir -p "$THEME_DIR"
   echo '}'
 } >"$THEME"
 
-# One painter at a time. A repeating key, a wallpaper change and the login unit can all
-# ask at once; libusb hands the loser "Resource busy" and alienfx then retries forever,
-# one error line per packet -- measured at 512KB before it was killed. So: wait for the
-# device rather than race for it, and give up rather than queue forever.
-#
-# The timeout is the other half. The writability check above catches a node we cannot
-# open; a node that is merely *busy* gets past it, and only a bound runtime stops the
-# flood.
-readonly LOCK="${SYMPHONY_STATE:-$HOME/.local/state/symphony}/alienfx.lock"
-mkdir -p "$(dirname "$LOCK")"
-exec 9>"$LOCK"
-if ! flock -w 5 9; then
-  echo "alienfx-theme: another repaint is still running; skipping this one" >&2
-  exit 0
-fi
-
-timeout 15 alienfx --theme symphony ||
+# One painter runs at a time because alienfx-theme.service owns it and callers ask
+# through lighting_repaint -- see scripts/lib/lighting.bash. The ready-wait inside
+# alienfx is bounded by our own patch (packages/aur/alienfx), so a run that cannot claim
+# the controller fails instead of spinning.
+alienfx --theme symphony ||
   echo "alienfx-theme: alienfx failed (no device, no access, or busy?)" >&2
 exit 0

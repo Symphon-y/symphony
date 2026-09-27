@@ -20,6 +20,9 @@ setup() {
   printf '#!/usr/bin/env bash\necho "alienfx-theme${*:+ $*}" >>"$STUB_LOG"\n' \
     >"$BATS_TEST_TMPDIR/bin/alienfx-theme"
   # shellcheck disable=SC2016 # the stub body expands when the stub runs, not here
+  printf '#!/usr/bin/env bash\necho "systemctl $*" >>"$STUB_LOG"\n' \
+    >"$BATS_TEST_TMPDIR/bin/systemctl"
+  # shellcheck disable=SC2016 # the stub body expands when the stub runs, not here
   printf '#!/usr/bin/env bash\necho "notify-send $*" >>"$STUB_LOG"\nprintf 77\n' \
     >"$BATS_TEST_TMPDIR/bin/notify-send"
   chmod +x "$BATS_TEST_TMPDIR/bin"/*
@@ -85,12 +88,30 @@ calls() {
   assert_output "75"
 }
 
-@test "it repaints, or the new level would not be visible until the next wallpaper" {
+@test "it asks for a repaint, or the new level would not show until the next wallpaper" {
   echo 50 >"$LEVEL"
   run "$SCRIPT" up
   assert_success
   run calls
-  assert_line "alienfx-theme"
+  assert_output --partial "restart alienfx-theme.service"
+}
+
+@test "it never runs the painter itself: two at once wedge the USB controller" {
+  # A held key spawned one painter per press; the losers spun forever on the device,
+  # the level and the OSD moved, and the lights did not.
+  echo 50 >"$LEVEL"
+  run "$SCRIPT" up
+  assert_success
+  run calls
+  refute_line "alienfx-theme"
+}
+
+@test "the OSD does not wait for the paint" {
+  echo 50 >"$LEVEL"
+  run "$SCRIPT" up
+  assert_success
+  run calls
+  assert_output --partial "--no-block"
 }
 
 @test "the OSD says the level" {
@@ -115,6 +136,7 @@ calls() {
   assert_output --partial "usage"
   run calls
   refute_output --partial "alienfx-theme"
+  refute_output --partial "systemctl"
 }
 
 @test "no verb at all is a usage error" {
