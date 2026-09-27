@@ -25,6 +25,7 @@ matugen                       # single palette -> per-tool templates (D-0025)
 vulkan-intel                  # Vulkan driver for the Intel iGPU
 xdg-terminal-exec             # resolves the $terminal role; AUR (yay), see packages/external.md
 fuzzel                         # launcher; also the --dmenu engine behind the power/system menu
+lua                            # `symphony-keys` reads the keymap through the same modules Hyprland loads
 waybar                         # status bar, matugen-templated
 networkmanager-dmenu           # network picker through fuzzel (bar Wi-Fi icon, SUPER+CTRL+N): list, join, password, hidden (Phase 17, D-0071)
 nm-connection-editor           # full network settings, the icon's right-click: VPN, static IP, 802.1X (a GTK3 window)

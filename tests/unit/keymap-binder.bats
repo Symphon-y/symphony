@@ -47,8 +47,9 @@ binder() {
 @test "the submap is defined before anything is bound into it" {
   # hl.define_submap takes the function that does the binding, so a bind that escaped it
   # would land in the global map and fire while you type.
+  # In the order merge emits them, which is sorted so it is the same on every run.
   run binder "print(stub.defined_submaps())"
-  assert_output "volume"
+  assert_output "brightness menus capture volume"
 }
 
 @test "a member that does not exit keeps the group open and restarts the idle wait" {
@@ -175,9 +176,55 @@ binder() {
     ["u"] = "volume.up" } } } }'
   run binder "
     print(stub.bind_description('SUPER + v'))
-    print(stub.submap_of('u'), stub.submap_of('k'))"
+    print(stub.submap_of('u'))
+    print(stub.defined_submaps())"
   assert_line --index 0 "Sound..."
-  assert_line --index 1 "sound	"
+  assert_line --index 1 "sound"
+  # The shipped group is gone entirely -- not merged into, so its keys did not survive.
+  refute_line --partial "volume"
+}
+
+# --- Hyprland's own dispatchers, named by the registry (#23) ---------------------------
+#
+# Most of the migrated chords are not `exec`: they close a window, exit, focus a
+# direction, switch a workspace. The registry names the dispatcher as data -- `dsp` plus
+# optional `args` -- so a new one is a line in actions.lua rather than a branch here.
+
+@test "a dispatch action binds the dispatcher the registry names" {
+  user_keymap '{ global = { ["SUPER + z"] = "window.close" } }'
+  run binder "
+    stub.press('SUPER + z')
+    print(stub.log())
+    print(stub.bind_description('SUPER + z'))"
+  assert_output --partial "dispatch window.close"
+  assert_output --partial "Close window"
+}
+
+@test "a dispatch action passes its args through, so one action serves ten workspaces" {
+  user_keymap '{ global = { ["SUPER + z"] = "workspace.3" } }'
+  run binder "
+    stub.press('SUPER + z')
+    print(stub.log())"
+  assert_output --partial "dispatch focus {workspace=3}"
+}
+
+@test "an action with no args calls the dispatcher with no argument at all" {
+  # Not the same thing as nil: hl.dsp.focus(nil) raises \"expected a table\", measured on
+  # 0.56.2, so a dispatcher that takes nothing must be called with nothing.
+  user_keymap '{ global = { ["SUPER + z"] = "window.close" } }'
+  run binder "
+    stub.press('SUPER + z')
+    print(stub.log())"
+  assert_output --partial "(argc 0)"
+}
+
+@test "a dispatcher name the compositor does not have costs that key alone" {
+  user_keymap '{ global = { ["SUPER + z"] = { desc = "Nope", kind = "dispatch", dsp = "window.explode" } } }'
+  run binder "
+    print(stub.notifications())
+    print(stub.bind_description('SUPER + Return'))"
+  assert_output --partial "window.explode"
+  assert_line --index 1 "Terminal"
 }
 
 # --- the flat keymap is untouched by all this ------------------------------------------

@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# Target: ~/.local/bin/symphony-keys (linked by install/link-home)
+#
+# symphony-keys: what is bound to what (#17). SUPER+K shows the list; `text` prints it for
+# a terminal or a pipe; `defaults` opens the shipped keymap to copy lines out of.
+#
+# A view of the keymap, never a second copy of it: the rows come from keymap/cheatsheet.lua
+# reading the same defaults, the same ~/.config/symphony/keymap.lua and the same action
+# registry that keymap.lua binds from, so what this prints is what is bound -- including
+# anything you rebound.
+#
+# Read-only on purpose. fuzzel answers with the row that was selected and this ignores it:
+# making a row runnable is a separate decision (#18), left until the plain list has earned
+# it.
+#
+# Usage: symphony-keys [list|text|defaults]
+set -euo pipefail
+
+# SYMPHONY_HYPR_DIR exists for the tests; everything else reads the config Hyprland loads.
+HYPR="${SYMPHONY_HYPR_DIR:-$HOME/.config/hypr}"
+readonly HYPR
+readonly DEFAULTS="$HYPR/keymap/defaults.lua"
+
+# Wider and taller than the launcher's window (the matugen template sizes fuzzel for a
+# launcher: width=40, lines=8). Passed here rather than in the theme, so the launcher
+# keeps the shape it wants.
+readonly WIDTH=72 LINES=24
+
+usage() {
+  echo "usage: symphony-keys [list|text|defaults]" >&2
+  exit 2
+}
+
+# The rows, aligned, one per line. Skipped bindings go to stderr: a typo in a keymap
+# should be visible, and in a keybinding's case the journal is where it will be seen.
+rows() {
+  lua -e "
+    package.path = '$HYPR/?.lua;' .. package.path
+    local cheatsheet = require('keymap.cheatsheet')
+    local userconfig = require('keymap.userconfig')
+
+    local user, err = userconfig.load('keymap')
+    if err then
+      io.stderr:write('symphony-keys: your keymap.lua was not loaded, showing the ' ..
+        'shipped keys -- ' .. err .. '\n')
+    end
+
+    local list, skipped = cheatsheet.rows(
+      require('keymap.defaults'), user or {}, require('keymap.actions'))
+    print(table.concat(cheatsheet.text(list), '\n'))
+    if skipped > 0 then
+      io.stderr:write(('symphony-keys: %d binding(s) left out -- an action name with no ' ..
+        'entry in actions.lua, or a group with nothing in it\n'):format(skipped))
+    end"
+}
+
+list() {
+  if ! command -v fuzzel >/dev/null; then
+    echo "symphony-keys: fuzzel is not installed, so there is nothing to show the list in" >&2
+    exit 1
+  fi
+  rows | fuzzel --dmenu --prompt "Keys: " --width "$WIDTH" --lines "$LINES" >/dev/null || true
+}
+
+# The reference itself, to copy lines out of into ~/.config/symphony/keymap.lua. From a
+# keybinding there is no terminal to page in, so ask the terminal role for one.
+reference() {
+  local pager=${PAGER:-less}
+  if [[ -t 1 ]]; then
+    "$pager" "$DEFAULTS"
+  else
+    xdg-terminal-exec -- "$pager" "$DEFAULTS"
+  fi
+}
+
+case ${1:-list} in
+  list) list ;;
+  text) rows ;;
+  defaults) reference ;;
+  *) usage ;;
+esac
