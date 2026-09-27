@@ -156,3 +156,60 @@ setup() {
   run grep -q "app-name=symphony" "$HOME/.config/mako/config"
   assert_success
 }
+
+# --- a deploy makes the running desktop match the payload (#25) -----------------------
+#
+# The bug these pin: the test above asserts the update module is in the bar's *config*,
+# and it passed for two days while the running bar did not have it. `enable --now` is a
+# no-op on a unit that is already enabled and running, so nothing picked the change up.
+
+@test "the deploy restarts the user services, not just Hyprland" {
+  # shellcheck disable=SC2016 # a grep pattern, not a string to expand
+  run grep -qE '^\s*"\$CURRENT/install/enable-user-services" restart' \
+    "$REPO_ROOT/home/update/dot-local/bin/symphony-update"
+  assert_success
+}
+
+@test "the restart re-reads the unit files first, or a changed unit is missed" {
+  run grep -qE 'systemctl --user daemon-reload' "$REPO_ROOT/install/enable-user-services"
+  assert_success
+  run grep -qE 'systemctl daemon-reload' "$REPO_ROOT/install/enable-root-services"
+  assert_success
+}
+
+@test "the restart starts nothing that was not running" {
+  # try-restart, so a unit someone stopped stays stopped and a machine with no session
+  # is left alone.
+  run grep -qE 'systemctl --user try-restart' "$REPO_ROOT/install/enable-user-services"
+  assert_success
+  # shellcheck disable=SC2016 # a grep pattern, not a string to expand
+  run grep -nE 'systemctl --user (restart|start) "\$unit"' "$REPO_ROOT/install/enable-user-services"
+  assert_failure
+}
+
+@test "a deploy that changes a matugen template re-renders the palette" {
+  # Every generated config -- mako, waybar's colours, ghostty, fuzzel, GTK, theme.env --
+  # is stale until matugen runs, and a deploy is not a wallpaper change.
+  run grep -q 'rerender_palette' "$REPO_ROOT/home/update/dot-local/bin/symphony-update"
+  assert_success
+  run grep -q 'palette_render' "$REPO_ROOT/scripts/lib/wallpaper.bash"
+  assert_success
+}
+
+@test "the matugen call has one home, so its flags cannot drift apart" {
+  # --source-color-index 0 is what stops matugen prompting for a source colour with no
+  # TTY; a second copy of the command is a second place for that to be forgotten.
+  run bash -c "grep -rln 'matugen --config' '$REPO_ROOT/home' '$REPO_ROOT/install' '$REPO_ROOT/scripts' | grep -v 'scripts/lib/wallpaper.bash'"
+  assert_failure
+}
+
+@test "live-session: the running bar is newer than the payload it reads" {
+  # The exact failure this issue was filed for, as an assertion: waybar running since
+  # before the deploy that installed its config. ctime, not mtime -- the swap is a
+  # rename, so the directory's mtime comes from the tarball and only its ctime marks
+  # when it became current/.
+  local bar payload
+  bar=$(date -d "$(systemctl --user show -p ActiveEnterTimestamp --value waybar.service)" +%s)
+  payload=$(stat -c %Z /usr/local/share/symphony/current)
+  assert [ "$bar" -ge "$payload" ]
+}

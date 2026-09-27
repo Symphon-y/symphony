@@ -56,9 +56,8 @@ if systemctl --user is-active --quiet hyprpaper.service; then
   systemctl --user restart hyprpaper.service
 fi
 
-# --source-color-index 0 (most dominant color) skips matugen's interactive
-# source-color prompt, which would otherwise hang a keybind-triggered run with no TTY.
-matugen --config "$HOME/.config/matugen/config.toml" image "$path" --source-color-index 0
+# The palette, from the picture just set: one home for that call (scripts/lib/wallpaper).
+palette_render "$path"
 
 # Hardware that shows the theme colour (AlienFX, Phase 19): ask for a repaint from the
 # fresh palette. A no-op wherever there is no such hardware; never fails this script.

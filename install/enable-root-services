@@ -18,7 +18,7 @@ readonly REPO_ROOT
 readonly UNITS_FILE="$REPO_ROOT/system/services-root.txt"
 
 usage() {
-  echo "usage: enable-root-services check|apply [--root DIR]" >&2
+  echo "usage: enable-root-services check|apply [--root DIR]|reload" >&2
   exit 2
 }
 
@@ -66,10 +66,20 @@ apply() {
   echo "enabled: $(units | tr '\n' ' ')"
 }
 
+# A payload can change a unit file, and systemd keeps the definition it parsed at boot
+# until it is told otherwise -- nothing in this repo reloaded it until #25. Reload only:
+# the declared units are three timers, which re-read their definition when they next
+# start, and power-profiles-daemon, which gains nothing from being bounced every deploy.
+reload() {
+  systemctl daemon-reload
+  echo "reloaded: the system manager"
+}
+
 main() {
   case ${1:-} in
     check) check ;;
     apply) shift && apply "$@" ;;
+    reload) reload ;;
     *) usage ;;
   esac
 }

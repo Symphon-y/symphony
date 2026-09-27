@@ -2767,3 +2767,47 @@ and `wallpaper-set` drives the config file instead.)_
   been filtered. Rendering the list is what showed groups sorting to the *end* of it — the
   category was being taken from the first row, which is `Escape` in any group whose keys sort
   after it — a bug no test had asked about because nobody had looked at the output.
+
+## D-0094 — A deploy makes the running desktop match the payload
+
+- **Status:** Accepted (2026-09-27, #25)
+- **Decision:** `symphony-update`'s post-swap step reloads the whole desktop, not just the
+  compositor. `reload_desktop()` reloads Hyprland (D-0079's #8 behaviour, unchanged),
+  re-renders the palette when the payload's matugen templates changed, then runs
+  `install/enable-user-services restart` and `install/enable-root-services reload`. The
+  restart is `systemctl --user daemon-reload` followed by `try-restart` of **every** unit in
+  `system/services-user.txt`; the root side is a `daemon-reload` and nothing more. Every step
+  is session-gated and never fatal.
+- **Alternatives considered:** restart only the units whose config actually changed — quieter,
+  but it needs a mapping from each unit to the payload paths it reads, which is knowledge that
+  rots silently and would have to be right for a bug whose whole nature is silence. Restart
+  only waybar and mako, the two named in the issue — leaves the same trap set for the next
+  service whose shipped config changes. `restart` rather than `try-restart` — starts units a
+  deploy never asked to start, including on a machine with no session. Also restart the root
+  units — the declared ones are three timers, which re-read their definition when they next
+  start, plus `power-profiles-daemon`, which gains nothing from being bounced. Tell the user
+  to log out after a deploy — a runbook step is what #8 replaced.
+- **Reasoning:** `enable --now` is a no-op on a unit that is already enabled and running, so
+  every applier ran, every file was correct, and the screen kept the old configuration. Phase
+  20's update badge shipped that way and never appeared; the bar had been running since two
+  days before the deploy that installed its config. Phase 21 paid for it twice more — `SUPER+v`
+  reported as "isn't doing anything" was a correct binding with no indicator, because waybar
+  was still running the config from before the deploy. Two further gaps turned up while fixing
+  it: **nothing in the repo ran `systemctl daemon-reload`**, so a payload that changed a unit
+  file left systemd running the definition it parsed at boot; and **every generated config is
+  matugen output** — mako, waybar's colours, ghostty, fuzzel, the GTK sheets, `theme.env` — so
+  a release that changed a template changed nothing on screen, matugen running only on a
+  wallpaper change. Phase 20's badge appeared at all only because an unrelated migration
+  happened to call `wallpaper-set`. The restart is unconditional because the alternative is a
+  mapping that has to be maintained correctly to prevent a class of bug defined by nobody
+  noticing; the re-render is the one conditional step, because it is the one with a real cost.
+- **Consequences:** a deploy now costs a brief bar reset and about 200 ms of black while
+  hyprpaper restarts (D-0085) — paid on a deliberate, infrequent act that already takes minutes
+  installing packages. `system/services-user.txt` gains a second job: it is no longer only what
+  to enable, it is what a deploy restarts, so a unit added there is covered without anyone
+  remembering to. The matugen call has one home, `palette_render()` in
+  `scripts/lib/wallpaper.bash`, shared by `wallpaper-set` and the deploy — its
+  `--source-color-index 0` (which stops matugen prompting for a source colour with no TTY) can
+  no longer be forgotten in one copy. An acceptance test asserts the running bar is newer than
+  the payload it reads, which is the exact thing that was false when this was filed and which
+  no file-contents test could have caught.

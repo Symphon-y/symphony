@@ -41,10 +41,20 @@ make_installed_payload() {
     # shellcheck disable=SC2016 # stub body expands when the stub runs
     mkdir -p "$dir/$(dirname "$tool")"
     # shellcheck disable=SC2016 # stub body expands when the stub runs
-    printf '#!/usr/bin/env bash\nd=$(dirname "$0"); while [[ ! -e $d/VERSION ]]; do d=$(dirname "$d"); done\necho "%s${*:+ $*} from $(cat "$d/VERSION")" >>"$STUB_LOG"\n' "${tool##*/}" >"$dir/$tool"
+    printf '#!/usr/bin/env bash\nd=$(dirname "$0"); while [[ ! -e $d/VERSION ]]; do d=$(dirname "$d"); done\necho "%s${*:+ $*} from $(cat "$d/VERSION")" >>"$STUB_LOG"\n[[ $1 == restart && -n ${STUB_RESTART_FAIL:-} ]] && exit 1\nexit 0\n' "${tool##*/}" >"$dir/$tool"
     chmod +x "$dir/$tool"
   done
   echo "old-package" >"$dir/packages/base.txt"
+  payload_theme_files "$dir"
+}
+
+# What the palette is rendered from, and where the pointer's path is defined: both live
+# in the payload, so symphony-update reads them from there and the fakes carry them too.
+payload_theme_files() {
+  local dir=$1
+  mkdir -p "$dir/home/matugen/dot-config/matugen/templates" "$dir/scripts/lib"
+  echo "# mako template" >"$dir/home/matugen/dot-config/matugen/templates/mako.ini"
+  cp "$REPO_ROOT/scripts/lib/wallpaper.bash" "$dir/scripts/lib/wallpaper.bash"
 }
 
 # A release: a throwaway repo whose payload dirs carry the same logging stubs, packed
@@ -61,10 +71,11 @@ make_release() {
     # The release's stubs must find VERSION wherever the payload lands (current/ after
     # the swap, or previous/ after a rollback): walk up from $0 to the dir holding it.
     # shellcheck disable=SC2016 # stub body expands when the stub runs
-    printf '#!/usr/bin/env bash\nd=$(dirname "$0"); while [[ ! -e $d/VERSION ]]; do d=$(dirname "$d"); done\necho "%s${*:+ $*} from $(cat "$d/VERSION")" >>"$STUB_LOG"\n' "${tool##*/}" >"$repo/$tool"
+    printf '#!/usr/bin/env bash\nd=$(dirname "$0"); while [[ ! -e $d/VERSION ]]; do d=$(dirname "$d"); done\necho "%s${*:+ $*} from $(cat "$d/VERSION")" >>"$STUB_LOG"\n[[ $1 == restart && -n ${STUB_RESTART_FAIL:-} ]] && exit 1\nexit 0\n' "${tool##*/}" >"$repo/$tool"
     chmod +x "$repo/$tool"
   done
   echo "$package" >"$repo/packages/base.txt"
+  payload_theme_files "$repo"
   echo "echo migrated" >"$repo/migrations/1-new.sh"
   echo 'readonly PAYLOAD_CONTENT=(home install migrations packages scripts system)' >"$repo/install/configure-base-system"
   git -C "$repo" init -q -b main
@@ -147,6 +158,7 @@ fi
 exit 0
 EOF
   printf '#!/usr/bin/env bash\necho "notify-send $*" >>"$STUB_LOG"\n' >"$bin/notify-send"
+  printf '#!/usr/bin/env bash\necho "matugen $*" >>"$STUB_LOG"\n' >"$bin/matugen"
   chmod +x "$bin"/*
   PATH="$bin:$PATH"
 }
@@ -412,6 +424,98 @@ installed_version() {
   STUB_HYPRCTL_RELOAD_FAIL=1 run "$SCRIPT" apply --yes
   assert_success
   assert_output --partial "reload"
+  assert_equal "$(installed_version)" "2026.09.22"
+}
+
+# --- the rest of the desktop, not just the compositor (#25) --------------------------
+#
+# The bug: `enable --now` is a no-op on a unit that is already enabled and running, so a
+# deploy that changed waybar's config left the old bar on screen -- which is how Phase
+# 20's update badge shipped and never appeared. A deploy now makes the running desktop
+# match the payload.
+
+@test "apply: restarts the user services, so a changed config reaches the screen" {
+  export HYPRLAND_INSTANCE_SIGNATURE=abc123
+  run "$SCRIPT" apply --yes
+  assert_success
+  run calls
+  assert_line "enable-user-services restart from 2026.09.22"
+}
+
+@test "apply: reloads the system manager, so a changed unit file is re-read" {
+  export HYPRLAND_INSTANCE_SIGNATURE=abc123
+  run "$SCRIPT" apply --yes
+  assert_success
+  run calls
+  assert_line "enable-root-services reload from 2026.09.22"
+}
+
+@test "apply: the restart runs from the new payload, after its own appliers" {
+  export HYPRLAND_INSTANCE_SIGNATURE=abc123
+  run "$SCRIPT" apply --yes
+  assert_success
+  local applied restarted
+  applied=$(grep -n '^enable-user-services apply' "$STUB_LOG" | cut -d: -f1 | head -1)
+  restarted=$(grep -n '^enable-user-services restart' "$STUB_LOG" | cut -d: -f1 | head -1)
+  assert [ -n "$applied" ]
+  assert [ "$applied" -lt "$restarted" ]
+}
+
+@test "apply: re-renders the palette when a matugen template changed" {
+  # mako's config, waybar's colours, ghostty, fuzzel and the GTK sheets are all matugen
+  # output. A deploy that changes a template changes nothing on screen otherwise: matugen
+  # runs on a wallpaper change, and a deploy is not one.
+  export HYPRLAND_INSTANCE_SIGNATURE=abc123
+  export HOME="$BATS_TEST_TMPDIR/home"
+  mkdir -p "$HOME/.local/state/symphony" "$HOME/Pictures"
+  : >"$HOME/Pictures/wall.png"
+  ln -sfn "$HOME/Pictures/wall.png" "$HOME/.local/state/symphony/wallpaper"
+  # The installed payload's template differs from the release's.
+  echo "# changed" >>"$SYMPHONY_PAYLOAD_ROOT/current/home/matugen/dot-config/matugen/templates/mako.ini"
+  run "$SCRIPT" apply --yes
+  assert_success
+  run calls
+  assert_output --partial "matugen"
+}
+
+@test "apply: does not re-render when the templates are untouched" {
+  # The one step with a real cost, so it is the one step that asks first.
+  export HYPRLAND_INSTANCE_SIGNATURE=abc123
+  export HOME="$BATS_TEST_TMPDIR/home"
+  mkdir -p "$HOME/.local/state/symphony" "$HOME/Pictures"
+  : >"$HOME/Pictures/wall.png"
+  ln -sfn "$HOME/Pictures/wall.png" "$HOME/.local/state/symphony/wallpaper"
+  run "$SCRIPT" apply --yes
+  assert_success
+  run calls
+  refute_output --partial "matugen"
+}
+
+@test "apply: no wallpaper yet (a machine before first-login) skips the re-render" {
+  export HYPRLAND_INSTANCE_SIGNATURE=abc123
+  export HOME="$BATS_TEST_TMPDIR/home"
+  mkdir -p "$HOME"
+  echo "# changed" >>"$SYMPHONY_PAYLOAD_ROOT/current/home/matugen/dot-config/matugen/templates/mako.ini"
+  run "$SCRIPT" apply --yes
+  assert_success
+  run calls
+  refute_output --partial "matugen"
+}
+
+@test "apply: no session means the desktop is left alone entirely" {
+  unset HYPRLAND_INSTANCE_SIGNATURE
+  STUB_HYPRCTL_NO_SESSION=1 run "$SCRIPT" apply --yes
+  assert_success
+  run calls
+  refute_output --partial "enable-user-services restart"
+  refute_output --partial "matugen"
+}
+
+@test "apply: a service that will not restart is reported, and the update still stands" {
+  export HYPRLAND_INSTANCE_SIGNATURE=abc123
+  STUB_RESTART_FAIL=1 run "$SCRIPT" apply --yes
+  assert_success
+  assert_output --partial "restart"
   assert_equal "$(installed_version)" "2026.09.22"
 }
 
