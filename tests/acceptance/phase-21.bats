@@ -75,6 +75,26 @@ lua_eval() {
   assert_success
 }
 
+@test "the installed alienfx sends the dim inside the theme's transaction" {
+  # The bug this pins: a dim of its own dies in _wait_controller_ready, because this
+  # controller answers STATUS_READY only just after a reset -- so `--theme X --dim on`
+  # painted the theme and then silently failed, leaving the keys at full. The dim is a
+  # parameter of set_theme, sent while the controller is ready.
+  run python -c "import inspect
+from alienfx.core.controller import AlienFXController
+print('dim' in inspect.signature(AlienFXController.set_theme).parameters)"
+  assert_success
+  assert_output "True"
+}
+
+@test "the stretch leaves every lit channel room to be dimmed" {
+  # The hardware dim is multiplicative in the controller's 4 bits, so the saturation
+  # stretch (D-0084) must stop short of a channel that rounds away when halved -- that
+  # is what turned the violet blue. Pins the rule, not a colour.
+  run grep -q 'DIM_FLOOR' "$REPO_ROOT/home/hardware/dot-local/bin/alienfx-theme"
+  assert_success
+}
+
 @test "the installed alienfx cannot spin forever waiting for the controller" {
   # Upstream counts failures only inside `except TypeError`, which `bool(resp) and`
   # made unreachable -- so a contended controller loops without end. Our patch counts

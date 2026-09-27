@@ -49,7 +49,7 @@ print(t['AC Charged'][0]['loop'][0]['colours'][0])
 print(sorted(k for k in t if k!='speed'))
 "
   assert_line --index 0 "['Alien Head', 'Left Keyboard', 'Logo', 'Middle-left Keyboard', 'Middle-right Keyboard', 'Right Keyboard', 'Status LEDs', 'Touchpad']"
-  assert_line --index 1 "[0, 9, 13]"
+  assert_line --index 1 "[4, 10, 13]"
   assert_line --index 2 "['AC Charged', 'AC Charging', 'AC Sleep', 'Battery Critical', 'Battery On', 'Battery Sleep', 'Boot']"
 }
 
@@ -65,18 +65,19 @@ print(sorted(k for k in t if k!='speed'))
   # Material You's dark-scheme primaries are pastels: #f9bb72's lowest channel is 114
   # of 255, and an LED with 16 levels and a diffuser renders that white floor as pale
   # pink, not amber (seen on the Alienware). Stretching each channel so the lowest
-  # reaches zero keeps the hue and the brightness and drops the wash.
+  # reaches zero keeps the hue and the brightness and drops the wash -- as far as
+  # dimming leaves room for, below.
   printf 'PRIMARY=#f9bb72\n' >"$HOME/.config/symphony/theme.env"
   run "$SCRIPT"
   assert_success
   run colour
-  assert_output "[15, 8, 0]"
+  assert_output "[15, 10, 4]"
 }
 
 @test "each hue keeps its own character once the floor is gone" {
   local hex expected
-  # green pastel -> green; lavender -> its blue hue; warm amber -> gold
-  for hex in "#b0d18b:[6, 12, 0]" "#c1c1ff:[0, 0, 15]" "#ae885d:[10, 5, 0]"; do
+  # green pastel -> green; lavender -> lavender, not pure blue; warm amber -> gold
+  for hex in "#b0d18b:[8, 12, 4]" "#c1c1ff:[4, 4, 15]" "#ae885d:[10, 7, 4]"; do
     printf 'PRIMARY=%s\n' "${hex%%:*}" >"$HOME/.config/symphony/theme.env"
     expected=${hex#*:}
     run "$SCRIPT"
@@ -92,6 +93,56 @@ print(sorted(k for k in t if k!='speed'))
   assert_success
   run colour
   assert_output "[8, 8, 8]"
+}
+
+# --- the stretch leaves room for the hardware dim (D-0088) ---------------------------
+#
+# The dim is multiplicative in the controller's 4 bits, so a channel below 4 of 15 keeps
+# fewer than two levels once halved and rounding decides the hue. Fully stretched,
+# #cabeff is (3, 0, 15) and dims to about (1, 0, 7): violet to pure blue, which is what
+# shipped and what was reported. The stretch is therefore backed off until every lit
+# channel survives a dim.
+
+@test "the stretch stops short of a channel that could not survive being dimmed" {
+  # The colour that showed the bug. Fully stretched it is (3, 0, 15).
+  printf 'PRIMARY=#cabeff\n' >"$HOME/.config/symphony/theme.env"
+  run "$SCRIPT"
+  assert_success
+  run colour
+  assert_output "[7, 5, 15]"
+}
+
+@test "no lit channel is left below the dim floor, whatever the palette is" {
+  local hex channel
+  # Material You primaries across the hue circle; none of these has a dark channel, so
+  # every channel of every one of them has to clear the floor.
+  for hex in cabeff f9bb72 b0d18b ae885d a8d5a2 3fa7d6 7f6ae0; do
+    printf 'PRIMARY=#%s\n' "$hex" >"$HOME/.config/symphony/theme.env"
+    run "$SCRIPT"
+    assert_success
+    run colour
+    for channel in ${output//[^0-9]/ }; do
+      ((channel >= 4)) || fail "#$hex gave $output: channel $channel cannot survive a dim"
+    done
+  done
+}
+
+@test "a channel the palette itself left dark stays dark: there is no hue to preserve" {
+  printf 'PRIMARY=#0000ff\n' >"$HOME/.config/symphony/theme.env"
+  run "$SCRIPT"
+  assert_success
+  run colour
+  assert_output "[0, 0, 15]"
+}
+
+@test "a colour too dark to satisfy the floor is left alone rather than stretched anyway" {
+  # (32, 32, 64) quantises to (2, 2, 4) unstretched and no stretch improves that, so the
+  # rule gives up on the floor rather than spending the headroom for nothing.
+  printf 'PRIMARY=#202040\n' >"$HOME/.config/symphony/theme.env"
+  run "$SCRIPT"
+  assert_success
+  run colour
+  assert_output "[2, 2, 4]"
 }
 
 @test "black does not divide by zero" {
@@ -177,8 +228,8 @@ print(sorted(k for k in t if k!='speed'))
 }
 
 @test "the colour is never scaled: no arithmetic on the channels" {
-  # The property the old code violated. #3fa7d6 with its floor removed is [0, 147, 214],
-  # which quantises to [0, 9, 13] -- and must, at every brightness.
+  # The property the old code violated: the same channels at every brightness, the dim
+  # being a controller state rather than arithmetic.
   mkdir -p "$HOME/.local/state/symphony"
   local level
   for level in full dim; do
@@ -186,7 +237,7 @@ print(sorted(k for k in t if k!='speed'))
     run "$SCRIPT"
     assert_success
     run colour
-    assert_output "[0, 9, 13]"
+    assert_output "[4, 10, 13]"
   done
 }
 

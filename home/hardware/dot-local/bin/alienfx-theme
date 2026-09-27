@@ -50,6 +50,10 @@ r=$((16#${primary:0:2}))
 g=$((16#${primary:2:2}))
 b=$((16#${primary:4:2}))
 
+# The controller takes 4 bits per channel (0-15); the palette gives 8. Rounded, not
+# truncated: 255 -> 15 either way, but 0xa7 is nearer 10 than 9.
+quantise() { printf '%s' $((($1 + 8) / 17)); }
+
 # Remove the white floor. Material You's dark-scheme primaries are pastels -- this
 # palette's amber #f9bb72 has 114 of 255 in its lowest channel -- and an LED with 16
 # levels behind a diffuser renders that floor as a pale wash: on the Alienware the
@@ -58,16 +62,40 @@ b=$((16#${primary:4:2}))
 # and drops the wash; a grey palette (a monochrome wallpaper) has no hue to keep and
 # stays grey. A display-space correction, like gamma -- the palette is still the one
 # source of truth (D-0084).
+#
+# But only as far as dimming leaves room (D-0088): the hardware dim is multiplicative in
+# those 4 bits, so a channel below DIM_FLOOR of 15 keeps fewer than two levels once
+# halved and rounding decides the hue. A fully stretched #cabeff is (3, 0, 15), which
+# dims to about (1, 0, 7) -- violet to pure blue, seen on the machine. So back the
+# stretch off in 5% steps until the dimmest *lit* channel survives a dim. A channel the
+# palette itself left at zero (pure blue) has nothing there to preserve.
+readonly DIM_FLOOR=4
 low=$r
 ((g < low)) && low=$g
 ((b < low)) && low=$b
 high=$r
 ((g > high)) && high=$g
 ((b > high)) && high=$b
-if ((high > low)); then
-  r=$(((r - low) * high / (high - low)))
-  g=$(((g - low) * high / (high - low)))
-  b=$(((b - low) * high / (high - low)))
+
+cut=0
+for ((fraction = 100; fraction >= 0; fraction -= 5)); do
+  ((high > low)) || break # grey: nothing to stretch, and no hue to lose
+  cut=$((low * fraction / 100))
+  survives=1
+  for channel in "$r" "$g" "$b"; do
+    ((channel > 0)) || continue
+    stretched=$(((channel - cut) * high / (high - cut)))
+    (($(quantise "$stretched") < DIM_FLOOR)) && survives=0
+  done
+  ((survives || fraction == 0)) && break
+done
+
+# A cut of zero is the identity, so a grey or unstretchable colour needs no branch of
+# its own; black has no channel to divide by and keeps its zeroes.
+if ((high > cut)); then
+  r=$(((r - cut) * high / (high - cut)))
+  g=$(((g - cut) * high / (high - cut)))
+  b=$(((b - cut) * high / (high - cut)))
 fi
 
 # The keyboard backlight level (#26) is a hardware state, never a scale on the colour.
@@ -81,11 +109,9 @@ if [[ $state == off ]]; then
   r=0 g=0 b=0
 fi
 
-# The controller takes 4 bits per channel (0-15); the palette gives 8. Rounded,
-# not truncated: 255 -> 15 either way, but 0xa7 is nearer 10 than 9.
-r=$(((r + 8) / 17))
-g=$(((g + 8) / 17))
-b=$(((b + 8) / 17))
+r=$(quantise "$r")
+g=$(quantise "$g")
+b=$(quantise "$b")
 
 # The Alienware 14's zones, as verified by zonescan (packages/aur/alienfx's patch).
 zones='["Left Keyboard", "Middle-left Keyboard", "Middle-right Keyboard", "Right Keyboard", "Alien Head", "Logo", "Touchpad", "Status LEDs"]'

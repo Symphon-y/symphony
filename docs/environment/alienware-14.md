@@ -315,6 +315,17 @@ installed packages: 704
   is what matters: with 16 levels per channel a colour whose smallest lit channel is a
   small fraction of its largest loses that channel first, so `#cabeff`'s violet turned
   pure blue as it dimmed.
+- **The dim only lands inside a programming transaction.** This controller answers
+  `STATUS_READY` only just after a reset, so a dim sent on its own -- acquire, wait, send --
+  spends `_wait_controller_ready`'s fifty tries and returns having sent nothing
+  (`ERROR:root:Controller status could not be retrieved`). It belongs after `_ping` +
+  `_reset("all-lights-on")` + `_wait_controller_ready`, in the same transaction as the theme.
+- **The dim is multiplicative in the 4 bits**, so how far the colour is stretched decides
+  whether the hue survives it. Measured at the keyboard with `#cabeff`: `(3, 0, 15)` (the
+  full saturation stretch) dims to pure blue; `(12, 11, 15)` (unstretched) dims with its hue
+  intact; `(7, 5, 15)` -- the most stretch that leaves four of fifteen in the dimmest lit
+  channel -- keeps the hue *and* most of the saturation. Four is where a halving stops
+  having two levels to land on.
 - **`STATUS_UNKNOWN_COMMAND` latches until a reset.** Probing a few deliberately bogus
   commands and then the interesting one reports `UNKNOWN_COMMAND` for everything after the
   first bogus one -- which produced a confident, wrong "this controller has no dim
