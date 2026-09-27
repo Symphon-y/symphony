@@ -43,6 +43,10 @@ return {
     ["SUPER + SPACE"] = "app.launcher",
     ["SUPER + ESCAPE"] = "session.power-menu",
 
+    -- What everything else is bound to (#17). The chord Omarchy uses, so muscle memory
+    -- carries over.
+    ["SUPER + K"] = "keys.cheatsheet",
+
     -- Panels and pickers.
     ["SUPER + CTRL + V"] = "menu.clipboard",
     ["SUPER + CTRL + N"] = "menu.network",

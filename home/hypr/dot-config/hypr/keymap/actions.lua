@@ -52,6 +52,7 @@ local M = {
   ["session.lock"] = { desc = "Lock the screen", kind = "exec", cmd = "hyprlock" },
   ["session.power-menu"] = { desc = "Power menu", kind = "exec", cmd = "power-menu", exits = true },
   ["session.exit"] = { desc = "Exit Hyprland", kind = "dispatch", dsp = "exit" },
+  ["keys.cheatsheet"] = { desc = "Keybindings", kind = "exec", cmd = "symphony-keys", exits = true },
   ["window.close"] = { desc = "Close window", kind = "dispatch", dsp = "window.close" },
 
   -- Menus: the same pickers the bar's icons open, on a key too, because a small icon

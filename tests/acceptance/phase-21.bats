@@ -170,7 +170,7 @@ print('dim' in inspect.signature(AlienFXController.set_theme).parameters)"
 @test "the pure keymap modules load with no compositor at all" {
   # This is what makes them testable, and it is easy to lose by reaching for `hl`.
   local module
-  for module in notation merge actions defaults userconfig groups; do
+  for module in notation merge actions defaults userconfig groups cheatsheet; do
     run lua_eval "require('keymap.$module')"
     assert_success
   done
@@ -269,6 +269,66 @@ print('dim' in inspect.signature(AlienFXController.set_theme).parameters)"
       '.[]|select(.modmask==\$m and .key==\$k)'"
     assert_success
   done
+}
+
+# --- the cheatsheet (#17) -------------------------------------------------------------
+
+@test "the cheatsheet ships, beside the keymap it reads" {
+  assert [ -x "$REPO_ROOT/home/hypr/dot-local/bin/symphony-keys" ]
+  # It runs `lua` itself, so lua is declared rather than relied on as hyprland's
+  # dependency.
+  run "$REPO_ROOT/scripts/pkglist" "$REPO_ROOT/packages/desktop.txt"
+  assert_line "lua"
+  assert_line "fuzzel"
+}
+
+@test "SUPER+K is the cheatsheet, and it is a view of the registry" {
+  run grep -E '\["SUPER \+ K"\][[:space:]]*=[[:space:]]*"keys\.cheatsheet"' \
+    "$REPO_ROOT/home/hypr/dot-config/hypr/keymap/defaults.lua"
+  assert_success
+  run grep -E '\["keys\.cheatsheet"\].*cmd = "symphony-keys"' \
+    "$REPO_ROOT/home/hypr/dot-config/hypr/keymap/actions.lua"
+  assert_success
+}
+
+@test "the cheatsheet lists every binding there is" {
+  # A cheatsheet that quietly omits a binding is worse than none: it teaches you the
+  # keymap is smaller than it is. Every entry must produce a row, and the group prefixes
+  # must bring their members with them.
+  run lua_eval "
+    local cheatsheet = require('keymap.cheatsheet')
+    local groups = require('keymap.groups')
+    local merge = require('keymap.merge')
+    local actions = require('keymap.actions')
+    local defaults = require('keymap.defaults')
+
+    local expected = 0
+    for _, entry in ipairs(merge.entries(merge.merge(defaults, {}))) do
+      expected = expected + 1
+      if type(entry.action) == 'table' and entry.action.kind == 'group' then
+        expected = expected + #groups.plan(entry.chord, entry.action, actions).members
+      end
+    end
+
+    local rows, skipped = cheatsheet.rows(defaults, {}, actions)
+    print(('%d rows, %d expected, %d skipped'):format(#rows, expected, skipped))"
+  assert_success
+  run bash -c "echo '$output' | awk -F'[ ,]+' '{ exit !(\$1 == \$3 && \$5 == 0) }'"
+  assert_success
+}
+
+@test "the promise the keymap makes about symphony-keys is true" {
+  # defaults.lua and the seeded keymap both tell the reader to run `symphony-keys
+  # defaults`; that was a lie until this task.
+  run grep -q "symphony-keys defaults" "$REPO_ROOT/home/hypr/dot-config/hypr/keymap/defaults.lua"
+  assert_success
+  run grep -qE '^ *defaults\)' "$REPO_ROOT/home/hypr/dot-local/bin/symphony-keys"
+  assert_success
+}
+
+@test "live-session: SUPER+K is bound and says what it is" {
+  run bash -c "hyprctl binds -j | jq -r '.[]|select(.modmask==64 and .key==\"K\").description'"
+  assert_output "Keybindings"
 }
 
 # --- transient prefix groups (#22) ----------------------------------------------------
