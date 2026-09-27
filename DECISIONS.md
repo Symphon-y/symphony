@@ -2513,3 +2513,47 @@ and `wallpaper-set` drives the config file instead.)_
   announced release tag and package set, at the cost of one `checkupdates` sync instead
   of two. The dev seat still sees only the package half until it runs a release, which is
   correct and is also the one thing these tests cannot prove here.
+
+## D-0088 — Keyboard brightness is the controller's `0x1C` dim, not arithmetic on the colour (amends D-0084)
+
+- **Status:** Accepted (2026-09-27, Phase 21)
+- **Decision:** Keyboard-LED brightness is a *hardware* state, set with the AlienFX
+  protocol's `0x1C` Dim command, and the palette colour is never scaled. The level has
+  three positions because that is all the hardware offers — `full` (dim disabled), `dim`
+  (dim enabled) and `off` (the zones painted dark, there being no third hardware state).
+  `packages/aur/alienfx` gains `0003-add-dim-command.patch` (`pkgrel` 4) exposing it as
+  `alienfx --dim on|off`, applied outside the `--theme` dispatch chain so one process and
+  one device claim do both. `scripts/lib/lighting.bash` is the single home for the state;
+  `alienfx-theme` paints the palette colour at full fidelity at every level.
+- **Alternatives considered:** scale the RGB channels (what we shipped first) — it visibly
+  shifts the hue, below. Clamp the scaling to the range where the smallest lit channel
+  survives quantisation, about 40% for `#cabeff` — honest but a much smaller range than the
+  hardware actually has, and the clamp would depend on the wallpaper. Leave brightness to a
+  firmware Fn cycle — Dell documents one on other Alienware models, but not on this Fn layer,
+  which is fully probed (`docs/environment/alienware-14.md`). Pull in a second AlienFX
+  implementation for the command — we already package one, so this is a patch, not a
+  dependency.
+- **Reasoning:** the controller is 4 bits per channel. `#cabeff` has red at 18% of blue, so
+  as blue quantises down that ratio cannot be expressed and the violet flips to pure blue:
+  "brightness" built on multiplication is a hue control at the low end. The dim command was
+  there the whole time — documented in the upstream project's own knowledgebase
+  (`0x1C`, `32` Enable / `64` Disable, `01` always / `00` battery-only) but absent from
+  `cmdpacket.py`'s command table, which stops at `0x0E`. Two test errors hid it and produced
+  a confident, wrong "this controller has no dim command": the parameter sent was `0x64`
+  (*Disable*, copied from a vendor SDK template's default) so Enable was never once sent, and
+  two deliberately bogus commands were probed *before* the candidate when
+  `STATUS_UNKNOWN_COMMAND` latches until a reset, so every later probe reported it
+  regardless. Re-probed with a reset and a bounded ready-wait between commands, the candidate
+  first and the calibration re-checked last, `02:1C:32:01` answers `READY` while a bogus
+  command in the same run still answers `UNKNOWN_COMMAND`; on a keyboard painted pure white,
+  where no hue can be mistaken for brightness, toggling Enable and Disable visibly dims and
+  restores it.
+- **Consequences:** the rule this leaves behind is that **a vendored library's command table
+  is not the protocol** — its absence is evidence about the library only, and the same
+  knowledgebase says outright that unmapped commands remain. The OSD reports a named state
+  rather than a percentage the hardware cannot honour, keeping a bar position so it reads
+  like the volume OSD. A machine updating across this change has a numeric level on disk, so
+  `lighting_state` maps `0` to `off` and anything lit to the nearest lit state; nobody is
+  left dark. Any future brightness beyond three steps means finding more of the protocol,
+  not more arithmetic. The probe method and the latching status are recorded in
+  `docs/environment/alienware-14.md` so the trap is not re-entered.
