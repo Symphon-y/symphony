@@ -28,6 +28,7 @@ window#waybar {
 }
 
 #clock,
+#submap,
 #custom-update,
 #wireplumber,
 #network,
@@ -44,6 +45,12 @@ window#waybar {
 }
 
 #custom-update.release {
+  color: @primary;
+}
+
+/* An open prefix group (#22). Absent the rest of the time, so like the update module its
+ * presence is the signal; the accent says a key is being waited for. */
+#submap {
   color: @primary;
 }
 

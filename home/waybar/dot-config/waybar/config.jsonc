@@ -9,7 +9,7 @@
   "height": 30,
   "spacing": 4,
 
-  "modules-left": ["hyprland/workspaces"],
+  "modules-left": ["hyprland/workspaces", "hyprland/submap"],
   "modules-center": ["clock"],
   "modules-right": ["custom/update", "wireplumber", "network", "battery", "tray"],
 
@@ -19,6 +19,15 @@
       "active": "",
       "default": ""
     }
+  },
+
+  // Which prefix group is open (#22). Waybar's own module, and `hide-empty-text` means
+  // the bar is byte-for-byte what it was the rest of the time -- no script, no socket,
+  // no new dependency.
+  "hyprland/submap": {
+    "format": "{}",
+    "tooltip": false,
+    "hide-empty-text": true
   },
 
   "clock": {

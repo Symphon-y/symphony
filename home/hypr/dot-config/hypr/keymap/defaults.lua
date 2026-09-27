@@ -40,4 +40,24 @@ return {
     ["XF86AudioNext"] = "player.next",
     ["XF86AudioPrev"] = "player.previous",
   },
+
+  global = {
+    -- A prefix group (#22): SUPER+v opens it and it waits for one key. k and j keep it
+    -- open, so k k k works; m mutes and closes it; Escape closes it, and so does 1.5 s
+    -- of nothing. Nothing is captured while you type, because a group is only ever
+    -- entered by this chord.
+    --
+    -- This is also how a keyboard without dedicated volume keys reaches the same verbs.
+    -- A group is one value, so overriding it in your own keymap means writing the whole
+    -- group, not one of its keys.
+    ["SUPER + v"] = {
+      kind = "group",
+      desc = "Volume",
+      keys = {
+        ["k"] = "volume.up",
+        ["j"] = "volume.down",
+        ["m"] = "volume.mute",
+      },
+    },
+  },
 }

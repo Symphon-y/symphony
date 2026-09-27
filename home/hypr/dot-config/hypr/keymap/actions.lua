@@ -32,6 +32,11 @@ return {
   ["keyboard.dimmer"] = { desc = "Keyboard light down", kind = "exec", cmd = "keyboard-backlight down" },
   ["keyboard.off"] = { desc = "Keyboard light off", kind = "exec", cmd = "keyboard-backlight off", exits = true },
 
+  -- Leaving a prefix group. The exit itself comes from `exits`, the same field every
+  -- other action uses; this entry exists so Escape is listed on the cheatsheet rather
+  -- than being invisible machinery.
+  ["group.leave"] = { desc = "Close this group", kind = "leave", exits = true },
+
   ["player.play-pause"] = { desc = "Play/pause", kind = "exec", cmd = "player play-pause" },
   ["player.next"] = { desc = "Next track", kind = "exec", cmd = "player next" },
   ["player.previous"] = { desc = "Previous track", kind = "exec", cmd = "player previous" },

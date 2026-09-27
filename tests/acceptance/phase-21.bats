@@ -115,10 +115,19 @@ print('dim' in inspect.signature(AlienFXController.set_theme).parameters)"
     local actions = require('keymap.actions')
     local defaults = require('keymap.defaults')
     local missing = {}
+    local function check(where, action)
+      if type(action) == 'string' and not actions[action] then
+        missing[#missing + 1] = where .. ' -> ' .. action
+      end
+    end
     for scope, keys in pairs(defaults) do
       for chord, action in pairs(keys) do
-        if type(action) == 'string' and not actions[action] then
-          missing[#missing + 1] = scope .. ' ' .. chord .. ' -> ' .. action
+        check(scope .. ' ' .. chord, action)
+        -- A group's members are named the same way, and are just as easy to typo.
+        if type(action) == 'table' and action.kind == 'group' then
+          for key, member in pairs(action.keys or {}) do
+            check(scope .. ' ' .. chord .. ' ' .. key, member)
+          end
         end
       end
     end
@@ -161,10 +170,101 @@ print('dim' in inspect.signature(AlienFXController.set_theme).parameters)"
 @test "the pure keymap modules load with no compositor at all" {
   # This is what makes them testable, and it is easy to lose by reaching for `hl`.
   local module
-  for module in notation merge actions defaults userconfig; do
+  for module in notation merge actions defaults userconfig groups; do
     run lua_eval "require('keymap.$module')"
     assert_success
   done
+}
+
+@test "only keymap.lua reaches for hl, which is what keeps the rest testable" {
+  # Comments stripped first: these modules talk *about* hl.bind without calling it.
+  run bash -c "sed 's/--.*//' '$REPO_ROOT'/home/hypr/dot-config/hypr/keymap/*.lua | grep -n 'hl\\.'"
+  assert_failure
+}
+
+# --- transient prefix groups (#22) ----------------------------------------------------
+
+@test "every group the defaults ship plans without complaint" {
+  # A group with no desc, no keys, or a group nested inside it is reported at runtime as
+  # a toast and then silently does nothing. Worth failing the build over instead.
+  run lua_eval "
+    local actions = require('keymap.actions')
+    local defaults = require('keymap.defaults')
+    local groups = require('keymap.groups')
+    local problems = {}
+    for scope, keys in pairs(defaults) do
+      for chord, action in pairs(keys) do
+        if type(action) == 'table' and action.kind == 'group' then
+          local plan, err = groups.plan(chord, action, actions)
+          if not plan then
+            problems[#problems + 1] = scope .. ' ' .. chord .. ': ' .. err
+          end
+        end
+      end
+    end
+    print(table.concat(problems, ', '))"
+  assert_success
+  assert_output ""
+}
+
+@test "every group can be left by Escape, whatever its author wrote" {
+  # The timeout is the backstop; Escape is the one a person reaches for. A group that
+  # could only be left by waiting would be a trap.
+  run lua_eval "
+    local actions = require('keymap.actions')
+    local defaults = require('keymap.defaults')
+    local groups = require('keymap.groups')
+    local stuck = {}
+    for scope, keys in pairs(defaults) do
+      for chord, action in pairs(keys) do
+        if type(action) == 'table' and action.kind == 'group' then
+          local escapable = false
+          for _, member in ipairs(groups.plan(chord, action, actions).members) do
+            if member.chord == 'Escape' and member.exits then
+              escapable = true
+            end
+          end
+          if not escapable then
+            stuck[#stuck + 1] = scope .. ' ' .. chord
+          end
+        end
+      end
+    end
+    print(table.concat(stuck, ', '))"
+  assert_success
+  assert_output ""
+}
+
+@test "a reload cannot strand the session inside an open group" {
+  # Hyprland clears every bind and all of this Lua state on a reload but does NOT leave
+  # the current submap, so without this the keyboard would answer to nothing at all.
+  run grep -q 'config.reloaded' "$REPO_ROOT/home/hypr/dot-config/hypr/keymap.lua"
+  assert_success
+}
+
+@test "an open group is shown by waybar's own module, with no script behind it" {
+  run bash -c "jq -e '.\"modules-left\"|index(\"hyprland/submap\")' \
+    <(sed 's://.*::' '$REPO_ROOT/home/waybar/dot-config/waybar/config.jsonc')"
+  assert_success
+  run bash -c "jq -e '.\"hyprland/submap\".\"hide-empty-text\"' \
+    <(sed 's://.*::' '$REPO_ROOT/home/waybar/dot-config/waybar/config.jsonc')"
+  assert_success
+}
+
+@test "live-session: the prefix opens a group, and the group's keys are bound in it" {
+  run bash -c "hyprctl binds -j | jq -r '.[]|select(.modmask==64 and .key==\"v\").description'"
+  assert_output "Volume..."
+  run bash -c "hyprctl binds -j | jq -r '.[]|select(.submap==\"volume\")|.key' | sort | tr '\n' ' '"
+  assert_output "Escape j k m "
+}
+
+@test "live-session: the group's keys keep it open or leave it, as the action says" {
+  # k repeats -- k k k works -- and m acts once and leaves. Asserted through `repeat`,
+  # the only part of that distinction hyprctl can see.
+  run bash -c "hyprctl binds -j | jq -r '.[]|select(.submap==\"volume\" and .key==\"k\")|.repeat'"
+  assert_output "true"
+  run bash -c "hyprctl binds -j | jq -r '.[]|select(.submap==\"volume\" and .key==\"m\")|.repeat'"
+  assert_output "false"
 }
 
 @test "the keyboard-light default does not sit on an Fn-layer keysym" {

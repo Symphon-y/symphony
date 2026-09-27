@@ -3,8 +3,8 @@
 -- Turns the keymap into bindings: the shipped defaults, the user's file laid over
 -- them per key, one hl.bind per surviving entry.
 --
--- This and keymap/groups.lua are the only files here that touch `hl`; the rest are
--- pure, which is what lets them be unit-tested under /usr/bin/lua with no compositor.
+-- This is the only file here that touches `hl`; the rest are pure, which is what lets
+-- them be unit-tested under /usr/bin/lua with no compositor.
 --
 -- Nothing in here may cost a session. A broken user file, an unknown action name, an
 -- unknown scope: each is reported and skipped, because Hyprland coming up with zero
@@ -12,6 +12,7 @@
 
 local actions = require("keymap.actions")
 local defaults = require("keymap.defaults")
+local groups = require("keymap.groups")
 local merge = require("keymap.merge")
 local userconfig = require("keymap.userconfig")
 
@@ -30,6 +31,108 @@ local function notify(text)
   end)
 end
 
+-- --- an open prefix group ---------------------------------------------------------
+--
+-- One timer for every group, because only one group can be open at a time: it is
+-- re-armed on each keystroke that keeps the group open, never created per keystroke.
+
+local idle
+
+local function close_group()
+  hl.dispatch(hl.dsp.submap("reset"))
+  if idle then
+    idle:set_enabled(false)
+  end
+end
+
+local function hold_group_open()
+  if idle then
+    idle:set_timeout(groups.TIMEOUT)
+    idle:set_enabled(true)
+  else
+    idle = hl.timer(close_group, { timeout = groups.TIMEOUT, type = "oneshot" })
+  end
+end
+
+-- A reload clears every bind and all of this Lua state but does *not* leave the current
+-- submap, so a reload while a group was open would strand the session with no binds at
+-- all. The event fires once this config has finished evaluating, which is exactly when
+-- the stale submap needs dropping.
+pcall(function()
+  hl.on("config.reloaded", close_group)
+end)
+
+-- --- actions ----------------------------------------------------------------------
+--
+-- One place that turns an action into something bindable, so a verb reached from a
+-- hardware key, a chord or a group's member is the same verb. Returns nil and a reason
+-- rather than raising: an unbindable action costs its own key and nothing else.
+
+local function resolve(action, chord)
+  local spec = action
+  if type(action) == "string" then
+    spec = actions[action]
+    if not spec then
+      return nil, ("no action named %q, from %s"):format(action, chord)
+    end
+  end
+
+  if type(spec) == "function" then
+    return { run = spec, desc = chord }
+  end
+  if type(spec) == "table" and spec.kind == "exec" and spec.cmd then
+    return { run = hl.dsp.exec_cmd(spec.cmd), desc = spec.desc, repeating = spec.repeating }
+  end
+  if type(spec) == "table" and spec.kind == "leave" then
+    -- Leaving is what `exits` does below; this action exists so the cheatsheet lists
+    -- Escape like any other key.
+    return { run = function() end, desc = spec.desc }
+  end
+
+  -- Say what was written and what is valid. The old wording, "no command for it", named
+  -- neither and left you guessing at your own config.
+  local written = type(action) == "string" and ("%q"):format(action) or type(action)
+  return nil,
+    ("cannot bind %s: %s is not an action -- name one from actions.lua, or use "):format(chord, written)
+      .. "false to unbind, true to keep the shipped binding."
+end
+
+local function bind_group(chord, spec, scope)
+  local plan, problem = groups.plan(chord, spec, actions)
+  if not plan then
+    return notify(problem)
+  end
+
+  hl.define_submap(plan.name, function()
+    for _, member in ipairs(plan.members) do
+      local resolved, err = resolve(member.action, member.chord)
+      if not resolved then
+        notify(err)
+      else
+        hl.bind(member.chord, function()
+          hl.dispatch(resolved.run)
+          if member.exits then
+            close_group()
+          else
+            hold_group_open()
+          end
+        end, {
+          description = resolved.desc,
+          locked = scope.locked,
+          repeating = resolved.repeating,
+        })
+      end
+    end
+  end)
+
+  hl.bind(plan.prefix, function()
+    hl.dispatch(hl.dsp.submap(plan.name))
+    hold_group_open()
+  end, { description = plan.desc .. "...", locked = scope.locked })
+end
+
+-- --- the binding pass -------------------------------------------------------------
+
 local user, err = userconfig.load("keymap")
 if err then
   notify("your keymap was not loaded, using defaults -- " .. err)
@@ -37,34 +140,21 @@ end
 
 for _, entry in ipairs(merge.entries(merge.merge(defaults, user or {}))) do
   local scope = SCOPES[entry.scope]
-  local action = entry.action
-
-  -- A string names an entry in the registry; a table is one written inline; a
-  -- function is anything the registry does not cover.
-  if type(action) == "string" then
-    local named = actions[action]
-    if not named then
-      notify(("no action named %q, from %s"):format(action, entry.chord))
-    end
-    action = named
-  end
 
   if not scope then
     notify(("unknown scope %q, from %s"):format(entry.scope, entry.chord))
-  elseif type(action) == "function" then
-    hl.bind(entry.chord, action, { locked = scope.locked, description = entry.chord })
-  elseif type(action) == "table" and action.kind == "exec" and action.cmd then
-    hl.bind(entry.chord, hl.dsp.exec_cmd(action.cmd), {
-      description = action.desc,
-      locked = scope.locked,
-      repeating = action.repeating,
-    })
-  elseif action ~= nil then
-    -- Say what was written and what is valid. The old wording, "no command for it",
-    -- named neither and left you guessing at your own config.
-    local written = type(entry.action) == "string" and ("%q"):format(entry.action)
-      or type(entry.action)
-    notify(("cannot bind %s: %s is not an action -- name one from actions.lua, or use "):format(
-      entry.chord, written) .. "false to unbind, true to keep the shipped binding.")
+  elseif type(entry.action) == "table" and entry.action.kind == "group" then
+    bind_group(entry.chord, entry.action, scope)
+  else
+    local resolved, problem = resolve(entry.action, entry.chord)
+    if not resolved then
+      notify(problem)
+    else
+      hl.bind(entry.chord, resolved.run, {
+        description = resolved.desc,
+        locked = scope.locked,
+        repeating = resolved.repeating,
+      })
+    end
   end
 end
