@@ -25,8 +25,12 @@ return {
   ["screen.brighter"] = { desc = "Brightness up", kind = "exec", cmd = "brightness up", repeating = true },
   ["screen.dimmer"] = { desc = "Brightness down", kind = "exec", cmd = "brightness down", repeating = true },
 
-  ["keyboard.brighter"] = { desc = "Keyboard light up", kind = "exec", cmd = "keyboard-backlight up", repeating = true },
-  ["keyboard.dimmer"] = { desc = "Keyboard light down", kind = "exec", cmd = "keyboard-backlight down", repeating = true },
+  -- Not `repeating`: each press is a USB transaction, and holding the key made several
+  -- alienfx processes fight over the controller -- the level moved, the OSD moved, and
+  -- the lights did not. 10% a press, because 16 levels per channel means 5% often shows
+  -- no change at all and 100 -> off would be twenty presses.
+  ["keyboard.brighter"] = { desc = "Keyboard light up", kind = "exec", cmd = "keyboard-backlight up 10" },
+  ["keyboard.dimmer"] = { desc = "Keyboard light down", kind = "exec", cmd = "keyboard-backlight down 10" },
   ["keyboard.off"] = { desc = "Keyboard light off", kind = "exec", cmd = "keyboard-backlight off", exits = true },
 
   ["player.play-pause"] = { desc = "Play/pause", kind = "exec", cmd = "player play-pause" },
