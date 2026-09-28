@@ -251,18 +251,16 @@ bar_json() {
   done
 }
 
-# --- Hardware that needs extra packages: the PCI-ID map (Broadcom BCM4352) ---------------
+# --- Hardware that needs extra packages: the Broadcom BCM4352 ---------------------------
+#
+# The hardware map itself is phase-19's (D-0082 rebuilt it): `map: every line parses` there
+# runs scripts/hwmatch --all, which validates every value of every entry -- packages=,
+# cmdline=, modprobe=, files=, service= -- through the one real parser, and `map: the
+# Alienware 14's three entries are there` pins this machine's. Two tests here duplicated
+# that by re-parsing the file, and rotted the day the format changed (#28). What is Phase
+# 17's own is below: which packages the Wi-Fi driver needs.
 
-@test "hardware: every map entry names a package list that exists" {
-  local id list
-  while read -r id list _; do
-    assert [ -e "$REPO_ROOT/packages/hardware/$list.txt" ]
-  done < <(sed -E 's/#.*//' "$REPO_ROOT/system/hardware.txt" | awk 'NF >= 2')
-}
-
-@test "hardware: the BCM4352 (14e4:43b1) needs the proprietary wl driver, with headers for both kernels" {
-  run grep -E '^14e4:43b1[[:space:]]+broadcom-wl([[:space:]]|$)' "$REPO_ROOT/system/hardware.txt"
-  assert_success
+@test "hardware: the BCM4352 needs the proprietary wl driver, with headers for both kernels" {
   run "$REPO_ROOT/scripts/pkglist" "$REPO_ROOT/packages/hardware/broadcom-wl.txt"
   assert_success
   assert_line "broadcom-wl-dkms"
@@ -330,10 +328,4 @@ bar_json() {
   assert_success
   run grep -F 'D-0077' "$REPO_ROOT/DECISIONS.md"
   assert_output --partial 'Extended by D-0077'
-}
-
-@test "quirks: the Alienware 14's dell_rbtn blacklist is keyed to its DMI, not to every machine" {
-  run grep -E '^dmi:[^[:space:]]*Alienware[^[:space:]]*[[:space:]]+module_blacklist=dell_rbtn([[:space:]]|$)' \
-    "$REPO_ROOT/system/quirks.txt"
-  assert_success
 }

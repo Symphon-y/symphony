@@ -89,8 +89,19 @@ end
 -- submap, so a reload while a group was open would strand the session with no binds at
 -- all. The event fires once this config has finished evaluating, which is exactly when
 -- the stale submap needs dropping.
+--
+-- Only when a group is actually open, which is also what keeps `Hyprland --verify-config`
+-- alive: verification fires this event with no compositor behind it, and dispatching a
+-- submap from there segfaults -- measured, and not catchable, since the crash is at C
+-- level and happens long after the pcall around the registration has returned.
+-- get_current_submap is safe there and answers with an empty string.
 pcall(function()
-  hl.on("config.reloaded", close_group)
+  hl.on("config.reloaded", function()
+    local ok, submap = pcall(hl.get_current_submap)
+    if ok and submap and submap ~= "" then
+      close_group()
+    end
+  end)
 end)
 
 -- --- actions ----------------------------------------------------------------------

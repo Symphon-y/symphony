@@ -2684,7 +2684,12 @@ and `wallpaper-set` drives the config file instead.)_
   - **A reload clears every bind and all Lua state but does *not* leave the current submap**, so
     `hl.on("config.reloaded")` dispatches `submap("reset")`. Without it a reload while a group
     was open leaves a keyboard that answers to almost nothing. (When a config error leaves zero
-    binds, Hyprland installs its own emergency `SUPER+Q` and `SUPER+M`.)
+    binds, Hyprland installs its own emergency `SUPER+Q` and `SUPER+M`.) The handler asks
+    `hl.get_current_submap()` first and only acts when something is open -- which is also what
+    keeps `Hyprland --verify-config` alive: **verification fires `config.reloaded` with no
+    compositor behind it**, and dispatching a submap from there segfaults the validator. Not
+    catchable, since the crash is at C level long after the registration's `pcall` returned;
+    the getter is safe there and answers an empty string.
   - **No unbounded blocking syscall from inside a Lua callback.** The watchdog is an
     instruction-count hook: it protects against a runaway Lua loop, not against C-level
     blocking. `open(2)` on a FIFO for writing blocks until a reader exists, which can hard

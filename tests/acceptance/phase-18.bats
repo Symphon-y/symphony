@@ -81,12 +81,16 @@ setup() {
   assert_failure
 }
 
-@test "updater: update-notify lives in the same package and checks releases/latest" {
+@test "updater: update-notify lives in the same package as the updater it reports on" {
   assert [ -x "$UPDATE/update-notify" ]
   assert [ ! -e "$REPO_ROOT/home/update-notify" ]
-  run grep -F 'releases/latest' "$UPDATE/update-notify"
+  # It only tells you. Phase 20 split the job four ways (D-0087): update-check is the one
+  # that talks to the release API, update-now is the one that applies, and phase-20's
+  # "only update-check talks to the release API" owns that split -- update-notify reads the
+  # state file and raises the toast.
+  run grep -F 'scripts/lib/updates.bash' "$UPDATE/update-notify"
   assert_success
-  run grep -F 'symphony-update apply' "$UPDATE/update-notify"
+  run grep -F 'notify-send' "$UPDATE/update-notify"
   assert_success
 }
 
