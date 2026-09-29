@@ -16,15 +16,17 @@ while IFS= read -r file; do
     shell_files+=("$file")
   fi
 done < <(
-  # install/seed holds config templates in the user's language, not scripts -- they
-  # are syntax-checked by the luac step below, not by shellcheck.
-  find scripts install -type f -not -path 'install/seed/*' | sort
+  # Everything under scripts/ and install/ is shell unless it is Lua: install/seed holds
+  # templates the user ends up owning, and each is still in a language something checks --
+  # the Lua ones by the luac step below, install/seed/bashrc by shellcheck like any other
+  # shell file. Excluding the whole seed directory would silently drop that one.
+  find scripts install -type f -not -name '*.lua' | sort
   find home -path '*/dot-local/bin/*' -type f -not -path '*/__pycache__/*' | sort
   find migrations -name '*.sh' -type f 2>/dev/null | sort
   find iso/profile/airootfs -type f -path '*/bin/*' 2>/dev/null | sort
   printf '%s\n' iso/build-offline-repo iso/build-in-container iso/profile/airootfs/root/.bash_profile
   printf '%s\n' system/*/*.sh tests/helpers/*.bash tests/unit/*.bats tests/acceptance/*.bats
-  printf '%s\n' home/bash/dot-bashrc
+  printf '%s\n' home/bash/dot-config/bash/symphony.bash
   printf '%s\n' gui/fake-backend
 )
 

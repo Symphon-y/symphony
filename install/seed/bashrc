@@ -1,0 +1,16 @@
+# ~/.bashrc -- yours. symphony seeds this file once, on install, and never touches it
+# again: edit it freely, it survives every update.
+# shellcheck shell=bash
+#
+# symphony's own shell configuration is the file sourced below -- a symlink into the
+# payload, replaced by every deploy. Change symphony's behaviour there, in the repo;
+# change yours here. Anything you add after the source line wins, because it runs last.
+
+[[ $- != *i* ]] && return
+
+# Guarded so that a rolled-back machine, where the payload has no such file, comes up
+# quietly instead of printing an error in every new shell.
+# shellcheck source=/dev/null # a link into the payload; not present at lint time
+[[ -r ~/.config/bash/symphony.bash ]] && source ~/.config/bash/symphony.bash
+
+# Your own aliases, functions and exports below.

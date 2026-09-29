@@ -13,7 +13,7 @@ readonly REPO_ROOT
 readonly UNITS_FILE="$REPO_ROOT/system/services-user.txt"
 
 usage() {
-  echo "usage: enable-user-services check|apply" >&2
+  echo "usage: enable-user-services check|apply|restart" >&2
   exit 2
 }
 
@@ -59,9 +59,31 @@ apply() {
   echo "enabled: $(units | tr '\n' ' ')"
 }
 
+# What a deploy needs beyond `apply` (#25): `enable --now` is a no-op on a unit that is
+# already enabled and running, so a payload that changed waybar's config -- or any unit
+# file -- changed nothing on screen. Phase 20's update badge shipped that way and never
+# appeared.
+#
+# daemon-reload first, because systemd otherwise keeps the unit definition it parsed at
+# boot; then try-restart, which restarts what is running and starts nothing that is not,
+# so a unit stopped on purpose stays stopped and a machine with no session is left alone.
+restart() {
+  local unit failed=()
+  systemctl --user daemon-reload || echo "could not reload the user manager" >&2
+  while IFS= read -r unit; do
+    systemctl --user try-restart "$unit" || failed+=("$unit")
+  done < <(units)
+
+  if ((${#failed[@]} > 0)); then
+    echo "failed: ${failed[*]}" >&2
+    return 1
+  fi
+  echo "restarted: $(units | tr '\n' ' ')"
+}
+
 main() {
   case ${1:-} in
-    check | apply) "$1" ;;
+    check | apply | restart) "$1" ;;
     *) usage ;;
   esac
 }

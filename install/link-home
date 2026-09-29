@@ -72,6 +72,25 @@ seed_config() {
   done
 }
 
+# ~/.bashrc is the user's own file, not a link (D-0095): a stow link there cannot be
+# edited without sudo, and a sudo edit lands inside the root-owned payload, which the
+# next update replaces. symphony's own shell config is what it sources,
+# ~/.config/bash/symphony.bash, which *is* a link and every deploy replaces.
+#
+# The -L in the guard is load-bearing. On a machine installed before D-0095 ~/.bashrc is
+# a link into the payload that the swap left dangling, so -e alone is false -- and cp
+# follows a symlink, so it would try to write inside the root-owned payload, fail with
+# EACCES, and take this whole applier down under set -e. Clearing that link is the
+# migration's job: link-home is also run by hand against already-customized machines and
+# never removes anything there.
+seed_shell() {
+  local src="$REPO_ROOT/install/seed/bashrc"
+  local target="$HOME/.bashrc"
+  [[ -f $src ]] || return 0
+
+  [[ -e $target || -L $target ]] || cp "$src" "$target"
+}
+
 apply() {
   local dir names=()
   for dir in "$PACKAGES_DIR"/*/; do
@@ -83,6 +102,8 @@ apply() {
 
   seed_wallpaper
   seed_config
+  # After the stow call: the file it seeds sources ~/.config/bash/symphony.bash.
+  seed_shell
 
   echo "linked: ${names[*]}"
 }

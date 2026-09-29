@@ -48,3 +48,16 @@ ipc = on
 splash = false
 CONF
 }
+
+# Re-derive the whole system's palette from an image. The wallpaper *is* the theme
+# (D-0037), so this lives here: matugen renders every template and its own post_hooks
+# reload what reads them (`makoctl reload`, `pkill -SIGUSR2 waybar`).
+#
+# --source-color-index 0 (the most dominant colour) skips matugen's interactive
+# source-colour prompt, which would otherwise hang a run with no TTY -- a keybinding, or
+# a deploy. Called by wallpaper-set on a new picture and by symphony-update when a
+# deploy changed a template (#25), which is the only other thing that can make the
+# generated files stale.
+palette_render() {
+  matugen --config "$HOME/.config/matugen/config.toml" image "$1" --source-color-index 0
+}

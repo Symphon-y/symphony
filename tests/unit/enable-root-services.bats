@@ -79,3 +79,29 @@ make_stubs() {
   assert_failure 2
   assert_output --partial "usage"
 }
+
+# --- reload, so a changed unit file takes effect (#25) --------------------------------
+
+@test "reload re-reads the unit files" {
+  # Nothing in this repo ran daemon-reload until #25, so a payload that changed a root
+  # unit left systemd running the definition it parsed at boot.
+  run "$SCRIPT" reload
+  assert_success
+  run cat "$STUB_LOG"
+  assert_line "systemctl daemon-reload"
+}
+
+@test "reload restarts nothing: these are timers and a power daemon" {
+  # A timer re-reads its definition when it next starts, and bouncing
+  # power-profiles-daemon on every deploy is churn for no gain.
+  run "$SCRIPT" reload
+  assert_success
+  run bash -c "grep -E 'systemctl (try-restart|restart|start) ' '$STUB_LOG' || true"
+  assert_output ""
+}
+
+@test "an unknown command is a usage error" {
+  run "$SCRIPT" bounce
+  assert_failure 2
+  assert_output --partial "usage"
+}

@@ -236,3 +236,26 @@ binder() {
   assert_line --index 0 "[]"
   assert_line --index 1 "true"
 }
+
+# --- a reload, with and without a group open (#22, and the validator crash) ------------
+
+@test "a reload while a group is open leaves it" {
+  run binder "
+    stub.press('SUPER + v')
+    stub.reset()
+    stub.reload()
+    print(stub.log())"
+  assert_output --partial "submap reset"
+}
+
+@test "a reload with no group open dispatches nothing" {
+  # Not just tidiness: `Hyprland --verify-config` fires config.reloaded with no compositor
+  # behind it, and dispatching a submap from there segfaults -- measured, and not
+  # catchable, because the crash is at C level long after the registration's pcall
+  # returned. Asking what is open first is what keeps the validator alive.
+  run binder "
+    stub.reset()
+    stub.reload()
+    print('[' .. stub.log() .. ']')"
+  assert_output "[]"
+}

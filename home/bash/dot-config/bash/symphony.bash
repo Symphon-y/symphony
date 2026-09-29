@@ -1,11 +1,20 @@
-# Target: ~/.bashrc (linked by install/link-home)
+# Target: ~/.config/bash/symphony.bash (linked by install/link-home)
 # shellcheck shell=bash
+#
+# symphony's shell configuration, sourced from ~/.bashrc. That file is the user's --
+# seeded once and never written again (D-0095) -- so this is where symphony's own
+# changes go, and it is a read-only symlink into the payload that every deploy
+# replaces. Anything the user adds after the source line in ~/.bashrc wins.
 #
 # Interactive-only -- scripts and non-interactive SSH commands never load this
 # (system/profile/local-bin.sh already puts ~/.local/bin on PATH for every login
 # shell, so this file has no PATH logic of its own -- the stock Arch skel default it
 # replaced prepended ~/.local/bin here too, which would have undone that file's
 # deliberate append-only ordering for real interactive sessions).
+#
+# The guard is kept even though the seeded ~/.bashrc has one: that file is the user's
+# to edit, and editing theirs away must not put `starship init` in non-interactive
+# shells. Layered guards are already this file's habit -- see $TERM below.
 
 [[ $- != *i* ]] && return
 

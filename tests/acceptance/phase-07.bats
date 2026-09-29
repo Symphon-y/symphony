@@ -24,14 +24,41 @@ setup() {
 
 # --- shell ------------------------------------------------------------------------
 
-@test "shell: bashrc is valid syntax and activates starship/mise/zoxide" {
+@test "shell: ~/.bashrc is the user's own file, editable without sudo (D-0095)" {
+  assert [ -f "$HOME/.bashrc" ]
+  assert [ ! -L "$HOME/.bashrc" ]
+  assert [ -w "$HOME/.bashrc" ]
   run bash -n "$HOME/.bashrc"
   assert_success
+  # The only thing asserted about its contents: everything else in here is the user's.
   run cat "$HOME/.bashrc"
+  assert_output --partial ".config/bash/symphony.bash"
+}
+
+@test "shell: symphony's shell config is linked from the payload and activates starship/mise/zoxide" {
+  assert [ -L "$HOME/.config/bash/symphony.bash" ]
+  assert_equal "$(realpath "$HOME/.config/bash/symphony.bash")" \
+    "$(realpath "$(os_root)/home/bash/dot-config/bash/symphony.bash")"
+  # --no-folding: a folded ~/.config/bash would put the user's shell config inside the
+  # root-owned payload.
+  assert [ -d "$HOME/.config/bash" ]
+  assert [ ! -L "$HOME/.config/bash" ]
+  run bash -n "$HOME/.config/bash/symphony.bash"
+  assert_success
+  run cat "$HOME/.config/bash/symphony.bash"
   assert_success
   assert_output --partial "starship init bash"
   assert_output --partial "mise activate bash"
   assert_output --partial "zoxide init bash"
+}
+
+@test "shell: an interactive shell really picks symphony's config up" {
+  # The test the split needs: greps over two files cannot catch a ~/.bashrc whose source
+  # line is gone or a ~/.config/bash that got folded. Assert the running shell (D-0094's
+  # lesson -- assert the thing, not a side effect).
+  run bash -ic 'declare -f n >/dev/null && alias ll >/dev/null && echo ok'
+  assert_success
+  assert_line "ok"
 }
 
 # --- prompt -------------------------------------------------------------------------

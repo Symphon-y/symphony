@@ -37,14 +37,24 @@ make_installed_payload() {
   mkdir -p "$dir/install" "$dir/scripts" "$dir/packages" "$dir/migrations" "$dir/home" "$dir/system"
   echo "$version" >"$dir/VERSION"
   local tool
-  for tool in install/sync-system install/link-home install/enable-user-services install/enable-root-services install/install-packages scripts/migrate scripts/hwpkglist home/hardware/dot-local/bin/symphony-hardware; do
+  for tool in install/sync-system install/link-home install/enable-user-services install/enable-root-services install/install-packages install/reload-desktop scripts/migrate scripts/hwpkglist home/hardware/dot-local/bin/symphony-hardware; do
     # shellcheck disable=SC2016 # stub body expands when the stub runs
     mkdir -p "$dir/$(dirname "$tool")"
     # shellcheck disable=SC2016 # stub body expands when the stub runs
-    printf '#!/usr/bin/env bash\nd=$(dirname "$0"); while [[ ! -e $d/VERSION ]]; do d=$(dirname "$d"); done\necho "%s${*:+ $*} from $(cat "$d/VERSION")" >>"$STUB_LOG"\n' "${tool##*/}" >"$dir/$tool"
+    printf '#!/usr/bin/env bash\nd=$(dirname "$0"); while [[ ! -e $d/VERSION ]]; do d=$(dirname "$d"); done\necho "%s${*:+ $*} from $(cat "$d/VERSION")" >>"$STUB_LOG"\n[[ $0 == *reload-desktop && -n ${STUB_RELOAD_FAIL:-} ]] && exit 1\nexit 0\n' "${tool##*/}" >"$dir/$tool"
     chmod +x "$dir/$tool"
   done
   echo "old-package" >"$dir/packages/base.txt"
+  payload_theme_files "$dir"
+}
+
+# What the palette is rendered from, and where the pointer's path is defined: both live
+# in the payload, so symphony-update reads them from there and the fakes carry them too.
+payload_theme_files() {
+  local dir=$1
+  mkdir -p "$dir/home/matugen/dot-config/matugen/templates" "$dir/scripts/lib"
+  echo "# mako template" >"$dir/home/matugen/dot-config/matugen/templates/mako.ini"
+  cp "$REPO_ROOT/scripts/lib/wallpaper.bash" "$dir/scripts/lib/wallpaper.bash"
 }
 
 # A release: a throwaway repo whose payload dirs carry the same logging stubs, packed
@@ -55,16 +65,17 @@ make_release() {
   local repo="$BATS_TEST_TMPDIR/repo-$tag"
   mkdir -p "$repo/install" "$repo/scripts" "$repo/packages" "$repo/migrations" "$repo/home" "$repo/system"
   local tool
-  for tool in install/sync-system install/link-home install/enable-user-services install/enable-root-services install/install-packages scripts/migrate scripts/hwpkglist home/hardware/dot-local/bin/symphony-hardware; do
+  for tool in install/sync-system install/link-home install/enable-user-services install/enable-root-services install/install-packages install/reload-desktop scripts/migrate scripts/hwpkglist home/hardware/dot-local/bin/symphony-hardware; do
     # shellcheck disable=SC2016 # stub body expands when the stub runs
     mkdir -p "$repo/$(dirname "$tool")"
     # The release's stubs must find VERSION wherever the payload lands (current/ after
     # the swap, or previous/ after a rollback): walk up from $0 to the dir holding it.
     # shellcheck disable=SC2016 # stub body expands when the stub runs
-    printf '#!/usr/bin/env bash\nd=$(dirname "$0"); while [[ ! -e $d/VERSION ]]; do d=$(dirname "$d"); done\necho "%s${*:+ $*} from $(cat "$d/VERSION")" >>"$STUB_LOG"\n' "${tool##*/}" >"$repo/$tool"
+    printf '#!/usr/bin/env bash\nd=$(dirname "$0"); while [[ ! -e $d/VERSION ]]; do d=$(dirname "$d"); done\necho "%s${*:+ $*} from $(cat "$d/VERSION")" >>"$STUB_LOG"\n[[ $0 == *reload-desktop && -n ${STUB_RELOAD_FAIL:-} ]] && exit 1\nexit 0\n' "${tool##*/}" >"$repo/$tool"
     chmod +x "$repo/$tool"
   done
   echo "$package" >"$repo/packages/base.txt"
+  payload_theme_files "$repo"
   echo "echo migrated" >"$repo/migrations/1-new.sh"
   echo 'readonly PAYLOAD_CONTENT=(home install migrations packages scripts system)' >"$repo/install/configure-base-system"
   git -C "$repo" init -q -b main
@@ -147,6 +158,7 @@ fi
 exit 0
 EOF
   printf '#!/usr/bin/env bash\necho "notify-send $*" >>"$STUB_LOG"\n' >"$bin/notify-send"
+  printf '#!/usr/bin/env bash\necho "matugen $*" >>"$STUB_LOG"\n' >"$bin/matugen"
   chmod +x "$bin"/*
   PATH="$bin:$PATH"
 }
@@ -370,59 +382,61 @@ installed_version() {
   assert [ "$chown" -lt "$sync" ]
 }
 
-# --- reloading Hyprland after the swap (#8) -----------------------------------------
+# --- reloading the desktop after the swap (#8, #25) ---------------------------------
+#
+# The work itself lives in the payload's install/reload-desktop and is tested there. What
+# matters here is that the updater hands off to it, from the payload that just landed and
+# after everything else -- and that a desktop which could not be reloaded never turns a
+# successful update into a failed one.
 
-@test "apply: reloads Hyprland at the end, so the swap's config-error overlay clears" {
-  export HYPRLAND_INSTANCE_SIGNATURE=abc123
+@test "apply: hands the desktop to the payload's own applier, naming the payload it replaced" {
   run "$SCRIPT" apply --yes
   assert_success
   run calls
-  assert_line "hyprctl reload"
+  assert_line "reload-desktop --since $SYMPHONY_PAYLOAD_ROOT/previous from 2026.09.22"
 }
 
 @test "apply: the reload comes after the appliers and the migrations, never before" {
-  export HYPRLAND_INSTANCE_SIGNATURE=abc123
   run "$SCRIPT" apply --yes
   assert_success
   local migrate reload
   migrate=$(grep -n '^migrate apply' "$STUB_LOG" | cut -d: -f1 | head -1)
-  reload=$(grep -n '^hyprctl reload' "$STUB_LOG" | cut -d: -f1 | head -1)
+  reload=$(grep -n '^reload-desktop' "$STUB_LOG" | cut -d: -f1 | head -1)
   assert [ -n "$migrate" ]
   assert [ "$migrate" -lt "$reload" ]
 }
 
-@test "apply: a session detected only by hyprctl, with no env var, still reloads" {
-  unset HYPRLAND_INSTANCE_SIGNATURE
+@test "apply: reloads the system manager too, so a changed unit file is re-read" {
+  # Not the applier's job and not session-gated: a changed unit file matters on a TTY as
+  # much as on a desktop, and this is the one reload that needs root.
   run "$SCRIPT" apply --yes
   assert_success
   run calls
-  assert_line "hyprctl reload"
+  assert_line "enable-root-services reload from 2026.09.22"
 }
 
-@test "apply: no session (a TTY or over SSH) means no reload, and no failure" {
-  unset HYPRLAND_INSTANCE_SIGNATURE
-  STUB_HYPRCTL_NO_SESSION=1 run "$SCRIPT" apply --yes
-  assert_success
-  run calls
-  refute_output --partial "hyprctl reload"
+@test "apply: the reload is a payload applier, not logic in the updater (#25)" {
+  # The reason it moved: the updater runs from the copy installed *before* the swap, so a
+  # change to this behaviour in here would only take effect one deploy later -- which is
+  # how the first version of this fix appeared not to work at all.
+  run grep -nE 'hyprctl|matugen|try-restart' "$SCRIPT"
+  assert_failure
 }
 
-@test "apply: a failed reload is reported, but the update already succeeded and stands" {
-  export HYPRLAND_INSTANCE_SIGNATURE=abc123
-  STUB_HYPRCTL_RELOAD_FAIL=1 run "$SCRIPT" apply --yes
+@test "apply: a desktop that will not reload is reported, and the update still stands" {
+  STUB_RELOAD_FAIL=1 run "$SCRIPT" apply --yes
   assert_success
   assert_output --partial "reload"
   assert_equal "$(installed_version)" "2026.09.22"
 }
 
-@test "rollback: reloads too -- it swaps the payload the same way" {
-  export HYPRLAND_INSTANCE_SIGNATURE=abc123
+@test "rollback: reloads the desktop too -- it swaps the payload the same way" {
   "$SCRIPT" apply --yes >/dev/null
   : >"$STUB_LOG"
   run "$SCRIPT" rollback
   assert_success
   run calls
-  assert_line "hyprctl reload"
+  assert_output --partial "reload-desktop"
 }
 
 # --- apply --from DIR: the dev seat ------------------------------------------------
@@ -480,4 +494,42 @@ installed_version() {
   run "$SCRIPT" rollback
   assert_failure
   assert_output --partial "previous"
+}
+
+@test "rollback: refuses when the old payload stows its own ~/.bashrc and yours is a real file" {
+  # D-0095 inverted ~/.bashrc's ownership. Rolling back past that runs the *old* payload's
+  # link-home, whose bash package still contains dot-bashrc -- and stow refuses to stow
+  # over a real file, aborting its entire combined call (every package, not just bash).
+  # Nothing is damaged, because stow plans before it acts, but the rollback stops in a
+  # wall of conflict output. Refuse first instead, like the pacman-lock check.
+  echo "2026.09.01" >"$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
+  "$SCRIPT" apply >/dev/null
+  : >"$STUB_LOG"
+  mkdir -p "$SYMPHONY_PAYLOAD_ROOT/previous/home/bash"
+  : >"$SYMPHONY_PAYLOAD_ROOT/previous/home/bash/dot-bashrc"
+  export HOME="$BATS_TEST_TMPDIR/home"
+  mkdir -p "$HOME"
+  echo "# mine" >"$HOME/.bashrc"
+
+  run "$SCRIPT" rollback
+  assert_failure
+  assert_output --partial "stows its own ~/.bashrc"
+  assert_output --partial "mv ~/.bashrc"
+  # Before the snapshot and before the swap: nothing may have happened yet.
+  run calls
+  refute_output --partial "snapper"
+  assert_equal "$(installed_version)" "2026.09.22"
+}
+
+@test "rollback: proceeds when the old payload has no ~/.bashrc of its own" {
+  echo "2026.09.01" >"$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
+  "$SCRIPT" apply >/dev/null
+  : >"$STUB_LOG"
+  export HOME="$BATS_TEST_TMPDIR/home"
+  mkdir -p "$HOME"
+  echo "# mine" >"$HOME/.bashrc"
+
+  run "$SCRIPT" rollback
+  assert_success
+  assert_equal "$(installed_version)" "2026.09.01"
 }

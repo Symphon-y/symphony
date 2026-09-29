@@ -2684,7 +2684,12 @@ and `wallpaper-set` drives the config file instead.)_
   - **A reload clears every bind and all Lua state but does *not* leave the current submap**, so
     `hl.on("config.reloaded")` dispatches `submap("reset")`. Without it a reload while a group
     was open leaves a keyboard that answers to almost nothing. (When a config error leaves zero
-    binds, Hyprland installs its own emergency `SUPER+Q` and `SUPER+M`.)
+    binds, Hyprland installs its own emergency `SUPER+Q` and `SUPER+M`.) The handler asks
+    `hl.get_current_submap()` first and only acts when something is open -- which is also what
+    keeps `Hyprland --verify-config` alive: **verification fires `config.reloaded` with no
+    compositor behind it**, and dispatching a submap from there segfaults the validator. Not
+    catchable, since the crash is at C level long after the registration's `pcall` returned;
+    the getter is safe there and answers an empty string.
   - **No unbounded blocking syscall from inside a Lua callback.** The watchdog is an
     instruction-count hook: it protects against a runaway Lua loop, not against C-level
     blocking. `open(2)` on a FIFO for writing blocks until a reader exists, which can hard
@@ -2767,3 +2772,117 @@ and `wallpaper-set` drives the config file instead.)_
   been filtered. Rendering the list is what showed groups sorting to the *end* of it — the
   category was being taken from the first row, which is `Escape` in any group whose keys sort
   after it — a bug no test had asked about because nobody had looked at the output.
+
+## D-0094 — A deploy makes the running desktop match the payload
+
+- **Status:** Accepted (2026-09-27, #25)
+- **Decision:** A deploy reloads the whole desktop, not just the compositor, and it does so
+  from **`install/reload-desktop` in the payload** rather than from a function in
+  `symphony-update`. The applier reloads Hyprland (D-0079's #8 behaviour, unchanged),
+  re-renders the palette when the payload's matugen templates changed, and runs
+  `install/enable-user-services restart`; the updater calls it with `--since "$PREVIOUS"`
+  and adds `sudo install/enable-root-services reload`, the one part needing root. The
+  restart is `systemctl --user daemon-reload` followed by `try-restart` of **every** unit in
+  `system/services-user.txt`; the root side is a `daemon-reload` and nothing more. Every step
+  is session-gated and never fatal.
+- **Alternatives considered:** keep the reload in `symphony-update`, which is where it was
+  written first — the updater runs from the copy of itself installed *before* the swap, so
+  the fix deployed cleanly and then did nothing, and only the *next* deploy would have
+  restarted anything. Any future improvement to the reload would have the same lag, looking
+  broken each time. An applier runs from the payload that just landed. Restart only the units
+  whose config actually changed — quieter,
+  but it needs a mapping from each unit to the payload paths it reads, which is knowledge that
+  rots silently and would have to be right for a bug whose whole nature is silence. Restart
+  only waybar and mako, the two named in the issue — leaves the same trap set for the next
+  service whose shipped config changes. `restart` rather than `try-restart` — starts units a
+  deploy never asked to start, including on a machine with no session. Also restart the root
+  units — the declared ones are three timers, which re-read their definition when they next
+  start, plus `power-profiles-daemon`, which gains nothing from being bounced. Tell the user
+  to log out after a deploy — a runbook step is what #8 replaced.
+- **Reasoning:** `enable --now` is a no-op on a unit that is already enabled and running, so
+  every applier ran, every file was correct, and the screen kept the old configuration. Phase
+  20's update badge shipped that way and never appeared; the bar had been running since two
+  days before the deploy that installed its config. Phase 21 paid for it twice more — `SUPER+v`
+  reported as "isn't doing anything" was a correct binding with no indicator, because waybar
+  was still running the config from before the deploy. Two further gaps turned up while fixing
+  it: **nothing in the repo ran `systemctl daemon-reload`**, so a payload that changed a unit
+  file left systemd running the definition it parsed at boot; and **every generated config is
+  matugen output** — mako, waybar's colours, ghostty, fuzzel, the GTK sheets, `theme.env` — so
+  a release that changed a template changed nothing on screen, matugen running only on a
+  wallpaper change. Phase 20's badge appeared at all only because an unrelated migration
+  happened to call `wallpaper-set`. The restart is unconditional because the alternative is a
+  mapping that has to be maintained correctly to prevent a class of bug defined by nobody
+  noticing; the re-render is the one conditional step, because it is the one with a real cost.
+- **Consequences:** a deploy now costs a brief bar reset and about 200 ms of black while
+  hyprpaper restarts (D-0085) — paid on a deliberate, infrequent act that already takes minutes
+  installing packages. `system/services-user.txt` gains a second job: it is no longer only what
+  to enable, it is what a deploy restarts, so a unit added there is covered without anyone
+  remembering to. The matugen call has one home, `palette_render()` in
+  `scripts/lib/wallpaper.bash`, shared by `wallpaper-set` and the deploy — its
+  `--source-color-index 0` (which stops matugen prompting for a source colour with no TTY) can
+  no longer be forgotten in one copy. An acceptance test asserts the running bar is newer than
+  the payload it reads, which is the exact thing that was false when this was filed and which
+  no file-contents test could have caught. The general rule this leaves: **anything a deploy
+  must do belongs in the payload, not in the updater** — the updater can only orchestrate with
+  the code it was started with.
+
+## D-0095 — `~/.bashrc` is the user's file; symphony's shell config is what it sources (amends D-0043)
+
+- **Status:** Accepted (2026-09-29, #31)
+- **Decision:** Ownership of the shell config is inverted. `~/.bashrc` is a **real file the
+  user owns**, seeded once from `install/seed/bashrc` by `seed_shell()` in
+  `install/link-home` and never written again; it guards for an interactive shell and sources
+  `~/.config/bash/symphony.bash`. That second file is symphony's — the old
+  `home/bash/dot-bashrc`, moved to `home/bash/dot-config/bash/symphony.bash` — and it stays a
+  stow link into the root-owned payload that every deploy replaces. Anything the user adds
+  after the source line wins, because it runs last. A migration replaces the old link on
+  machines installed earlier, and `symphony-update rollback` refuses, before its snapshot and
+  swap, to roll back to a payload that still stows its own `~/.bashrc`.
+- **Alternatives considered:** a `~/.bashrc.local` drop-in sourced *from* the payload's file,
+  which was the first idea and the wrong way round — it leaves the file people actually expect
+  to edit unwritable, which is the entire complaint. `/etc/bash.bashrc` as the hook: invisible
+  to anyone reading `~/.bashrc`, applies to root's shells too, and pacman owns that file, so
+  symphony would be fighting `.pacnew`. Sourcing the payload path from `~/.bashrc` directly,
+  with no link: bakes `/usr/local/share/symphony/current/...` into a file the payload can no
+  longer migrate. `stow --adopt` to resolve the rollback conflict: it *moves* the user's file
+  into the root-owned payload, which is strictly worse than failing. Leaving it alone and
+  telling the user to edit the repo and deploy: that is the previous state, and the reason
+  this exists.
+- **Reasoning:** editing your own `.bashrc` is the most ordinary thing a person does on a
+  Linux box, and symphony forbade it. `~/.bashrc` was a stow link into a `root:root` payload,
+  so an edit needed `sudo`; an edit made *with* `sudo` landed inside the payload, and
+  `swap_in` restages `current/` wholesale, so the next deploy discarded it with no error and
+  no trace in either generation. The repo already had the answer and had never applied it to
+  the shell: D-0090 seeds `~/.config/symphony/keymap.lua` once and lays it over shipped
+  defaults, D-0048 splits `~/.gitconfig.local` out of a tracked `~/.gitconfig`. D-0043 chose
+  bash in Phase 7 and said nothing about a user surface — a gap, not a decision. Inverting
+  rather than adding a drop-in is what puts the conventional filename back in the user's
+  hands; the include is symphony's half, which is the half that should be replaceable by a
+  deploy.
+- **Consequences:** three of them cost real thought. **The seed guard is
+  `[[ -e $target || -L $target ]]`, not `[[ -e … ]]`** — after the payload swap the old
+  `~/.bashrc` is a *dangling* link, so `-e` is false, and `cp` follows a symlink: it would try
+  to write inside the root-owned payload, fail with `EACCES`, and take `install/link-home` down
+  under `set -e` mid-deploy, before services, hardware, migrations and the desktop reload. A
+  unit test asserts the link survives *and* that nothing was written through it. **Rollback
+  across this boundary is a hard failure** — the older payload's `link-home` is the one that
+  runs, its `bash` package still contains `dot-bashrc`, and stow refuses to stow over a real
+  file, aborting its entire combined call. Nothing is damaged, because stow plans before it
+  acts, but the rollback stops; so `rollback()` refuses early and names the one command that
+  unblocks it (`mv ~/.bashrc ~/.bashrc.mine`), beside the existing pacman-lock preflight. This
+  sits next to the note that migrations are not undone: a rollback past a structural change is
+  not free. **`~/.bashrc` is the first seeded file whose loss silently disables something
+  visible** rather than reverting to a default — `link-home check` is structurally blind to it,
+  because its contract is "every file under `home/` is linked" and this file is no longer
+  under `home/`. The acceptance test carries that invariant instead, and asserts it by running
+  `bash -ic` rather than grepping a file, because neither a missing source line nor a folded
+  `~/.config/bash` shows up in a file's contents. Recovery is one line:
+  `rm ~/.bashrc && /usr/local/share/symphony/current/install/link-home apply`. Smaller
+  consequences: the template lives at `install/seed/bashrc` because `link-home check` demands a
+  symlink in `$HOME` for every file under `home/`, so a template cannot live there; the
+  migration spells its text out in a heredoc instead of reading the payload's template,
+  because a migration records what was true when it ran, with a test pinning the two lines
+  both must share; skel's `.bashrc` is still deleted on a fresh install, now to let the seed
+  land rather than to stop stow aborting; and `scripts/check`'s seed exclusion narrowed from
+  "everything under `install/seed`" to "everything but `*.lua`", so a shell template gets
+  shellcheck instead of falling through both checkers.

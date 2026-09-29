@@ -19,6 +19,7 @@ local timer = nil
 local timers_created = 0
 local current_submap = nil
 local in_timer = false
+local open_submap = ""
 
 local function record(line)
   log[#log + 1] = line
@@ -142,6 +143,16 @@ hl = {
   dispatch = function(dispatcher)
     local ignored = in_timer and type(dispatcher) == "table" and dispatcher.kind == "submap"
     record(describe(dispatcher) .. (ignored and " (ignored: dispatched from a timer)" or ""))
+    if not ignored and type(dispatcher) == "table" and dispatcher.kind == "submap" then
+      open_submap = dispatcher.name ~= "reset" and dispatcher.name or ""
+    end
+  end,
+
+  -- What the compositor would answer. Safe to call when nothing is open, and in
+  -- `--verify-config` it answers an empty string -- which is what the reload guard relies
+  -- on, since dispatching a submap there segfaults.
+  get_current_submap = function()
+    return open_submap
   end,
 
   timer = function(callback, opts)
@@ -284,6 +295,10 @@ function stub.reload()
       subscription.callback()
     end
   end
+end
+
+function stub.open_submap()
+  return open_submap
 end
 
 function stub.notifications()

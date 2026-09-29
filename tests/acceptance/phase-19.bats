@@ -66,12 +66,15 @@ setup() {
   assert [ -e "$REPO_ROOT/home/hardware/dot-config/systemd/user/alienfx-theme.service" ]
 }
 
-@test "alienfx: the theme colour has one home, written by the matugen render, read by alienfx-theme and wallpaper-set calls it" {
+@test "alienfx: the theme colour has one home, and a wallpaper change asks for a repaint" {
   run grep -F 'theme.env' "$REPO_ROOT/home/matugen/dot-config/matugen/config.toml"
   assert_success
   run grep -F 'theme.env' "$HW/alienfx-theme"
   assert_success
-  run grep -F 'alienfx-theme' "$REPO_ROOT/home/hyprpaper/dot-local/bin/wallpaper-set"
+  # Through lighting_repaint, not by running the painter: two painters at once wedge the
+  # USB controller, so the unit owns it (Phase 21, D-0088). phase-21 forbids the direct
+  # call; this asserts the repaint is still asked for at all.
+  run grep -F 'lighting_repaint' "$REPO_ROOT/home/hyprpaper/dot-local/bin/wallpaper-set"
   assert_success
 }
 
