@@ -156,6 +156,54 @@ seed_default() {
   assert_output "PRIMARY=#abcdef"
 }
 
+# --- seeding ~/.bashrc (D-0095, #31) ------------------------------------------------
+
+@test "apply seeds ~/.bashrc as a real file the user can edit" {
+  seed_default
+  run "$SCRIPT" apply
+  assert_success
+  assert [ -f "$HOME/.bashrc" ]
+  assert [ ! -L "$HOME/.bashrc" ]
+  run cat "$HOME/.bashrc"
+  assert_output --partial ".config/bash/symphony.bash"
+}
+
+@test "a ~/.bashrc the user has written is never overwritten" {
+  seed_default
+  echo "# mine" >"$HOME/.bashrc"
+  run "$SCRIPT" apply
+  assert_success
+  run cat "$HOME/.bashrc"
+  assert_output "# mine"
+}
+
+@test "a dangling ~/.bashrc link is left for the migration, and never written through" {
+  # What every machine installed before D-0095 looks like mid-deploy: the payload swap
+  # removed home/bash/dot-bashrc, so the stow link dangles. `-e` is false on a dangling
+  # link, so a seed guarded only by `[[ -e ]]` would `cp` *through* it -- on a real
+  # machine that writes inside the root-owned payload (EACCES, killing the whole applier
+  # under set -e); here, where the fixture repo is the user's, it would silently
+  # resurrect the file in the tree. Clearing the link is a migration's job, not an
+  # applier's.
+  seed_default
+  mkdir -p "$REPO_COPY/home/bash/dot-config/bash"
+  echo "# fixture" >"$REPO_COPY/home/bash/dot-config/bash/symphony.bash"
+  ln -s "$REPO_COPY/home/bash/dot-bashrc" "$HOME/.bashrc"
+
+  run "$SCRIPT" apply
+  assert_success
+  assert [ -L "$HOME/.bashrc" ]
+  assert [ ! -e "$REPO_COPY/home/bash/dot-bashrc" ]
+}
+
+@test "apply succeeds when the bashrc seed is missing from the payload" {
+  seed_default
+  rm "$REPO_COPY/install/seed/bashrc"
+  run "$SCRIPT" apply
+  assert_success
+  assert [ ! -e "$HOME/.bashrc" ]
+}
+
 @test "fails with usage when no command is given" {
   run "$SCRIPT"
   assert_failure 2

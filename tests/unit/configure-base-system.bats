@@ -476,7 +476,7 @@ calls() {
   assert [ -e "$payload/install/link-home" ]
   assert [ -e "$payload/home/update/dot-local/bin/symphony-update" ]
   assert [ -e "$payload/system/files.txt" ]
-  assert [ -e "$payload/home/bash/dot-bashrc" ]
+  assert [ -e "$payload/home/bash/dot-config/bash/symphony.bash" ]
   assert [ -e "$payload/packages/desktop.txt" ]
   assert [ -d "$payload/migrations" ]
   assert [ ! -e "$payload/.git" ]
@@ -550,13 +550,14 @@ calls() {
   assert [ "$xdg_line" -lt "$link_line" ]
 }
 
-@test "removes only the skel .bashrc before link-home apply, so stow doesn't abort on it (Phase 16)" {
+@test "removes only the skel .bashrc before link-home apply, so symphony's seed is what lands (D-0095)" {
   # useradd -m populates a fresh account from /etc/skel, which ships
-  # .bash_logout/.bash_profile/.bashrc. Only .bashrc collides with a stow
-  # package (home/bash/dot-bashrc), and GNU stow aborts its entire combined
-  # call (every package, not just bash) on a single conflict -- which, under
-  # set -Eeuo pipefail, killed the whole script before it reached
-  # enable_services() (a real hardware install that booted to a bare TTY).
+  # .bash_logout/.bash_profile/.bashrc. Nothing stows over .bashrc any more --
+  # it is the user's own file now, seeded once by link-home -- but a file that
+  # already exists is exactly what that seeding refuses to overwrite. Left in
+  # place, skel's copy would give every new account a .bashrc that never sources
+  # ~/.config/bash/symphony.bash: no prompt, no mise, no aliases, and no error
+  # anywhere, because link-home apply and link-home check both still pass.
   # .bash_profile is what makes login shells (SSH, TTY) source .bashrc at
   # all; nothing in home/ replaces it, so it must survive.
   touch "$TARGET/home/alice/.bash_logout" \
