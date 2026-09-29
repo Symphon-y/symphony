@@ -2825,3 +2825,64 @@ and `wallpaper-set` drives the config file instead.)_
   no file-contents test could have caught. The general rule this leaves: **anything a deploy
   must do belongs in the payload, not in the updater** — the updater can only orchestrate with
   the code it was started with.
+
+## D-0095 — `~/.bashrc` is the user's file; symphony's shell config is what it sources (amends D-0043)
+
+- **Status:** Accepted (2026-09-29, #31)
+- **Decision:** Ownership of the shell config is inverted. `~/.bashrc` is a **real file the
+  user owns**, seeded once from `install/seed/bashrc` by `seed_shell()` in
+  `install/link-home` and never written again; it guards for an interactive shell and sources
+  `~/.config/bash/symphony.bash`. That second file is symphony's — the old
+  `home/bash/dot-bashrc`, moved to `home/bash/dot-config/bash/symphony.bash` — and it stays a
+  stow link into the root-owned payload that every deploy replaces. Anything the user adds
+  after the source line wins, because it runs last. A migration replaces the old link on
+  machines installed earlier, and `symphony-update rollback` refuses, before its snapshot and
+  swap, to roll back to a payload that still stows its own `~/.bashrc`.
+- **Alternatives considered:** a `~/.bashrc.local` drop-in sourced *from* the payload's file,
+  which was the first idea and the wrong way round — it leaves the file people actually expect
+  to edit unwritable, which is the entire complaint. `/etc/bash.bashrc` as the hook: invisible
+  to anyone reading `~/.bashrc`, applies to root's shells too, and pacman owns that file, so
+  symphony would be fighting `.pacnew`. Sourcing the payload path from `~/.bashrc` directly,
+  with no link: bakes `/usr/local/share/symphony/current/...` into a file the payload can no
+  longer migrate. `stow --adopt` to resolve the rollback conflict: it *moves* the user's file
+  into the root-owned payload, which is strictly worse than failing. Leaving it alone and
+  telling the user to edit the repo and deploy: that is the previous state, and the reason
+  this exists.
+- **Reasoning:** editing your own `.bashrc` is the most ordinary thing a person does on a
+  Linux box, and symphony forbade it. `~/.bashrc` was a stow link into a `root:root` payload,
+  so an edit needed `sudo`; an edit made *with* `sudo` landed inside the payload, and
+  `swap_in` restages `current/` wholesale, so the next deploy discarded it with no error and
+  no trace in either generation. The repo already had the answer and had never applied it to
+  the shell: D-0090 seeds `~/.config/symphony/keymap.lua` once and lays it over shipped
+  defaults, D-0048 splits `~/.gitconfig.local` out of a tracked `~/.gitconfig`. D-0043 chose
+  bash in Phase 7 and said nothing about a user surface — a gap, not a decision. Inverting
+  rather than adding a drop-in is what puts the conventional filename back in the user's
+  hands; the include is symphony's half, which is the half that should be replaceable by a
+  deploy.
+- **Consequences:** three of them cost real thought. **The seed guard is
+  `[[ -e $target || -L $target ]]`, not `[[ -e … ]]`** — after the payload swap the old
+  `~/.bashrc` is a *dangling* link, so `-e` is false, and `cp` follows a symlink: it would try
+  to write inside the root-owned payload, fail with `EACCES`, and take `install/link-home` down
+  under `set -e` mid-deploy, before services, hardware, migrations and the desktop reload. A
+  unit test asserts the link survives *and* that nothing was written through it. **Rollback
+  across this boundary is a hard failure** — the older payload's `link-home` is the one that
+  runs, its `bash` package still contains `dot-bashrc`, and stow refuses to stow over a real
+  file, aborting its entire combined call. Nothing is damaged, because stow plans before it
+  acts, but the rollback stops; so `rollback()` refuses early and names the one command that
+  unblocks it (`mv ~/.bashrc ~/.bashrc.mine`), beside the existing pacman-lock preflight. This
+  sits next to the note that migrations are not undone: a rollback past a structural change is
+  not free. **`~/.bashrc` is the first seeded file whose loss silently disables something
+  visible** rather than reverting to a default — `link-home check` is structurally blind to it,
+  because its contract is "every file under `home/` is linked" and this file is no longer
+  under `home/`. The acceptance test carries that invariant instead, and asserts it by running
+  `bash -ic` rather than grepping a file, because neither a missing source line nor a folded
+  `~/.config/bash` shows up in a file's contents. Recovery is one line:
+  `rm ~/.bashrc && /usr/local/share/symphony/current/install/link-home apply`. Smaller
+  consequences: the template lives at `install/seed/bashrc` because `link-home check` demands a
+  symlink in `$HOME` for every file under `home/`, so a template cannot live there; the
+  migration spells its text out in a heredoc instead of reading the payload's template,
+  because a migration records what was true when it ran, with a test pinning the two lines
+  both must share; skel's `.bashrc` is still deleted on a fresh install, now to let the seed
+  land rather than to stop stow aborting; and `scripts/check`'s seed exclusion narrowed from
+  "everything under `install/seed`" to "everything but `*.lua`", so a shell template gets
+  shellcheck instead of falling through both checkers.
