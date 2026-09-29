@@ -495,3 +495,41 @@ installed_version() {
   assert_failure
   assert_output --partial "previous"
 }
+
+@test "rollback: refuses when the old payload stows its own ~/.bashrc and yours is a real file" {
+  # D-0095 inverted ~/.bashrc's ownership. Rolling back past that runs the *old* payload's
+  # link-home, whose bash package still contains dot-bashrc -- and stow refuses to stow
+  # over a real file, aborting its entire combined call (every package, not just bash).
+  # Nothing is damaged, because stow plans before it acts, but the rollback stops in a
+  # wall of conflict output. Refuse first instead, like the pacman-lock check.
+  echo "2026.09.01" >"$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
+  "$SCRIPT" apply >/dev/null
+  : >"$STUB_LOG"
+  mkdir -p "$SYMPHONY_PAYLOAD_ROOT/previous/home/bash"
+  : >"$SYMPHONY_PAYLOAD_ROOT/previous/home/bash/dot-bashrc"
+  export HOME="$BATS_TEST_TMPDIR/home"
+  mkdir -p "$HOME"
+  echo "# mine" >"$HOME/.bashrc"
+
+  run "$SCRIPT" rollback
+  assert_failure
+  assert_output --partial "stows its own ~/.bashrc"
+  assert_output --partial "mv ~/.bashrc"
+  # Before the snapshot and before the swap: nothing may have happened yet.
+  run calls
+  refute_output --partial "snapper"
+  assert_equal "$(installed_version)" "2026.09.22"
+}
+
+@test "rollback: proceeds when the old payload has no ~/.bashrc of its own" {
+  echo "2026.09.01" >"$SYMPHONY_PAYLOAD_ROOT/current/VERSION"
+  "$SCRIPT" apply >/dev/null
+  : >"$STUB_LOG"
+  export HOME="$BATS_TEST_TMPDIR/home"
+  mkdir -p "$HOME"
+  echo "# mine" >"$HOME/.bashrc"
+
+  run "$SCRIPT" rollback
+  assert_success
+  assert_equal "$(installed_version)" "2026.09.01"
+}

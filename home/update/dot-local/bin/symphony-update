@@ -308,6 +308,17 @@ rollback() {
   previous=$(tr -d '[:space:]' <"$PREVIOUS/VERSION")
   [[ ! -e $PACMAN_LOCK ]] || die "a pacman transaction is running ($PACMAN_LOCK exists) -- try again when it is done"
 
+  # A payload from before D-0095 stows its own ~/.bashrc, and ~/.bashrc is the user's own
+  # real file now. stow refuses to stow over one and aborts its entire combined call
+  # (every package, not just bash), so that payload's link-home would fail halfway through
+  # apply_payload below. Nothing would be damaged -- stow plans before it acts -- but the
+  # rollback stops in a wall of conflict output. Refuse here instead, before the snapshot
+  # and before the swap, where the fix is still one command.
+  if [[ -e $PREVIOUS/home/bash/dot-bashrc && -f $HOME/.bashrc && ! -L $HOME/.bashrc ]]; then
+    die "$previous stows its own ~/.bashrc, and yours is a real file now (D-0095) -- stow would abort the whole call.
+  Move it aside first:  mv ~/.bashrc ~/.bashrc.mine"
+  fi
+
   echo "symphony-update: rolling back $current -> $previous"
   snapshot "pre-rollback: $current -> $previous"
   local staging="$PAYLOAD_ROOT/staging.$$"
